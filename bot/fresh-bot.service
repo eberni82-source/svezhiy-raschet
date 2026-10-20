@@ -1,0 +1,17 @@
+# Автозапуск на сервере Linux (systemd).
+# 1) Скопируйте папку бота в /opt/fresh-bot
+# 2) sudo cp fresh-bot.service /etc/systemd/system/
+# 3) sudo systemctl enable --now fresh-bot
+# Логи: journalctl -u fresh-bot -f
+[Unit]
+Description=Svezhiy raschet Telegram bot
+After=network-online.target
+
+[Service]
+WorkingDirectory=/opt/fresh-bot
+ExecStart=/usr/bin/python3 /opt/fresh-bot/bot.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
