@@ -1,0 +1,209 @@
+<title>Кабинет «Свежий расчёт»</title>
+<meta name="description" content="Личный кабинет заведения: план на день, витрина, итоги, товары и сроки годности.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,400..700&family=Manrope:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;600;700&display=swap">
+<style>
+/* Layout: рабочий пульт заведения — лента дня сверху (план → витрина → итоги), под ней вкладки с таблицами */
+:root {
+  --bg: #FAF9F6; --surface: #FFFFFF; --ink: #211B16; --ink-2: #5E554C; --ink-3: #8A8077; --line: #E4DFD7;
+  --kraft: #E6D5B5; --kraft-2: #D9C49D; --kraft-ink: #3F311F; --paper: #FFFEFA;
+  --stamp: #2346C8; --stamp-ink: #FFFFFF; --stamp-soft: #E7ECFB;
+  --ok: #2B7A4B; --ok-soft: #E2F1E7; --warn: #9A6210; --warn-soft: #F6ECD8; --bad: #B3371F; --bad-soft: #F8E3DE;
+  --shadow: 0 1px 0 rgba(33,27,22,.06), 0 12px 28px -14px rgba(33,27,22,.28);
+  --f-display: "Literata", Georgia, "Times New Roman", serif;
+  --f-body: "Manrope", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #15120F; --surface: #1D1915; --ink: #F1EBE3; --ink-2: #B9AFA4; --ink-3: #8E847A; --line: #352E28;
+    --kraft: #2E261D; --kraft-2: #3A3025; --kraft-ink: #EBDCC0; --paper: #F4EFE4;
+    --stamp: #93A8FF; --stamp-ink: #0E1533; --stamp-soft: #222A4C;
+    --ok: #6CC08F; --ok-soft: #1C3326; --warn: #E3AB4E; --warn-soft: #3A2C14; --bad: #F2907A; --bad-soft: #3E211A;
+    --shadow: 0 1px 0 rgba(0,0,0,.3), 0 14px 30px -12px rgba(0,0,0,.7); color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #15120F; --surface: #1D1915; --ink: #F1EBE3; --ink-2: #B9AFA4; --ink-3: #8E847A; --line: #352E28;
+  --kraft: #2E261D; --kraft-2: #3A3025; --kraft-ink: #EBDCC0; --paper: #F4EFE4;
+  --stamp: #93A8FF; --stamp-ink: #0E1533; --stamp-soft: #222A4C;
+  --ok: #6CC08F; --ok-soft: #1C3326; --warn: #E3AB4E; --warn-soft: #3A2C14; --bad: #F2907A; --bad-soft: #3E211A;
+  --shadow: 0 1px 0 rgba(0,0,0,.3), 0 14px 30px -12px rgba(0,0,0,.7); color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font: 400 15px/1.5 var(--f-body); margin: 0; -webkit-font-smoothing: antialiased; }
+h1, h2, h3 { margin: 0; text-wrap: balance; }
+p { margin: 0; }
+a { color: inherit; }
+:focus-visible { outline: 2px solid var(--stamp); outline-offset: 2px; border-radius: 6px; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+.wrap { max-width: 1160px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.num, table, .mono { font-variant-numeric: tabular-nums; }
+.mono { font-family: var(--f-mono); }
+
+/* шапка */
+.top { background: var(--kraft); color: var(--kraft-ink); }
+.top-in { display: flex; align-items: center; gap: 12px 20px; padding-block: 14px; flex-wrap: wrap; }
+.brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: inherit; margin-right: auto; min-width: 0; }
+.brand-mark { width: 32px; height: 32px; border-radius: 50%; border: 2px solid currentColor; display: grid; place-items: center; font: 700 11px var(--f-mono); transform: rotate(-8deg); flex: none; }
+.brand-name { font: 600 18px/1.1 var(--f-display); }
+.brand small { display: block; font: 500 13px/1.2 var(--f-body); opacity: .8; }
+.clock { font: 600 14px var(--f-mono); white-space: nowrap; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 40px; padding: 0 16px; border-radius: 999px; font: 600 14px/1 var(--f-body); border: 1.5px solid transparent; cursor: pointer; text-decoration: none; background: none; color: inherit; white-space: nowrap; }
+.btn-primary { background: var(--stamp); color: var(--stamp-ink); }
+.btn-ghost { border-color: currentColor; }
+.btn-quiet { color: var(--ink-2); border-color: var(--line); background: var(--surface); }
+.btn-quiet:hover { color: var(--ink); border-color: var(--ink-3); }
+.btn-danger { color: var(--bad); border-color: var(--bad-soft); background: var(--surface); }
+.btn-sm { min-height: 32px; padding: 0 12px; font-size: 13px; }
+.btn:disabled { opacity: .5; cursor: default; }
+
+.local-note { background: var(--stamp-soft); color: var(--ink); font-size: 14px; }
+.local-note .wrap { padding-block: 10px; display: flex; gap: 8px 16px; align-items: center; flex-wrap: wrap; }
+.local-note b { font-weight: 700; }
+
+/* лента дня */
+.day { margin-top: 22px; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 16px 18px 14px; box-shadow: var(--shadow); }
+.day-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px 16px; flex-wrap: wrap; margin-bottom: 14px; }
+.day-head h1 { font: 600 clamp(22px, 3vw, 28px)/1.15 var(--f-display); }
+.day-head .upd { font-size: 13px; color: var(--ink-3); display: inline-flex; align-items: center; gap: 6px; }
+.pulse { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); animation: pulse 2s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: .3; } }
+.ribbon { position: relative; display: grid; grid-template-columns: var(--cols); gap: 4px; }
+.seg { position: relative; text-align: left; border: 0; cursor: pointer; padding: 10px 12px 9px; border-radius: 10px; background: var(--bg); color: var(--ink-2); font: 500 13px/1.25 var(--f-body); min-width: 0; }
+.seg b { display: block; font: 600 15px/1.2 var(--f-body); color: var(--ink); }
+.seg .t { font: 600 12px var(--f-mono); color: var(--ink-3); }
+.seg.past { opacity: .62; }
+.seg.now { background: var(--stamp-soft); }
+.seg.now b { color: var(--stamp); }
+.seg[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--stamp); }
+.now-tag { font: 700 10.5px/1 var(--f-mono); letter-spacing: .08em; text-transform: uppercase; background: var(--stamp); color: var(--stamp-ink); padding: 3px 6px; border-radius: 5px; margin-left: 6px; vertical-align: 1px; }
+.track { position: relative; height: 4px; background: var(--line); border-radius: 2px; margin-top: 10px; }
+.track i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--stamp); border-radius: 2px; }
+.track span { position: absolute; top: 50%; width: 12px; height: 12px; border-radius: 50%; background: var(--stamp); border: 2px solid var(--surface); transform: translate(-50%, -50%); }
+.seg { overflow: hidden; }
+.hint .mono { overflow-wrap: anywhere; }
+@media (max-width: 620px) {
+  .ribbon { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+  .seg { padding: 8px; } .seg .desc { display: none; }
+  .now-tag { display: table; margin: 3px 0 2px; }
+}
+
+/* вкладки */
+.tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line); margin: 22px 0 18px; overflow-x: auto; }
+.tabs button { border: 0; background: none; font: 600 15px/1 var(--f-body); color: var(--ink-3); padding: 12px 12px 14px; cursor: pointer; border-bottom: 2.5px solid transparent; margin-bottom: -1px; white-space: nowrap; }
+.tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--stamp); }
+.tabs .cnt { font: 600 11px var(--f-mono); background: var(--bad-soft); color: var(--bad); border-radius: 999px; padding: 2px 6px; margin-left: 4px; }
+
+.view { padding-bottom: 56px; display: grid; gap: 18px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 18px; min-width: 0; }
+.card h2 { font: 600 20px/1.25 var(--f-display); margin-bottom: 4px; }
+.card .sub { color: var(--ink-2); font-size: 14px; margin-bottom: 14px; }
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+.kpi { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; }
+.kpi b { display: block; font: 600 30px/1.05 var(--f-display); }
+.kpi span { color: var(--ink-2); font-size: 13px; }
+.kpi.warn b { color: var(--warn); }
+.kpi.bad b { color: var(--bad); }
+
+.table-wrap { overflow-x: auto; }
+table.t { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+.t th { text-align: left; font: 600 11px/1.2 var(--f-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); padding: 0 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.t td { padding: 11px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.t tr:last-child td { border-bottom: 0; }
+.t .r { text-align: right; white-space: nowrap; }
+.t .name { font-weight: 600; }
+.t .why { font-size: 13px; color: var(--ink-2); margin-top: 2px; }
+.t .big { font: 700 20px/1 var(--f-mono); }
+.t .muted { color: var(--ink-3); }
+.t tfoot td { font-weight: 700; border-top: 1px solid var(--line); border-bottom: 0; }
+.chip { display: inline-flex; align-items: center; gap: 5px; font: 600 12px/1 var(--f-body); padding: 5px 9px; border-radius: 999px; white-space: nowrap; }
+.chip.ok { background: var(--ok-soft); color: var(--ok); }
+.chip.warn { background: var(--warn-soft); color: var(--warn); }
+.chip.bad { background: var(--bad-soft); color: var(--bad); }
+.chip.new { background: var(--stamp-soft); color: var(--stamp); }
+.chip.mute { background: var(--bg); color: var(--ink-3); }
+
+input[type="text"], input[type="number"], input[type="date"], input[type="time"], select {
+  font: 500 15px/1.2 var(--f-body); color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; min-height: 40px; width: 100%; min-width: 0; }
+input.small { width: 84px; }
+.form { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); align-items: end; }
+.form label { display: grid; gap: 4px; font-size: 12.5px; color: var(--ink-3); min-width: 0; }
+.form .wide { grid-column: span 2; }
+@media (max-width: 520px) { .form .wide { grid-column: auto; } }
+.err { color: var(--bad); font-weight: 600; font-size: 14px; }
+.hint { font-size: 13px; color: var(--ink-3); }
+.acts { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.slots { display: flex; gap: 4px; flex-wrap: wrap; }
+.slot { border: 1px solid var(--line); background: var(--surface); color: var(--ink-2); font: 500 12.5px/1 var(--f-body); padding: 8px 9px; border-radius: 8px; cursor: pointer; min-height: 32px; }
+.slot:hover { border-color: var(--ink-3); color: var(--ink); }
+.left-in { display: flex; gap: 4px; align-items: center; }
+.left-in input { width: 70px; min-height: 32px; padding: 5px 8px; }
+.progress { height: 6px; background: var(--bg); border-radius: 3px; overflow: hidden; margin-top: 6px; }
+.progress i { display: block; height: 100%; background: var(--ok); }
+.removed { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.empty { padding: 26px; text-align: center; color: var(--ink-3); border: 1px dashed var(--line); border-radius: 12px; }
+.grid2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; }
+@media (max-width: 860px) { .grid2 { grid-template-columns: minmax(0, 1fr); } }
+.cmp { display: grid; grid-template-columns: 110px minmax(0, 1fr) 100px; gap: 8px; align-items: center; font-size: 14px; margin-top: 6px; }
+.cmp .bar { height: 12px; background: var(--bg); border-radius: 4px; overflow: hidden; }
+.cmp .bar i { display: block; height: 100%; border-radius: 0 4px 4px 0; }
+.cmp .v { text-align: right; font: 600 14px var(--f-mono); }
+
+/* вход */
+.login { max-width: 440px; margin: 48px auto; background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 26px; box-shadow: var(--shadow); display: grid; gap: 14px; }
+.login h1 { font: 600 26px/1.15 var(--f-display); }
+.login ol { margin: 0; padding-left: 20px; color: var(--ink-2); display: grid; gap: 6px; }
+.code-in { font: 600 26px/1 var(--f-mono) !important; letter-spacing: .3em; text-align: center; }
+
+.toast { position: fixed; left: 50%; bottom: max(20px, env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 10px; font-weight: 600; z-index: 20; box-shadow: var(--shadow); max-width: calc(100% - 32px); }
+.loading { padding: 60px 0; text-align: center; color: var(--ink-3); }
+</style>
+
+<header class="top">
+  <div class="wrap top-in">
+    <a class="brand" id="brand" href="index.html"><span class="brand-mark" aria-hidden="true">СР</span><span><span class="brand-name">Свежий расчёт</span><small id="biz">Личный кабинет</small></span></a>
+    <span class="clock" id="clock"></span>
+    <span id="top-actions"></span>
+  </div>
+</header>
+<div class="local-note" id="local-note" hidden>
+  <div class="wrap"><span><b>Пример кабинета условной пекарни.</b> Данные хранятся только в этом браузере. Чтобы работать со своими данными, подключите бота <a id="bot-link" href="https://t.me/svezhiy_raschet_bot" target="_blank" rel="noopener">@svezhiy_raschet_bot</a> и войдите по коду из команды /web.</span></div>
+</div>
+<main class="wrap">
+  <div class="loading" id="loading">Загружаю кабинет…</div>
+  <section class="login" id="login" hidden aria-labelledby="login-h">
+    <h1 id="login-h">Вход в кабинет</h1>
+    <ol>
+      <li>Откройте бота <a id="login-bot" href="https://t.me/svezhiy_raschet_bot" target="_blank" rel="noopener">@svezhiy_raschet_bot</a>.</li>
+      <li>Отправьте команду <b>/web</b> или нажмите «Личный кабинет».</li>
+      <li>Введите код из 6 цифр, он действует 10 минут.</li>
+    </ol>
+    <form id="login-form" style="display:grid;gap:10px">
+      <input class="code-in" id="code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000" aria-label="Код из бота">
+      <button class="btn btn-primary" type="submit">Войти</button>
+      <p class="err" id="login-err" hidden></p>
+    </form>
+  </section>
+  <section id="app" hidden>
+    <div class="day" id="day"></div>
+    <nav class="tabs" role="tablist" aria-label="Разделы кабинета">
+      <button role="tab" data-tab="today" aria-selected="true">Сегодня</button>
+      <button role="tab" data-tab="tomorrow" aria-selected="false">Завтра</button>
+      <button role="tab" data-tab="products" aria-selected="false">Товары</button>
+      <button role="tab" data-tab="batches" aria-selected="false">Сроки годности</button>
+      <button role="tab" data-tab="data" aria-selected="false">Данные и настройки</button>
+    </nav>
+    <div class="view" id="view"></div>
+  </section>
+</main>
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script>/*MODEL*/</script>
+<script>
+"use strict";
+var BOT_USERNAME = "svezhiy_raschet_bot";
+var DEMO_CSV = __DEMO_CSV__;
+</script>
+<script>/*KABINET*/</script>

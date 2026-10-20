@@ -107,7 +107,11 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+import secrets
+import threading
 from dataclasses import dataclass, field
+from http.cookies import SimpleCookie
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from statistics import NormalDist
@@ -132,8 +136,10 @@ def bot_body() -> str:
 
 
 parts = [HEADER]
-for name in ("forecast.py", "csv_import.py", "storage.py", "tg.py", "weather.py"):
+for name in ("forecast.py", "csv_import.py", "storage.py", "tg.py", "weather.py", "web.py"):
     parts.append(module_body(BOT / "core" / name))
+import json as _json
+parts.append("# Страница личного кабинета (встроена, чтобы бот работал одним файлом)\nKABINET_HTML = " + _json.dumps((BOT / "web" / "kabinet.html").read_text(encoding="utf-8"), ensure_ascii=False))
 parts.append(DEMO)
 parts.append(bot_body())
 out = "\n\n".join(p.strip("\n") for p in parts) + "\n"

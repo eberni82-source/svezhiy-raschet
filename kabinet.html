@@ -1,0 +1,1055 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<style>:root{padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+</head>
+<body>
+<title>Кабинет «Свежий расчёт»</title>
+<meta name="description" content="Личный кабинет заведения: план на день, витрина, итоги, товары и сроки годности.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,400..700&family=Manrope:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;600;700&display=swap">
+<style>
+/* Layout: рабочий пульт заведения — лента дня сверху (план → витрина → итоги), под ней вкладки с таблицами */
+:root {
+  --bg: #FAF9F6; --surface: #FFFFFF; --ink: #211B16; --ink-2: #5E554C; --ink-3: #8A8077; --line: #E4DFD7;
+  --kraft: #E6D5B5; --kraft-2: #D9C49D; --kraft-ink: #3F311F; --paper: #FFFEFA;
+  --stamp: #2346C8; --stamp-ink: #FFFFFF; --stamp-soft: #E7ECFB;
+  --ok: #2B7A4B; --ok-soft: #E2F1E7; --warn: #9A6210; --warn-soft: #F6ECD8; --bad: #B3371F; --bad-soft: #F8E3DE;
+  --shadow: 0 1px 0 rgba(33,27,22,.06), 0 12px 28px -14px rgba(33,27,22,.28);
+  --f-display: "Literata", Georgia, "Times New Roman", serif;
+  --f-body: "Manrope", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #15120F; --surface: #1D1915; --ink: #F1EBE3; --ink-2: #B9AFA4; --ink-3: #8E847A; --line: #352E28;
+    --kraft: #2E261D; --kraft-2: #3A3025; --kraft-ink: #EBDCC0; --paper: #F4EFE4;
+    --stamp: #93A8FF; --stamp-ink: #0E1533; --stamp-soft: #222A4C;
+    --ok: #6CC08F; --ok-soft: #1C3326; --warn: #E3AB4E; --warn-soft: #3A2C14; --bad: #F2907A; --bad-soft: #3E211A;
+    --shadow: 0 1px 0 rgba(0,0,0,.3), 0 14px 30px -12px rgba(0,0,0,.7); color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #15120F; --surface: #1D1915; --ink: #F1EBE3; --ink-2: #B9AFA4; --ink-3: #8E847A; --line: #352E28;
+  --kraft: #2E261D; --kraft-2: #3A3025; --kraft-ink: #EBDCC0; --paper: #F4EFE4;
+  --stamp: #93A8FF; --stamp-ink: #0E1533; --stamp-soft: #222A4C;
+  --ok: #6CC08F; --ok-soft: #1C3326; --warn: #E3AB4E; --warn-soft: #3A2C14; --bad: #F2907A; --bad-soft: #3E211A;
+  --shadow: 0 1px 0 rgba(0,0,0,.3), 0 14px 30px -12px rgba(0,0,0,.7); color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font: 400 15px/1.5 var(--f-body); margin: 0; -webkit-font-smoothing: antialiased; }
+h1, h2, h3 { margin: 0; text-wrap: balance; }
+p { margin: 0; }
+a { color: inherit; }
+:focus-visible { outline: 2px solid var(--stamp); outline-offset: 2px; border-radius: 6px; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+.wrap { max-width: 1160px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.num, table, .mono { font-variant-numeric: tabular-nums; }
+.mono { font-family: var(--f-mono); }
+
+/* шапка */
+.top { background: var(--kraft); color: var(--kraft-ink); }
+.top-in { display: flex; align-items: center; gap: 12px 20px; padding-block: 14px; flex-wrap: wrap; }
+.brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: inherit; margin-right: auto; min-width: 0; }
+.brand-mark { width: 32px; height: 32px; border-radius: 50%; border: 2px solid currentColor; display: grid; place-items: center; font: 700 11px var(--f-mono); transform: rotate(-8deg); flex: none; }
+.brand-name { font: 600 18px/1.1 var(--f-display); }
+.brand small { display: block; font: 500 13px/1.2 var(--f-body); opacity: .8; }
+.clock { font: 600 14px var(--f-mono); white-space: nowrap; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 40px; padding: 0 16px; border-radius: 999px; font: 600 14px/1 var(--f-body); border: 1.5px solid transparent; cursor: pointer; text-decoration: none; background: none; color: inherit; white-space: nowrap; }
+.btn-primary { background: var(--stamp); color: var(--stamp-ink); }
+.btn-ghost { border-color: currentColor; }
+.btn-quiet { color: var(--ink-2); border-color: var(--line); background: var(--surface); }
+.btn-quiet:hover { color: var(--ink); border-color: var(--ink-3); }
+.btn-danger { color: var(--bad); border-color: var(--bad-soft); background: var(--surface); }
+.btn-sm { min-height: 32px; padding: 0 12px; font-size: 13px; }
+.btn:disabled { opacity: .5; cursor: default; }
+
+.local-note { background: var(--stamp-soft); color: var(--ink); font-size: 14px; }
+.local-note .wrap { padding-block: 10px; display: flex; gap: 8px 16px; align-items: center; flex-wrap: wrap; }
+.local-note b { font-weight: 700; }
+
+/* лента дня */
+.day { margin-top: 22px; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 16px 18px 14px; box-shadow: var(--shadow); }
+.day-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px 16px; flex-wrap: wrap; margin-bottom: 14px; }
+.day-head h1 { font: 600 clamp(22px, 3vw, 28px)/1.15 var(--f-display); }
+.day-head .upd { font-size: 13px; color: var(--ink-3); display: inline-flex; align-items: center; gap: 6px; }
+.pulse { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); animation: pulse 2s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: .3; } }
+.ribbon { position: relative; display: grid; grid-template-columns: var(--cols); gap: 4px; }
+.seg { position: relative; text-align: left; border: 0; cursor: pointer; padding: 10px 12px 9px; border-radius: 10px; background: var(--bg); color: var(--ink-2); font: 500 13px/1.25 var(--f-body); min-width: 0; }
+.seg b { display: block; font: 600 15px/1.2 var(--f-body); color: var(--ink); }
+.seg .t { font: 600 12px var(--f-mono); color: var(--ink-3); }
+.seg.past { opacity: .62; }
+.seg.now { background: var(--stamp-soft); }
+.seg.now b { color: var(--stamp); }
+.seg[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--stamp); }
+.now-tag { font: 700 10.5px/1 var(--f-mono); letter-spacing: .08em; text-transform: uppercase; background: var(--stamp); color: var(--stamp-ink); padding: 3px 6px; border-radius: 5px; margin-left: 6px; vertical-align: 1px; }
+.track { position: relative; height: 4px; background: var(--line); border-radius: 2px; margin-top: 10px; }
+.track i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--stamp); border-radius: 2px; }
+.track span { position: absolute; top: 50%; width: 12px; height: 12px; border-radius: 50%; background: var(--stamp); border: 2px solid var(--surface); transform: translate(-50%, -50%); }
+.seg { overflow: hidden; }
+.hint .mono { overflow-wrap: anywhere; }
+@media (max-width: 620px) {
+  .ribbon { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+  .seg { padding: 8px; } .seg .desc { display: none; }
+  .now-tag { display: table; margin: 3px 0 2px; }
+}
+
+/* вкладки */
+.tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line); margin: 22px 0 18px; overflow-x: auto; }
+.tabs button { border: 0; background: none; font: 600 15px/1 var(--f-body); color: var(--ink-3); padding: 12px 12px 14px; cursor: pointer; border-bottom: 2.5px solid transparent; margin-bottom: -1px; white-space: nowrap; }
+.tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--stamp); }
+.tabs .cnt { font: 600 11px var(--f-mono); background: var(--bad-soft); color: var(--bad); border-radius: 999px; padding: 2px 6px; margin-left: 4px; }
+
+.view { padding-bottom: 56px; display: grid; gap: 18px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 18px; min-width: 0; }
+.card h2 { font: 600 20px/1.25 var(--f-display); margin-bottom: 4px; }
+.card .sub { color: var(--ink-2); font-size: 14px; margin-bottom: 14px; }
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+.kpi { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; }
+.kpi b { display: block; font: 600 30px/1.05 var(--f-display); }
+.kpi span { color: var(--ink-2); font-size: 13px; }
+.kpi.warn b { color: var(--warn); }
+.kpi.bad b { color: var(--bad); }
+
+.table-wrap { overflow-x: auto; }
+table.t { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+.t th { text-align: left; font: 600 11px/1.2 var(--f-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); padding: 0 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.t td { padding: 11px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.t tr:last-child td { border-bottom: 0; }
+.t .r { text-align: right; white-space: nowrap; }
+.t .name { font-weight: 600; }
+.t .why { font-size: 13px; color: var(--ink-2); margin-top: 2px; }
+.t .big { font: 700 20px/1 var(--f-mono); }
+.t .muted { color: var(--ink-3); }
+.t tfoot td { font-weight: 700; border-top: 1px solid var(--line); border-bottom: 0; }
+.chip { display: inline-flex; align-items: center; gap: 5px; font: 600 12px/1 var(--f-body); padding: 5px 9px; border-radius: 999px; white-space: nowrap; }
+.chip.ok { background: var(--ok-soft); color: var(--ok); }
+.chip.warn { background: var(--warn-soft); color: var(--warn); }
+.chip.bad { background: var(--bad-soft); color: var(--bad); }
+.chip.new { background: var(--stamp-soft); color: var(--stamp); }
+.chip.mute { background: var(--bg); color: var(--ink-3); }
+
+input[type="text"], input[type="number"], input[type="date"], input[type="time"], select {
+  font: 500 15px/1.2 var(--f-body); color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; min-height: 40px; width: 100%; min-width: 0; }
+input.small { width: 84px; }
+.form { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); align-items: end; }
+.form label { display: grid; gap: 4px; font-size: 12.5px; color: var(--ink-3); min-width: 0; }
+.form .wide { grid-column: span 2; }
+@media (max-width: 520px) { .form .wide { grid-column: auto; } }
+.err { color: var(--bad); font-weight: 600; font-size: 14px; }
+.hint { font-size: 13px; color: var(--ink-3); }
+.acts { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.slots { display: flex; gap: 4px; flex-wrap: wrap; }
+.slot { border: 1px solid var(--line); background: var(--surface); color: var(--ink-2); font: 500 12.5px/1 var(--f-body); padding: 8px 9px; border-radius: 8px; cursor: pointer; min-height: 32px; }
+.slot:hover { border-color: var(--ink-3); color: var(--ink); }
+.left-in { display: flex; gap: 4px; align-items: center; }
+.left-in input { width: 70px; min-height: 32px; padding: 5px 8px; }
+.progress { height: 6px; background: var(--bg); border-radius: 3px; overflow: hidden; margin-top: 6px; }
+.progress i { display: block; height: 100%; background: var(--ok); }
+.removed { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.empty { padding: 26px; text-align: center; color: var(--ink-3); border: 1px dashed var(--line); border-radius: 12px; }
+.grid2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; }
+@media (max-width: 860px) { .grid2 { grid-template-columns: minmax(0, 1fr); } }
+.cmp { display: grid; grid-template-columns: 110px minmax(0, 1fr) 100px; gap: 8px; align-items: center; font-size: 14px; margin-top: 6px; }
+.cmp .bar { height: 12px; background: var(--bg); border-radius: 4px; overflow: hidden; }
+.cmp .bar i { display: block; height: 100%; border-radius: 0 4px 4px 0; }
+.cmp .v { text-align: right; font: 600 14px var(--f-mono); }
+
+/* вход */
+.login { max-width: 440px; margin: 48px auto; background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 26px; box-shadow: var(--shadow); display: grid; gap: 14px; }
+.login h1 { font: 600 26px/1.15 var(--f-display); }
+.login ol { margin: 0; padding-left: 20px; color: var(--ink-2); display: grid; gap: 6px; }
+.code-in { font: 600 26px/1 var(--f-mono) !important; letter-spacing: .3em; text-align: center; }
+
+.toast { position: fixed; left: 50%; bottom: max(20px, env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 10px; font-weight: 600; z-index: 20; box-shadow: var(--shadow); max-width: calc(100% - 32px); }
+.loading { padding: 60px 0; text-align: center; color: var(--ink-3); }
+</style>
+
+<header class="top">
+  <div class="wrap top-in">
+    <a class="brand" id="brand" href="index.html"><span class="brand-mark" aria-hidden="true">СР</span><span><span class="brand-name">Свежий расчёт</span><small id="biz">Личный кабинет</small></span></a>
+    <span class="clock" id="clock"></span>
+    <span id="top-actions"></span>
+  </div>
+</header>
+<div class="local-note" id="local-note" hidden>
+  <div class="wrap"><span><b>Пример кабинета условной пекарни.</b> Данные хранятся только в этом браузере. Чтобы работать со своими данными, подключите бота <a id="bot-link" href="https://t.me/svezhiy_raschet_bot" target="_blank" rel="noopener">@svezhiy_raschet_bot</a> и войдите по коду из команды /web.</span></div>
+</div>
+<main class="wrap">
+  <div class="loading" id="loading">Загружаю кабинет…</div>
+  <section class="login" id="login" hidden aria-labelledby="login-h">
+    <h1 id="login-h">Вход в кабинет</h1>
+    <ol>
+      <li>Откройте бота <a id="login-bot" href="https://t.me/svezhiy_raschet_bot" target="_blank" rel="noopener">@svezhiy_raschet_bot</a>.</li>
+      <li>Отправьте команду <b>/web</b> или нажмите «Личный кабинет».</li>
+      <li>Введите код из 6 цифр, он действует 10 минут.</li>
+    </ol>
+    <form id="login-form" style="display:grid;gap:10px">
+      <input class="code-in" id="code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000" aria-label="Код из бота">
+      <button class="btn btn-primary" type="submit">Войти</button>
+      <p class="err" id="login-err" hidden></p>
+    </form>
+  </section>
+  <section id="app" hidden>
+    <div class="day" id="day"></div>
+    <nav class="tabs" role="tablist" aria-label="Разделы кабинета">
+      <button role="tab" data-tab="today" aria-selected="true">Сегодня</button>
+      <button role="tab" data-tab="tomorrow" aria-selected="false">Завтра</button>
+      <button role="tab" data-tab="products" aria-selected="false">Товары</button>
+      <button role="tab" data-tab="batches" aria-selected="false">Сроки годности</button>
+      <button role="tab" data-tab="data" aria-selected="false">Данные и настройки</button>
+    </nav>
+    <div class="view" id="view"></div>
+  </section>
+</main>
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script>/* Модель «Свежий расчёт» — та же логика, что в боте (bot/core/forecast.py). */
+(function (root) {
+  "use strict";
+  var WD = ["понедельник", "вторник", "среда", "четверг", "пятница", "суббота", "воскресенье"];
+  var WDS = ["пн", "вт", "ср", "чт", "пт", "сб", "вс"];
+  var DEFAULT_RAIN = -0.10, SHARE_EVENING = 0.22, DISCOUNT_K = 1.2;
+
+  // даты как номера дней (UTC), чтобы не зависеть от часового пояса
+  function dnum(iso) { var p = iso.split("-"); return Math.round(Date.UTC(+p[0], +p[1] - 1, +p[2]) / 864e5); }
+  function diso(n) { return new Date(n * 864e5).toISOString().slice(0, 10); }
+  function wday(n) { return (new Date(n * 864e5).getUTCDay() + 6) % 7; }
+  function ddmm(n) { var s = diso(n); return s.slice(8, 10) + "." + s.slice(5, 7); }
+
+  function parseTime(s) {
+    if (!s) return null;
+    s = String(s).trim().replace(".", ":");
+    if (s.indexOf(":") < 0) return null;
+    var p = s.split(":"), h = parseInt(p[0], 10), m = parseInt(p[1], 10);
+    if (isNaN(h) || isNaN(m)) return null;
+    return h + m / 60;
+  }
+  function demand(s, oh, ch) {
+    oh = oh == null ? 7 : oh; ch = ch == null ? 21 : ch;
+    var t = parseTime(s.soldout);
+    if (t == null) return s.sold;
+    var f = Math.min(1, Math.max(0, (t - oh) / (ch - oh)));
+    return s.sold * (1 + 0.5 * (1 - f));
+  }
+  function rainEffect(sales) {
+    var dry = {}, ratios = [];
+    sales.forEach(function (s) {
+      if (s.rain === false) { var k = s.product + "|" + wday(s.day); (dry[k] = dry[k] || []).push(demand(s)); }
+    });
+    sales.forEach(function (s) {
+      if (s.rain === true) {
+        var d = dry[s.product + "|" + wday(s.day)];
+        if (d && d.length >= 2) {
+          var b = d.reduce(function (a, x) { return a + x; }, 0) / d.length;
+          if (b > 0) ratios.push(demand(s) / b);
+        }
+      }
+    });
+    if (ratios.length < 3) return { eff: DEFAULT_RAIN, learned: false };
+    var e = ratios.reduce(function (a, x) { return a + x; }, 0) / ratios.length - 1;
+    return { eff: Math.max(-0.35, Math.min(0.2, e)), learned: true };
+  }
+  function criticalRatio(price, cost) {
+    if (!price || cost == null || price <= 0) return 0.6;
+    return Math.max(0.3, Math.min(0.95, (price - cost) / price));
+  }
+  // обратная функция нормального распределения (Acklam)
+  function invNorm(p) {
+    var a = [-39.69683028665376, 220.9460984245205, -275.9285104469687, 138.357751867269, -30.66479806614716, 2.506628277459239],
+        b = [-54.47609879822406, 161.5858368580409, -155.6989798598866, 66.80131188771972, -13.28068155288572],
+        c = [-0.007784894002430293, -0.3223964580411365, -2.400758277161838, -2.549732539343734, 4.374664141464968, 2.938163982698783],
+        d = [0.007784695709041462, 0.3224671290700398, 2.445134137142996, 3.754408661907416], q, r;
+    if (p < 0.02425) { q = Math.sqrt(-2 * Math.log(p)); return (((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) / ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1); }
+    if (p > 1 - 0.02425) { q = Math.sqrt(-2 * Math.log(1 - p)); return -(((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) / ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1); }
+    q = p - 0.5; r = q * q;
+    return (((((a[0] * r + a[1]) * r + a[2]) * r + a[3]) * r + a[4]) * r + a[5]) * q / (((((b[0] * r + b[1]) * r + b[2]) * r + b[3]) * r + b[4]) * r + 1);
+  }
+  function signed(x) { var v = Math.round(x); return (v > 0 ? "+" : v < 0 ? "−" : "") + Math.abs(v) + "%"; }
+
+  function forecast(sales, product, target, rainTomorrow, eventFactor, rainEff) {
+    eventFactor = eventFactor || 1;
+    if (rainEff == null) rainEff = rainEffect(sales).eff;
+    var hist = sales.filter(function (s) { return s.product === product.name && s.day < target; })
+                    .sort(function (x, y) { return y.day - x.day; });
+    var cr = criticalRatio(product.price, product.cost), reasons = [];
+    if (!hist.length) {
+      if (product.default_qty) {
+        var dq = +product.default_qty;
+        return { product: product.name, mean: dq, sd: Math.sqrt(dq), qty: Math.max(0, Math.floor(dq + 0.5)), ratio: cr, reasons: ["новый товар: истории пока нет, берём ваш обычный объём"], n: 0 };
+      }
+      return { product: product.name, mean: 0, sd: 0, qty: 0, ratio: cr, reasons: ["нет истории продаж"], n: 0 };
+    }
+
+    var clean = {}, days = [];
+    hist.forEach(function (s) {
+      if (target - s.day > 56) return;
+      var d = demand(s);
+      if (s.rain === true) d = d / (1 + rainEff);
+      if (!(s.day in clean)) { clean[s.day] = 0; days.push(s.day); }
+      clean[s.day] += d;
+    });
+    var all = days.map(function (k) { return clean[k]; });
+    var recent = days.filter(function (k) { return target - k <= 14; }).map(function (k) { return clean[k]; });
+    if (recent.length < 5) recent = all;
+    var level = recent.reduce(function (a, x) { return a + x; }, 0) / recent.length;
+    var overall = all.reduce(function (a, x) { return a + x; }, 0) / all.length;
+    function wf(w) {
+      var v = days.filter(function (k) { return wday(k) === w; }).map(function (k) { return clean[k]; });
+      if (v.length < 2 || overall <= 0) return 1;
+      return (v.reduce(function (a, x) { return a + x; }, 0) / v.length) / overall;
+    }
+    var f = wf(wday(target));
+    if (days.length < 14) reasons.push("истории меньше 2 недель — прогноз грубый");
+    else if (Math.abs(f - 1) >= 0.08) reasons.push(WD[wday(target)] + ": обычно " + signed((f - 1) * 100) + " к среднему дню");
+
+    var resid = [];
+    days.forEach(function (k) { if (target - k <= 28) { var g = wf(wday(k)); if (g > 0) resid.push(clean[k] / g - level); } });
+    var v = resid.length >= 4 ? resid.reduce(function (a, r) { return a + r * r; }, 0) / resid.length * 1.25 * f * f : 0;
+
+    var base = level * f, mean = base;
+    var lastSame = null;
+    for (var i = 0; i < hist.length; i++) if (wday(hist[i].day) === wday(target)) { lastSame = hist[i]; break; }
+    if (rainTomorrow) { mean *= 1 + rainEff; reasons.push("дождь: " + signed(rainEff * 100) + " к спросу"); }
+    if (eventFactor !== 1) { mean *= eventFactor; reasons.push("событие: " + signed((eventFactor - 1) * 100)); }
+    if (lastSame && lastSame.soldout && target - lastSame.day <= 7)
+      reasons.push(WDS[wday(lastSame.day)] + " " + ddmm(lastSame.day) + " закончились в " + lastSame.soldout + " — спрос был выше продаж");
+    var scale = base ? mean / base : 1;
+    var sd = Math.max(Math.sqrt(v) * scale, Math.sqrt(Math.max(mean, 0)));
+    if (days.length < 14) sd *= 1.3;
+    var qty = Math.max(0, Math.floor(mean + invNorm(cr) * sd + 0.5));
+    if (product.price && product.cost != null) {
+      if (cr >= 0.6) reasons.push("маржа " + Math.round(cr * 100) + "% — берём с запасом");
+      else if (cr <= 0.45) reasons.push("маржа " + Math.round(cr * 100) + "% — впритык, остаток дорого обходится");
+    }
+    return { product: product.name, mean: mean, sd: sd, qty: qty, ratio: cr, reasons: reasons, n: days.length };
+  }
+
+  function eveningThreshold(rec) { return Math.max(1, Math.ceil(rec.mean * SHARE_EVENING * DISCOUNT_K)); }
+  function discountAdvice(rec, left) {
+    var exp = rec.mean * SHARE_EVENING;
+    if (left <= exp * DISCOUNT_K) return { pct: 0, why: "обычно после 17:00 уходит ~" + Math.round(exp) + " шт — скидка не нужна" };
+    var p = left <= exp * 2 ? 30 : 50;
+    return { pct: p, why: "обычно после 17:00 уходит ~" + Math.round(exp) + " шт, на витрине " + left + " — скидка " + p + "%" };
+  }
+
+  function backtest(sales, products, nDays) {
+    nDays = nDays || 28;
+    var withBaked = sales.filter(function (s) { return s.baked != null; });
+    if (!withBaked.length) return null;
+    var allDays = Array.from(new Set(sales.map(function (s) { return s.day; }))).sort(function (a, b) { return a - b; });
+    var test = allDays.slice(-nDays), eff = rainEffect(sales).eff;
+    var r = { days: test.length, wasteNow: 0, wasteNew: 0, lostNow: 0, lostNew: 0, wasteUnitsNow: 0, wasteUnitsNew: 0, producedNow: 0, producedNew: 0, perDay: [] };
+    test.forEach(function (d) {
+      var past = sales.filter(function (s) { return s.day < d; }), day = { day: d, wasteNow: 0, wasteNew: 0 };
+      withBaked.forEach(function (s) {
+        if (s.day !== d) return;
+        var p = products[s.product] || { name: s.product }, price = p.price || 0, cost = p.cost != null ? p.cost : price * 0.4;
+        var rec = forecast(past, p, d, s.rain === true, 1, eff), dem = demand(s), soldNew = Math.min(rec.qty, dem);
+        r.wasteNow += (s.baked - s.sold) * cost; r.wasteNew += (rec.qty - soldNew) * cost;
+        r.wasteUnitsNow += s.baked - s.sold; r.wasteUnitsNew += rec.qty - soldNew;
+        r.lostNow += Math.max(0, dem - s.sold) * (price - cost); r.lostNew += Math.max(0, dem - rec.qty) * (price - cost);
+        r.producedNow += s.baked; r.producedNew += rec.qty;
+        day.wasteNow += (s.baked - s.sold) * cost; day.wasteNew += (rec.qty - soldNew) * cost;
+      });
+      r.perDay.push(day);
+    });
+    return r;
+  }
+
+  function expiryStatus(expires, today) {
+    var left = expires - today;
+    if (left < 0) return { label: "просрочено", left: left, level: "bad" };
+    if (left === 0) return { label: "истекает сегодня", left: left, level: "bad" };
+    if (left === 1) return { label: "истекает завтра", left: left, level: "warn" };
+    if (left <= 2) return { label: "скоро", left: left, level: "warn" };
+    return { label: "в порядке", left: left, level: "ok" };
+  }
+  function expiryTip(item) {
+    var n = item.toLowerCase();
+    function has(arr) { return arr.some(function (k) { return n.indexOf(k) >= 0; }); }
+    if (has(["слив", "молок", "творог", "сметан", "сыр", "кефир", "йогурт", "маскарпоне"])) return "пустите сегодня в крем, начинку или сырники";
+    if (has(["ягод", "вишн", "клубник", "яблок", "фрукт", "банан", "груш"])) return "используйте в начинку или соус сегодня";
+    if (has(["курин", "куриц", "ветчин", "мяс", "колбас", "рыб", "лосос"])) return "в сэндвичи и пироги сегодня, остаток — списать";
+    if (has(["яйц", "яиц"])) return "в тесто или выпечку сегодня";
+    return "используйте в первую очередь или продайте со скидкой";
+  }
+
+  var ALIASES = {
+    date: ["дата", "date", "день"], product: ["товар", "product", "позиция", "наименование", "item"],
+    sold: ["продано", "sold", "продажи", "количество", "qty", "кол-во"], baked: ["испечено", "baked", "произведено", "выпечено", "приготовлено", "заказано", "закуплено", "поставлено"],
+    soldout: ["закончилось", "soldout", "распродано_в", "закончился"], price: ["цена", "price"],
+    cost: ["себестоимость", "cost", "себес"], rain: ["дождь", "rain", "осадки"]
+  };
+  function num(v) { v = String(v == null ? "" : v).replace(/[\s ]/g, "").replace(",", "."); if (!v) return null; var x = Number(v); return isNaN(x) ? null : x; }
+  function parseDate(v) {
+    v = String(v).trim(); var m;
+    if ((m = v.match(/^(\d{4})-(\d{2})-(\d{2})$/))) return dnum(v);
+    if ((m = v.match(/^(\d{1,2})[.\/](\d{1,2})[.\/](\d{2,4})$/))) {
+      var y = +m[3]; if (y < 100) y += 2000;
+      return dnum(y + "-" + ("0" + m[2]).slice(-2) + "-" + ("0" + m[1]).slice(-2));
+    }
+    throw new Error("не понял дату «" + v + "» — нужен формат 2026-10-17 или 17.10.2026");
+  }
+  function splitLine(line, delim) {
+    var out = [], cur = "", q = false;
+    for (var i = 0; i < line.length; i++) {
+      var ch = line[i];
+      if (ch === '"') { if (q && line[i + 1] === '"') { cur += '"'; i++; } else q = !q; }
+      else if (ch === delim && !q) { out.push(cur); cur = ""; }
+      else cur += ch;
+    }
+    out.push(cur);
+    return out;
+  }
+  function parseCSV(text) {
+    text = text.replace(/^﻿/, "");
+    var lines = text.split(/\r?\n/).filter(function (l) { return l.trim(); });
+    if (lines.length < 2) throw new Error("файл пустой — нужна строка заголовков и хотя бы одна строка продаж");
+    var first = lines[0], delim = (first.split(";").length >= first.split(",").length) ? ";" : ",";
+    var header = splitLine(first, delim).map(function (h) { return h.trim().toLowerCase().replace(/ё/g, "е"); });
+    var idx = {};
+    Object.keys(ALIASES).forEach(function (k) {
+      idx[k] = -1;
+      for (var i = 0; i < ALIASES[k].length; i++) { var j = header.indexOf(ALIASES[k][i]); if (j >= 0) { idx[k] = j; break; } }
+    });
+    ["date", "product", "sold"].forEach(function (k) {
+      if (idx[k] < 0) throw new Error("нет обязательной колонки «" + ALIASES[k][0] + "». Нужны как минимум: дата; товар; продано");
+    });
+    var sales = [], products = {};
+    for (var n = 1; n < lines.length; n++) {
+      var r = splitLine(lines[n], delim);
+      var get = function (k) { return idx[k] >= 0 && idx[k] < r.length ? r[idx[k]] : ""; };
+      var day;
+      try { day = parseDate(get("date")); } catch (e) { throw new Error("строка " + (n + 1) + ": " + e.message); }
+      var name = String(get("product")).trim(), sold = num(get("sold"));
+      if (!name || sold == null) continue;
+      var rr = String(get("rain")).trim().toLowerCase();
+      var rain = rr === "" ? null : ["1", "да", "yes", "true", "дождь"].indexOf(rr) >= 0;
+      sales.push({ day: day, product: name, sold: sold, baked: num(get("baked")), soldout: String(get("soldout")).trim() || null, rain: rain });
+      var p = products[name] || (products[name] = { name: name, price: null, cost: null });
+      var pr = num(get("price")), co = num(get("cost"));
+      if (pr != null) p.price = pr;
+      if (co != null) p.cost = co;
+    }
+    if (!sales.length) throw new Error("не нашёл ни одной строки с продажами");
+    return { sales: sales, products: products };
+  }
+
+  var api = { dnum: dnum, diso: diso, wday: wday, ddmm: ddmm, WD: WD, WDS: WDS, demand: demand, rainEffect: rainEffect,
+    criticalRatio: criticalRatio, forecast: forecast, eveningThreshold: eveningThreshold, discountAdvice: discountAdvice,
+    backtest: backtest, expiryStatus: expiryStatus, expiryTip: expiryTip, parseCSV: parseCSV, signed: signed, SHARE_EVENING: SHARE_EVENING };
+  if (typeof module !== "undefined" && module.exports) module.exports = api; else root.FreshModel = api;
+})(this);
+</script>
+<script>
+"use strict";
+var BOT_USERNAME = "svezhiy_raschet_bot";
+var DEMO_CSV = "дата;товар;испечено;продано;закончилось;цена;себестоимость;дождь\n2026-08-23;Круассан классический;65;65;;120;40;0\n2026-08-23;Багет;48;33;;90;34;0\n2026-08-23;Хлеб пшеничный;59;49;;70;32;0\n2026-08-23;Синнабон;25;14;;160;55;0\n2026-08-23;Пирожок с капустой;43;26;;60;22;0\n2026-08-23;Эклер;27;27;19:50;110;45;0\n2026-08-23;Слойка с вишней;36;24;;95;33;0\n2026-08-23;Сэндвич с курицей;36;15;;220;110;0\n2026-08-24;Круассан классический;46;37;;120;40;1\n2026-08-24;Багет;35;21;;90;34;1\n2026-08-24;Хлеб пшеничный;47;37;;70;32;1\n2026-08-24;Синнабон;23;13;;160;55;1\n2026-08-24;Пирожок с капустой;40;26;;60;22;1\n2026-08-24;Эклер;20;7;;110;45;1\n2026-08-24;Слойка с вишней;30;18;;95;33;1\n2026-08-24;Сэндвич с курицей;25;25;;220;110;1\n2026-08-25;Круассан классический;49;35;;120;40;1\n2026-08-25;Багет;40;31;;90;34;1\n2026-08-25;Хлеб пшеничный;45;32;;70;32;1\n2026-08-25;Синнабон;22;17;;160;55;1\n2026-08-25;Пирожок с капустой;41;40;;60;22;1\n2026-08-25;Эклер;21;21;18:00;110;45;1\n2026-08-25;Слойка с вишней;29;29;19:50;95;33;1\n2026-08-25;Сэндвич с курицей;23;16;;220;110;1\n2026-08-26;Круассан классический;54;34;;120;40;1\n2026-08-26;Багет;40;30;;90;34;1\n2026-08-26;Хлеб пшеничный;52;15;;70;32;1\n2026-08-26;Синнабон;21;16;;160;55;1\n2026-08-26;Пирожок с капустой;41;27;;60;22;1\n2026-08-26;Эклер;20;20;17:10;110;45;1\n2026-08-26;Слойка с вишней;32;19;;95;33;1\n2026-08-26;Сэндвич с курицей;24;16;;220;110;1\n2026-08-27;Круассан классический;44;44;20:10;120;40;0\n2026-08-27;Багет;34;32;;90;34;0\n2026-08-27;Хлеб пшеничный;49;45;;70;32;0\n2026-08-27;Синнабон;22;22;17:00;160;55;0\n2026-08-27;Пирожок с капустой;37;37;17:10;60;22;0\n2026-08-27;Эклер;23;20;;110;45;0\n2026-08-27;Слойка с вишней;25;25;15:40;95;33;0\n2026-08-27;Сэндвич с курицей;26;26;19:10;220;110;0\n2026-08-28;Круассан классический;56;56;18:20;120;40;0\n2026-08-28;Багет;40;33;;90;34;0\n2026-08-28;Хлеб пшеничный;55;31;;70;32;0\n2026-08-28;Синнабон;28;19;;160;55;0\n2026-08-28;Пирожок с капустой;46;31;;60;22;0\n2026-08-28;Эклер;23;15;;110;45;0\n2026-08-28;Слойка с вишней;34;30;;95;33;0\n2026-08-28;Сэндвич с курицей;27;27;18:50;220;110;0\n2026-08-29;Круассан классический;60;52;;120;40;0\n2026-08-29;Багет;47;37;;90;34;0\n2026-08-29;Хлеб пшеничный;65;37;;70;32;0\n2026-08-29;Синнабон;27;25;;160;55;0\n2026-08-29;Пирожок с капустой;51;32;;60;22;0\n2026-08-29;Эклер;31;31;19:50;110;45;0\n2026-08-29;Слойка с вишней;34;31;;95;33;0\n2026-08-29;Сэндвич с курицей;34;15;;220;110;0\n2026-08-30;Круассан классический;60;50;;120;40;1\n2026-08-30;Багет;43;33;;90;34;1\n2026-08-30;Хлеб пшеничный;61;20;;70;32;1\n2026-08-30;Синнабон;25;20;;160;55;1\n2026-08-30;Пирожок с капустой;51;22;;60;22;1\n2026-08-30;Эклер;27;17;;110;45;1\n2026-08-30;Слойка с вишней;30;21;;95;33;1\n2026-08-30;Сэндвич с курицей;30;12;;220;110;1\n2026-08-31;Круассан классический;50;34;;120;40;0\n2026-08-31;Багет;36;32;;90;34;0\n2026-08-31;Хлеб пшеничный;53;40;;70;32;0\n2026-08-31;Синнабон;22;12;;160;55;0\n2026-08-31;Пирожок с капустой;48;38;;60;22;0\n2026-08-31;Эклер;23;9;;110;45;0\n2026-08-31;Слойка с вишней;28;23;;95;33;0\n2026-08-31;Сэндвич с курицей;25;25;16:40;220;110;0\n2026-09-01;Круассан классический;47;47;19:20;120;40;1\n2026-09-01;Багет;36;27;;90;34;1\n2026-09-01;Хлеб пшеничный;50;26;;70;32;1\n2026-09-01;Синнабон;22;12;;160;55;1\n2026-09-01;Пирожок с капустой;47;17;;60;22;1\n2026-09-01;Эклер;25;15;;110;45;1\n2026-09-01;Слойка с вишней;29;15;;95;33;1\n2026-09-01;Сэндвич с курицей;23;23;15:00;220;110;1\n2026-09-02;Круассан классический;46;24;;120;40;1\n2026-09-02;Багет;40;29;;90;34;1\n2026-09-02;Хлеб пшеничный;48;42;;70;32;1\n2026-09-02;Синнабон;21;6;;160;55;1\n2026-09-02;Пирожок с капустой;42;41;;60;22;1\n2026-09-02;Эклер;22;7;;110;45;1\n2026-09-02;Слойка с вишней;33;31;;95;33;1\n2026-09-02;Сэндвич с курицей;26;22;;220;110;1\n2026-09-03;Круассан классический;45;34;;120;40;0\n2026-09-03;Багет;39;31;;90;34;0\n2026-09-03;Хлеб пшеничный;48;43;;70;32;0\n2026-09-03;Синнабон;20;11;;160;55;0\n2026-09-03;Пирожок с капустой;43;29;;60;22;0\n2026-09-03;Эклер;21;8;;110;45;0\n2026-09-03;Слойка с вишней;32;29;;95;33;0\n2026-09-03;Сэндвич с курицей;27;23;;220;110;0\n2026-09-04;Круассан классический;50;40;;120;40;1\n2026-09-04;Багет;46;23;;90;34;1\n2026-09-04;Хлеб пшеничный;56;43;;70;32;1\n2026-09-04;Синнабон;24;24;16:10;160;55;1\n2026-09-04;Пирожок с капустой;46;35;;60;22;1\n2026-09-04;Эклер;29;20;;110;45;1\n2026-09-04;Слойка с вишней;28;28;18:10;95;33;1\n2026-09-04;Сэндвич с курицей;28;16;;220;110;1\n2026-09-05;Круассан классический;52;52;18:10;120;40;1\n2026-09-05;Багет;38;13;;90;34;1\n2026-09-05;Хлеб пшеничный;59;35;;70;32;1\n2026-09-05;Синнабон;24;23;;160;55;1\n2026-09-05;Пирожок с капустой;41;14;;60;22;1\n2026-09-05;Эклер;27;27;19:50;110;45;1\n2026-09-05;Слойка с вишней;36;31;;95;33;1\n2026-09-05;Сэндвич с курицей;33;11;;220;110;1\n2026-09-06;Круассан классический;55;55;19:30;120;40;0\n2026-09-06;Багет;43;27;;90;34;0\n2026-09-06;Хлеб пшеничный;60;22;;70;32;0\n2026-09-06;Синнабон;25;25;;160;55;0\n2026-09-06;Пирожок с капустой;50;17;;60;22;0\n2026-09-06;Эклер;26;26;15:10;110;45;0\n2026-09-06;Слойка с вишней;33;23;;95;33;0\n2026-09-06;Сэндвич с курицей;27;12;;220;110;0\n2026-09-07;Круассан классический;49;39;;120;40;0\n2026-09-07;Багет;40;40;19:40;90;34;0\n2026-09-07;Хлеб пшеничный;47;45;;70;32;0\n2026-09-07;Синнабон;20;19;;160;55;0\n2026-09-07;Пирожок с капустой;42;41;;60;22;0\n2026-09-07;Эклер;26;15;;110;45;0\n2026-09-07;Слойка с вишней;24;24;17:50;95;33;0\n2026-09-07;Сэндвич с курицей;24;24;19:10;220;110;0\n2026-09-08;Круассан классический;50;34;;120;40;1\n2026-09-08;Багет;31;27;;90;34;1\n2026-09-08;Хлеб пшеничный;52;23;;70;32;1\n2026-09-08;Синнабон;25;19;;160;55;1\n2026-09-08;Пирожок с капустой;34;34;17:00;60;22;1\n2026-09-08;Эклер;19;19;19:30;110;45;1\n2026-09-08;Слойка с вишней;29;29;19:20;95;33;1\n2026-09-08;Сэндвич с курицей;29;13;;220;110;1\n2026-09-09;Круассан классический;41;41;18:10;120;40;0\n2026-09-09;Багет;35;33;;90;34;0\n2026-09-09;Хлеб пшеничный;48;40;;70;32;0\n2026-09-09;Синнабон;19;19;17:30;160;55;0\n2026-09-09;Пирожок с капустой;47;41;;60;22;0\n2026-09-09;Эклер;22;16;;110;45;0\n2026-09-09;Слойка с вишней;27;27;19:50;95;33;0\n2026-09-09;Сэндвич с курицей;25;25;19:10;220;110;0\n2026-09-10;Круассан классический;55;37;;120;40;0\n2026-09-10;Багет;37;37;;90;34;0\n2026-09-10;Хлеб пшеничный;46;34;;70;32;0\n2026-09-10;Синнабон;21;21;18:30;160;55;0\n2026-09-10;Пирожок с капустой;40;40;19:40;60;22;0\n2026-09-10;Эклер;22;22;18:30;110;45;0\n2026-09-10;Слойка с вишней;28;28;18:30;95;33;0\n2026-09-10;Сэндвич с курицей;26;26;19:10;220;110;0\n2026-09-11;Круассан классический;49;43;;120;40;1\n2026-09-11;Багет;39;22;;90;34;1\n2026-09-11;Хлеб пшеничный;58;28;;70;32;1\n2026-09-11;Синнабон;27;17;;160;55;1\n2026-09-11;Пирожок с капустой;45;45;19:40;60;22;1\n2026-09-11;Эклер;23;12;;110;45;1\n2026-09-11;Слойка с вишней;28;24;;95;33;1\n2026-09-11;Сэндвич с курицей;28;17;;220;110;1\n2026-09-12;Круассан классический;54;54;18:50;120;40;0\n2026-09-12;Багет;51;29;;90;34;0\n2026-09-12;Хлеб пшеничный;55;42;;70;32;0\n2026-09-12;Синнабон;28;23;;160;55;0\n2026-09-12;Пирожок с капустой;51;20;;60;22;0\n2026-09-12;Эклер;28;28;17:20;110;45;0\n2026-09-12;Слойка с вишней;33;33;18:10;95;33;0\n2026-09-12;Сэндвич с курицей;28;20;;220;110;0\n2026-09-13;Круассан классический;64;56;;120;40;0\n2026-09-13;Багет;45;37;;90;34;0\n2026-09-13;Хлеб пшеничный;62;30;;70;32;0\n2026-09-13;Синнабон;24;20;;160;55;0\n2026-09-13;Пирожок с капустой;50;18;;60;22;0\n2026-09-13;Эклер;27;14;;110;45;0\n2026-09-13;Слойка с вишней;33;28;;95;33;0\n2026-09-13;Сэндвич с курицей;31;17;;220;110;0\n2026-09-14;Круассан классический;46;36;;120;40;0\n2026-09-14;Багет;33;33;20:00;90;34;0\n2026-09-14;Хлеб пшеничный;47;35;;70;32;0\n2026-09-14;Синнабон;22;16;;160;55;0\n2026-09-14;Пирожок с капустой;45;39;;60;22;0\n2026-09-14;Эклер;21;21;;110;45;0\n2026-09-14;Слойка с вишней;30;18;;95;33;0\n2026-09-14;Сэндвич с курицей;28;26;;220;110;0\n2026-09-15;Круассан классический;48;29;;120;40;1\n2026-09-15;Багет;37;25;;90;34;1\n2026-09-15;Хлеб пшеничный;43;32;;70;32;1\n2026-09-15;Синнабон;23;17;;160;55;1\n2026-09-15;Пирожок с капустой;48;41;;60;22;1\n2026-09-15;Эклер;22;15;;110;45;1\n2026-09-15;Слойка с вишней;33;22;;95;33;1\n2026-09-15;Сэндвич с курицей;26;10;;220;110;1\n2026-09-16;Круассан классический;38;31;;120;40;0\n2026-09-16;Багет;33;17;;90;34;0\n2026-09-16;Хлеб пшеничный;46;46;19:40;70;32;0\n2026-09-16;Синнабон;20;16;;160;55;0\n2026-09-16;Пирожок с капустой;37;37;18:00;60;22;0\n2026-09-16;Эклер;20;20;16:20;110;45;0\n2026-09-16;Слойка с вишней;29;22;;95;33;0\n2026-09-16;Сэндвич с курицей;28;23;;220;110;0\n2026-09-17;Круассан классический;44;44;19:20;120;40;0\n2026-09-17;Багет;36;28;;90;34;0\n2026-09-17;Хлеб пшеничный;51;46;;70;32;0\n2026-09-17;Синнабон;23;17;;160;55;0\n2026-09-17;Пирожок с капустой;40;35;;60;22;0\n2026-09-17;Эклер;25;23;;110;45;0\n2026-09-17;Слойка с вишней;28;27;;95;33;0\n2026-09-17;Сэндвич с курицей;26;17;;220;110;0\n2026-09-18;Круассан классический;55;40;;120;40;1\n2026-09-18;Багет;45;16;;90;34;1\n2026-09-18;Хлеб пшеничный;51;26;;70;32;1\n2026-09-18;Синнабон;21;21;19:00;160;55;1\n2026-09-18;Пирожок с капустой;45;31;;60;22;1\n2026-09-18;Эклер;27;16;;110;45;1\n2026-09-18;Слойка с вишней;26;26;17:10;95;33;1\n2026-09-18;Сэндвич с курицей;29;11;;220;110;1\n2026-09-19;Круассан классический;56;43;;120;40;1\n2026-09-19;Багет;47;30;;90;34;1\n2026-09-19;Хлеб пшеничный;60;35;;70;32;1\n2026-09-19;Синнабон;29;17;;160;55;1\n2026-09-19;Пирожок с капустой;50;18;;60;22;1\n2026-09-19;Эклер;27;23;;110;45;1\n2026-09-19;Слойка с вишней;34;24;;95;33;1\n2026-09-19;Сэндвич с курицей;32;8;;220;110;1\n2026-09-20;Круассан классический;59;59;17:30;120;40;0\n2026-09-20;Багет;48;37;;90;34;0\n2026-09-20;Хлеб пшеничный;61;47;;70;32;0\n2026-09-20;Синнабон;28;25;;160;55;0\n2026-09-20;Пирожок с капустой;45;22;;60;22;0\n2026-09-20;Эклер;22;22;17:00;110;45;0\n2026-09-20;Слойка с вишней;35;27;;95;33;0\n2026-09-20;Сэндвич с курицей;30;18;;220;110;0\n2026-09-21;Круассан классический;48;48;20:10;120;40;0\n2026-09-21;Багет;33;23;;90;34;0\n2026-09-21;Хлеб пшеничный;44;31;;70;32;0\n2026-09-21;Синнабон;21;19;;160;55;0\n2026-09-21;Пирожок с капустой;41;41;19:20;60;22;0\n2026-09-21;Эклер;24;24;19:10;110;45;0\n2026-09-21;Слойка с вишней;28;22;;95;33;0\n2026-09-21;Сэндвич с курицей;22;20;;220;110;0\n2026-09-22;Круассан классический;53;47;;120;40;0\n2026-09-22;Багет;36;30;;90;34;0\n2026-09-22;Хлеб пшеничный;40;40;18:10;70;32;0\n2026-09-22;Синнабон;22;17;;160;55;0\n2026-09-22;Пирожок с капустой;45;35;;60;22;0\n2026-09-22;Эклер;22;22;18:30;110;45;0\n2026-09-22;Слойка с вишней;28;26;;95;33;0\n2026-09-22;Сэндвич с курицей;22;20;;220;110;0\n2026-09-23;Круассан классический;52;52;19:30;120;40;0\n2026-09-23;Багет;34;34;19:00;90;34;0\n2026-09-23;Хлеб пшеничный;57;57;;70;32;0\n2026-09-23;Синнабон;20;18;;160;55;0\n2026-09-23;Пирожок с капустой;42;33;;60;22;0\n2026-09-23;Эклер;22;16;;110;45;0\n2026-09-23;Слойка с вишней;25;25;16:20;95;33;0\n2026-09-23;Сэндвич с курицей;28;28;17:30;220;110;0\n2026-09-24;Круассан классический;43;36;;120;40;0\n2026-09-24;Багет;34;30;;90;34;0\n2026-09-24;Хлеб пшеничный;39;38;;70;32;0\n2026-09-24;Синнабон;25;17;;160;55;0\n2026-09-24;Пирожок с капустой;40;31;;60;22;0\n2026-09-24;Эклер;23;13;;110;45;0\n2026-09-24;Слойка с вишней;33;26;;95;33;0\n2026-09-24;Сэндвич с курицей;24;24;19:40;220;110;0\n2026-09-25;Круассан классический;51;51;18:20;120;40;0\n2026-09-25;Багет;42;25;;90;34;0\n2026-09-25;Хлеб пшеничный;55;42;;70;32;0\n2026-09-25;Синнабон;23;23;;160;55;0\n2026-09-25;Пирожок с капустой;51;41;;60;22;0\n2026-09-25;Эклер;28;19;;110;45;0\n2026-09-25;Слойка с вишней;30;28;;95;33;0\n2026-09-25;Сэндвич с курицей;28;28;17:00;220;110;0\n2026-09-26;Круассан классический;62;62;17:10;120;40;0\n2026-09-26;Багет;45;23;;90;34;0\n2026-09-26;Хлеб пшеничный;53;40;;70;32;0\n2026-09-26;Синнабон;26;15;;160;55;0\n2026-09-26;Пирожок с капустой;50;29;;60;22;0\n2026-09-26;Эклер;25;25;18:00;110;45;0\n2026-09-26;Слойка с вишней;33;24;;95;33;0\n2026-09-26;Сэндвич с курицей;30;10;;220;110;0\n2026-09-27;Круассан классический;54;54;18:40;120;40;0\n2026-09-27;Багет;42;30;;90;34;0\n2026-09-27;Хлеб пшеничный;62;41;;70;32;0\n2026-09-27;Синнабон;27;25;;160;55;0\n2026-09-27;Пирожок с капустой;47;12;;60;22;0\n2026-09-27;Эклер;28;28;18:50;110;45;0\n2026-09-27;Слойка с вишней;35;17;;95;33;0\n2026-09-27;Сэндвич с курицей;30;18;;220;110;0\n2026-09-28;Круассан классический;50;41;;120;40;0\n2026-09-28;Багет;40;32;;90;34;0\n2026-09-28;Хлеб пшеничный;50;39;;70;32;0\n2026-09-28;Синнабон;21;12;;160;55;0\n2026-09-28;Пирожок с капустой;40;40;17:30;60;22;0\n2026-09-28;Эклер;21;19;;110;45;0\n2026-09-28;Слойка с вишней;27;27;18:10;95;33;0\n2026-09-28;Сэндвич с курицей;23;23;17:30;220;110;0\n2026-09-29;Круассан классический;49;33;;120;40;0\n2026-09-29;Багет;38;32;;90;34;0\n2026-09-29;Хлеб пшеничный;48;47;;70;32;0\n2026-09-29;Синнабон;20;19;;160;55;0\n2026-09-29;Пирожок с капустой;43;43;18:20;60;22;0\n2026-09-29;Эклер;22;22;19:40;110;45;0\n2026-09-29;Слойка с вишней;28;21;;95;33;0\n2026-09-29;Сэндвич с курицей;25;25;19:10;220;110;0\n2026-09-30;Круассан классический;43;43;19:20;120;40;0\n2026-09-30;Багет;35;34;;90;34;0\n2026-09-30;Хлеб пшеничный;49;32;;70;32;0\n2026-09-30;Синнабон;23;8;;160;55;0\n2026-09-30;Пирожок с капустой;41;41;18:30;60;22;0\n2026-09-30;Эклер;20;16;;110;45;0\n2026-09-30;Слойка с вишней;23;23;18:10;95;33;0\n2026-09-30;Сэндвич с курицей;26;25;;220;110;0\n2026-10-01;Круассан классический;46;44;;120;40;0\n2026-10-01;Багет;39;34;;90;34;0\n2026-10-01;Хлеб пшеничный;49;49;20:10;70;32;0\n2026-10-01;Синнабон;21;15;;160;55;0\n2026-10-01;Пирожок с капустой;46;42;;60;22;0\n2026-10-01;Эклер;20;20;19:40;110;45;0\n2026-10-01;Слойка с вишней;24;22;;95;33;0\n2026-10-01;Сэндвич с курицей;22;22;18:10;220;110;0\n2026-10-02;Круассан классический;45;43;;120;40;0\n2026-10-02;Багет;43;27;;90;34;0\n2026-10-02;Хлеб пшеничный;47;33;;70;32;0\n2026-10-02;Синнабон;23;22;;160;55;0\n2026-10-02;Пирожок с капустой;48;42;;60;22;0\n2026-10-02;Эклер;22;22;18:10;110;45;0\n2026-10-02;Слойка с вишней;33;29;;95;33;0\n2026-10-02;Сэндвич с курицей;24;19;;220;110;0\n2026-10-03;Круассан классический;56;56;18:00;120;40;1\n2026-10-03;Багет;45;27;;90;34;1\n2026-10-03;Хлеб пшеничный;61;46;;70;32;1\n2026-10-03;Синнабон;27;20;;160;55;1\n2026-10-03;Пирожок с капустой;54;34;;60;22;1\n2026-10-03;Эклер;24;24;17:10;110;45;1\n2026-10-03;Слойка с вишней;31;31;14:50;95;33;1\n2026-10-03;Сэндвич с курицей;28;11;;220;110;1\n2026-10-04;Круассан классический;60;60;18:40;120;40;1\n2026-10-04;Багет;46;18;;90;34;1\n2026-10-04;Хлеб пшеничный;58;39;;70;32;1\n2026-10-04;Синнабон;24;14;;160;55;1\n2026-10-04;Пирожок с капустой;49;16;;60;22;1\n2026-10-04;Эклер;28;22;;110;45;1\n2026-10-04;Слойка с вишней;30;18;;95;33;1\n2026-10-04;Сэндвич с курицей;33;8;;220;110;1\n2026-10-05;Круассан классический;57;31;;120;40;1\n2026-10-05;Багет;34;29;;90;34;1\n2026-10-05;Хлеб пшеничный;50;27;;70;32;1\n2026-10-05;Синнабон;26;8;;160;55;1\n2026-10-05;Пирожок с капустой;43;27;;60;22;1\n2026-10-05;Эклер;22;22;18:30;110;45;1\n2026-10-05;Слойка с вишней;28;17;;95;33;1\n2026-10-05;Сэндвич с курицей;27;22;;220;110;1\n2026-10-06;Круассан классический;43;36;;120;40;1\n2026-10-06;Багет;35;26;;90;34;1\n2026-10-06;Хлеб пшеничный;47;17;;70;32;1\n2026-10-06;Синнабон;23;7;;160;55;1\n2026-10-06;Пирожок с капустой;47;47;20:10;60;22;1\n2026-10-06;Эклер;21;14;;110;45;1\n2026-10-06;Слойка с вишней;31;27;;95;33;1\n2026-10-06;Сэндвич с курицей;25;18;;220;110;1\n2026-10-07;Круассан классический;48;48;18:30;120;40;1\n2026-10-07;Багет;38;24;;90;34;1\n2026-10-07;Хлеб пшеничный;45;39;;70;32;1\n2026-10-07;Синнабон;20;14;;160;55;1\n2026-10-07;Пирожок с капустой;47;32;;60;22;1\n2026-10-07;Эклер;22;22;;110;45;1\n2026-10-07;Слойка с вишней;28;18;;95;33;1\n2026-10-07;Сэндвич с курицей;24;24;19:10;220;110;1\n2026-10-08;Круассан классический;43;43;17:50;120;40;1\n2026-10-08;Багет;43;26;;90;34;1\n2026-10-08;Хлеб пшеничный;54;20;;70;32;1\n2026-10-08;Синнабон;21;7;;160;55;1\n2026-10-08;Пирожок с капустой;43;33;;60;22;1\n2026-10-08;Эклер;19;2;;110;45;1\n2026-10-08;Слойка с вишней;29;20;;95;33;1\n2026-10-08;Сэндвич с курицей;25;15;;220;110;1\n2026-10-09;Круассан классический;51;36;;120;40;1\n2026-10-09;Багет;42;24;;90;34;1\n2026-10-09;Хлеб пшеничный;61;42;;70;32;1\n2026-10-09;Синнабон;23;15;;160;55;1\n2026-10-09;Пирожок с капустой;44;33;;60;22;1\n2026-10-09;Эклер;21;21;19:40;110;45;1\n2026-10-09;Слойка с вишней;29;28;;95;33;1\n2026-10-09;Сэндвич с курицей;24;14;;220;110;1\n2026-10-10;Круассан классический;57;57;16:20;120;40;0\n2026-10-10;Багет;46;45;;90;34;0\n2026-10-10;Хлеб пшеничный;54;31;;70;32;0\n2026-10-10;Синнабон;24;24;16:50;160;55;0\n2026-10-10;Пирожок с капустой;48;19;;60;22;0\n2026-10-10;Эклер;24;24;17:10;110;45;0\n2026-10-10;Слойка с вишней;33;29;;95;33;0\n2026-10-10;Сэндвич с курицей;31;3;;220;110;0\n2026-10-11;Круассан классический;64;46;;120;40;1\n2026-10-11;Багет;39;20;;90;34;1\n2026-10-11;Хлеб пшеничный;52;44;;70;32;1\n2026-10-11;Синнабон;27;17;;160;55;1\n2026-10-11;Пирожок с капустой;42;17;;60;22;1\n2026-10-11;Эклер;26;26;19:50;110;45;1\n2026-10-11;Слойка с вишней;36;32;;95;33;1\n2026-10-11;Сэндвич с курицей;26;24;;220;110;1\n2026-10-12;Круассан классический;44;36;;120;40;1\n2026-10-12;Багет;40;34;;90;34;1\n2026-10-12;Хлеб пшеничный;46;39;;70;32;1\n2026-10-12;Синнабон;18;11;;160;55;1\n2026-10-12;Пирожок с капустой;42;42;18:40;60;22;1\n2026-10-12;Эклер;24;16;;110;45;1\n2026-10-12;Слойка с вишней;31;27;;95;33;1\n2026-10-12;Сэндвич с курицей;24;11;;220;110;1\n2026-10-13;Круассан классический;50;38;;120;40;1\n2026-10-13;Багет;34;33;;90;34;1\n2026-10-13;Хлеб пшеничный;58;34;;70;32;1\n2026-10-13;Синнабон;23;17;;160;55;1\n2026-10-13;Пирожок с капустой;43;34;;60;22;1\n2026-10-13;Эклер;22;22;17:40;110;45;1\n2026-10-13;Слойка с вишней;27;27;18:50;95;33;1\n2026-10-13;Сэндвич с курицей;27;24;;220;110;1\n2026-10-14;Круассан классический;53;33;;120;40;1\n2026-10-14;Багет;35;23;;90;34;1\n2026-10-14;Хлеб пшеничный;57;35;;70;32;1\n2026-10-14;Синнабон;23;17;;160;55;1\n2026-10-14;Пирожок с капустой;41;29;;60;22;1\n2026-10-14;Эклер;21;12;;110;45;1\n2026-10-14;Слойка с вишней;29;29;;95;33;1\n2026-10-14;Сэндвич с курицей;25;25;18:20;220;110;1\n2026-10-15;Круассан классический;53;47;;120;40;0\n2026-10-15;Багет;33;29;;90;34;0\n2026-10-15;Хлеб пшеничный;51;51;19:50;70;32;0\n2026-10-15;Синнабон;22;7;;160;55;0\n2026-10-15;Пирожок с капустой;46;38;;60;22;0\n2026-10-15;Эклер;21;19;;110;45;0\n2026-10-15;Слойка с вишней;26;23;;95;33;0\n2026-10-15;Сэндвич с курицей;22;20;;220;110;0\n2026-10-16;Круассан классический;46;46;;120;40;0\n2026-10-16;Багет;36;25;;90;34;0\n2026-10-16;Хлеб пшеничный;51;41;;70;32;0\n2026-10-16;Синнабон;25;15;;160;55;0\n2026-10-16;Пирожок с капустой;43;39;;60;22;0\n2026-10-16;Эклер;27;24;;110;45;0\n2026-10-16;Слойка с вишней;33;33;;95;33;0\n2026-10-16;Сэндвич с курицей;26;8;;220;110;0\n2026-10-17;Круассан классический;56;46;;120;40;0\n2026-10-17;Багет;43;39;;90;34;0\n2026-10-17;Хлеб пшеничный;54;51;;70;32;0\n2026-10-17;Синнабон;23;23;16:50;160;55;0\n2026-10-17;Пирожок с капустой;51;25;;60;22;0\n2026-10-17;Эклер;26;26;16:10;110;45;0\n2026-10-17;Слойка с вишней;33;33;16:40;95;33;0\n2026-10-17;Сэндвич с курицей;23;13;;220;110;0\n";
+</script>
+<script>(function () {
+  "use strict";
+  var M = window.FreshModel;
+  var $ = function (id) { return document.getElementById(id); };
+  function esc(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
+  function pad(n) { return ("0" + n).slice(-2); }
+  function fmt(x) { return Math.round(x).toLocaleString("ru-RU"); }
+  function money(x) { return fmt(x) + " ₽"; }
+  function dayLabel(iso) { var n = M.dnum(iso); return M.WDS[M.wday(n)] + ", " + M.ddmm(n); }
+  function mins(hhmm) { var p = String(hhmm || "0:0").split(":"); return (+p[0]) * 60 + (+p[1]); }
+  function plural(n, a, b, c) { n = Math.abs(n) % 100; if (n > 10 && n < 15) return c; n %= 10; return n === 1 ? a : n >= 2 && n <= 4 ? b : c; }
+  function phaseOf(times, m) {
+    if (m < mins(times.morning)) return "night";
+    if (m < mins(times.evening)) return "morning";
+    if (m < mins(times.closing)) return "evening";
+    return "closing";
+  }
+  var PART_OF = { night: "plan", morning: "plan", evening: "vitrina", closing: "itogi" };
+  var SLOTS = [["до 12", "11:00"], ["12–15", "13:30"], ["15–18", "16:30"], ["после 18", "19:30"]];
+  var toastT = null;
+  function toast(msg) {
+    var t = $("toast"); t.textContent = msg; t.hidden = false;
+    clearTimeout(toastT); toastT = setTimeout(function () { t.hidden = true; }, 2600);
+  }
+
+  /* ================= Пример в браузере (без сервера) ================= */
+  var Local = (function () {
+    var KEY = "svezhiy-kabinet-v1", D = null, btCache = null;
+    function today() { var n = new Date(); return M.dnum(n.getFullYear() + "-" + pad(n.getMonth() + 1) + "-" + pad(n.getDate())); }
+    function save() { try { localStorage.setItem(KEY, JSON.stringify(D)); } catch (e) { /* хранилище недоступно — работаем в памяти */ } }
+    function example() {
+      var r = M.parseCSV(DEMO_CSV), T = today();
+      var last = Math.max.apply(null, r.sales.map(function (s) { return s.day; }));
+      r.sales.forEach(function (s) { s.day += (T - 1) - last; });
+      var products = {};
+      Object.keys(r.products).forEach(function (k) {
+        var p = r.products[k];
+        products[k] = { name: k, price: p.price, cost: p.cost, shelf_life: (k === "Эклер" || k === "Сэндвич с курицей") ? 2 : 1, default_qty: null, active: true };
+      });
+      D = { v: 1, business: "Условная пекарня", example: true, times: { morning: "06:00", evening: "17:00", closing: "21:00" },
+            products: products, sales: r.sales, plans: {}, events: {}, nextId: 5,
+            batches: [[1, "Сливки 33%", "2 л", 1], [2, "Творог 5%", "3 кг", 2], [3, "Филе куриное", "1,5 кг", 0], [4, "Вишня замороженная", "2 кг", 20]]
+              .map(function (b) { return { id: b[0], item: b[1], qty: b[2], exp: T + b[3], status: "active" }; }) };
+      btCache = null; save();
+    }
+    function load() {
+      try { var raw = localStorage.getItem(KEY); if (raw) { var d = JSON.parse(raw); if (d && d.v === 1) { D = d; return; } } } catch (e) { /* нет доступа */ }
+      example();
+    }
+    function prodMap(includeSalesOnly) {
+      var out = {}, removed = {};
+      Object.keys(D.products).forEach(function (k) { var p = D.products[k]; if (p.active) out[k] = p; else removed[k] = 1; });
+      if (includeSalesOnly) D.sales.forEach(function (s) { if (!out[s.product] && !removed[s.product]) out[s.product] = { name: s.product, price: null, cost: null }; });
+      return out;
+    }
+    function recs(day) {
+      var prods = prodMap(true), eff = M.rainEffect(D.sales).eff, ev = D.events[day] || 1, list = [], habit = {};
+      Object.keys(prods).forEach(function (k) { var r = M.forecast(D.sales, prods[k], day, false, ev, eff); if (r.n > 0 || r.qty > 0) list.push(r); });
+      list.sort(function (a, b) { return b.qty - a.qty; });
+      list.forEach(function (r) {
+        var same = D.sales.filter(function (s) { return s.product === r.product && s.baked != null && M.wday(s.day) === M.wday(day) && day - s.day > 0 && day - s.day <= 28; });
+        if (same.length) habit[r.product] = same.reduce(function (a, s) { return a + s.baked; }, 0) / same.length;
+      });
+      return { recs: list, eff: eff, event: ev, habit: habit };
+    }
+    function item(r, qty, mean) {
+      var q = qty == null ? r.qty : qty, m = mean == null ? r.mean : mean;
+      return { product: r.product, qty: q, mean: m, sd: r.sd, reasons: r.reasons, "new": r.n === 0, threshold: M.eveningThreshold({ mean: m }) };
+    }
+    function sale(day, product) { for (var i = 0; i < D.sales.length; i++) if (D.sales[i].day === day && D.sales[i].product === product) return D.sales[i]; return null; }
+    function state() {
+      var now = new Date(), T = today(), m = now.getHours() * 60 + now.getMinutes();
+      Object.keys(D.plans).forEach(function (k) { if (+k < T - 14) delete D.plans[k]; });
+      var rt = recs(T), plan = D.plans[T] || (D.plans[T] = {}), changed = false;
+      rt.recs.forEach(function (r) { if (!plan[r.product]) { plan[r.product] = { qty: r.qty, mean: r.mean }; changed = true; } });
+      if (changed) save();
+      var items = rt.recs.map(function (r) {
+        var p = plan[r.product], it = item(r, p.qty, p.mean), s = sale(T, r.product);
+        it.record = s ? { soldout: s.soldout, baked: s.baked, left: s.soldout ? null : Math.max(0, Math.round((s.baked || 0) - s.sold)) } : null;
+        return it;
+      }).sort(function (a, b) { return b.qty - a.qty; });
+      var rm = recs(T + 1);
+      var tom = rm.recs.map(function (r) { var it = item(r); it.habit = rm.habit[r.product] != null ? Math.round(rm.habit[r.product]) : null; return it; });
+      var hist = {};
+      D.sales.forEach(function (s) { (hist[s.product] = hist[s.product] || {})[s.day] = 1; });
+      var pm = prodMap(true);
+      var products = Object.keys(pm).map(function (k) {
+        var p = pm[k];
+        return { name: k, price: p.price, cost: p.cost, shelf_life: p.shelf_life == null ? null : p.shelf_life, default_qty: p.default_qty == null ? null : p.default_qty, history_days: hist[k] ? Object.keys(hist[k]).length : 0 };
+      }).sort(function (a, b) { return a.name.toLowerCase() < b.name.toLowerCase() ? -1 : 1; });
+      var removed = Object.keys(D.products).filter(function (k) { return !D.products[k].active; }).sort();
+      var batches = D.batches.filter(function (b) { return b.status === "active"; }).sort(function (a, b) { return a.exp - b.exp || a.id - b.id; }).map(function (b) {
+        var st = M.expiryStatus(b.exp, T);
+        return { id: b.id, item: b.item, qty: b.qty, expires: M.diso(b.exp), label: st.label, left: st.left, level: st.left <= 0 ? "bad" : st.left <= 2 ? "warn" : "ok",
+                 tip: st.left <= 1 ? (st.left < 0 ? "спишите" : M.expiryTip(b.item)) : null };
+      });
+      var days = D.sales.map(function (s) { return s.day; });
+      if (!btCache || btCache.n !== D.sales.length) {
+        var bt = D.sales.length ? M.backtest(D.sales, prodMap(false)) : null;
+        btCache = { n: D.sales.length, v: bt && bt.wasteNow > 0 ? { days: bt.days, waste_now: bt.wasteNow, waste_new: bt.wasteNew, lost_now: bt.lostNow, lost_new: bt.lostNew,
+          share_now: bt.wasteUnitsNow / bt.producedNow * 100, share_new: bt.wasteUnitsNew / bt.producedNew * 100 } : null };
+      }
+      return {
+        mode: "local", business: { name: D.business, city: "", is_example: D.example },
+        now: M.diso(T) + "T" + pad(now.getHours()) + ":" + pad(now.getMinutes()), phase: phaseOf(D.times, m), times: D.times,
+        today: { date: M.diso(T), rain: null, event: D.events[T] || 1, items: items },
+        tomorrow: { date: M.diso(T + 1), rain: null, event: D.events[T + 1] || 1, rain_effect: rm.eff, items: tom },
+        products: products, removed: removed, batches: batches,
+        data: { rows: D.sales.length, first: days.length ? M.diso(Math.min.apply(null, days)) : null, last: days.length ? M.diso(Math.max.apply(null, days)) : null },
+        summary: btCache.v
+      };
+    }
+    function num(v, lo, hi, integer) {
+      if (v === "" || v == null) return null;
+      var x = Number(String(v).replace(",", ".").replace(/\s/g, ""));
+      if (isNaN(x) || (lo != null && x < lo) || (hi != null && x > hi)) throw new Error("проверьте число: " + v);
+      return integer ? Math.round(x) : x;
+    }
+    function name(v, field) { var s = String(v || "").replace(/\s+/g, " ").trim(); if (!s) throw new Error("пустое поле: " + (field || "название")); return s.slice(0, 60); }
+    function act(path, b) {
+      var T = today();
+      try {
+        if (path === "/api/product") {
+          var nm = name(b.name), old = b.old_name || null, price = num(b.price, 0, 1e6), cost = num(b.cost, 0, 1e6);
+          if (price != null && cost != null && cost > price) throw new Error("себестоимость больше цены — проверьте цифры");
+          if (old && old !== nm) {
+            D.sales.forEach(function (s) { if (s.product === old) s.product = nm; });
+            Object.keys(D.plans).forEach(function (d) { if (D.plans[d][old]) { D.plans[d][nm] = D.plans[d][old]; delete D.plans[d][old]; } });
+            delete D.products[old]; btCache = null;
+          }
+          D.products[nm] = { name: nm, price: price, cost: cost, shelf_life: num(b.shelf_life, 0, 3650, true), default_qty: num(b.default_qty, 0, 1e5), active: true };
+        } else if (path === "/api/product/remove" || path === "/api/product/restore") {
+          var n2 = name(b.name), on = path === "/api/product/restore";
+          D.products[n2] = D.products[n2] || { name: n2, price: null, cost: null, shelf_life: null, default_qty: null };
+          D.products[n2].active = on;
+          if (!on) [T - 1, T, T + 1].forEach(function (d) { if (D.plans[d]) delete D.plans[d][n2]; });
+        } else if (path === "/api/batch") {
+          var it = name(b.item, "продукт"), exp = b.expires ? M.dnum(b.expires) : null;
+          if (exp == null) {
+            var p = D.products[it];
+            if (!p || !p.shelf_life) throw new Error("укажите дату «годен до» или срок хранения у товара");
+            exp = M.dnum(b.made || M.diso(T)) + p.shelf_life;
+          }
+          D.batches.push({ id: D.nextId++, item: it, qty: String(b.qty || "").trim().slice(0, 20), exp: exp, status: "active" });
+        } else if (path === "/api/batch/close") {
+          D.batches.forEach(function (x) { if (x.id === +b.id) x.status = b.status; });
+        } else if (path === "/api/record") {
+          var pr = name(b.product), so = b.soldout || null;
+          if (so && !/^([01]?\d|2[0-3]):[0-5]\d$/.test(so)) throw new Error("время в формате 15:30");
+          var left = so ? null : num(b.left, 0, 1e5, true);
+          if (!so && left == null) throw new Error("укажите остаток или время, когда товар закончился");
+          var baked = (D.plans[T] && D.plans[T][pr]) ? D.plans[T][pr].qty : 0;
+          var s = sale(T, pr), sold = so ? baked : Math.max(0, baked - left);
+          if (s) { s.sold = sold; s.baked = baked; s.soldout = so; } else D.sales.push({ day: T, product: pr, sold: sold, baked: baked, soldout: so, rain: null });
+          btCache = null;
+        } else if (path === "/api/event") {
+          var f = num(b.factor, 0.3, 3);
+          if (!f || Math.abs(f - 1) < 1e-9) delete D.events[T + 1]; else D.events[T + 1] = f;
+        } else if (path === "/api/settings") {
+          if ("business" in b) D.business = String(b.business || "").trim().slice(0, 80);
+          ["morning", "evening", "closing"].forEach(function (k) {
+            if (b[k]) { if (!/^([01]?\d|2[0-3]):[0-5]\d$/.test(b[k])) throw new Error("время в формате 06:00"); D.times[k] = pad(+b[k].split(":")[0]) + ":" + b[k].split(":")[1]; }
+          });
+        } else if (path === "/api/upload") {
+          var r = M.parseCSV(String(b.csv || ""));
+          if (D.example) { D.sales = []; D.products = {}; D.plans = {}; D.events = {}; D.batches = []; D.example = false; D.business = ""; }
+          var idx = {};
+          D.sales.forEach(function (x, i) { idx[x.day + "|" + x.product] = i; });
+          r.sales.forEach(function (x) { var k = x.day + "|" + x.product; if (k in idx) D.sales[idx[k]] = x; else { idx[k] = D.sales.length; D.sales.push(x); } });
+          Object.keys(r.products).forEach(function (k) {
+            var p = r.products[k], cur = D.products[k] || { name: k, shelf_life: null, default_qty: null };
+            cur.price = p.price != null ? p.price : cur.price; cur.cost = p.cost != null ? p.cost : cur.cost; cur.active = true; D.products[k] = cur;
+          });
+          btCache = null; save();
+          return Promise.resolve({ ok: true, rows: r.sales.length, products: Object.keys(r.products).length });
+        } else if (path === "/api/example") {
+          example();
+        } else {
+          throw new Error("неизвестное действие");
+        }
+      } catch (e) { return Promise.reject(e); }
+      save();
+      return Promise.resolve({ ok: true });
+    }
+    return { load: load, state: function () { return Promise.resolve(state()); }, act: act, reset: example };
+  })();
+
+  /* ================= Обращение к серверу бота ================= */
+  function LoginNeeded() { this.login = true; }
+  var API = {
+    mode: null,
+    init: function () {
+      var self = this;
+      if (location.protocol === "file:") { self.mode = "local"; Local.load(); return Promise.resolve(); }
+      return fetch("api/ping", { cache: "no-store" }).then(function (r) { return r.ok ? r.json() : null; })
+        .catch(function () { return null; })
+        .then(function (j) { if (j && j.app === "svezhiy") self.mode = "server"; else { self.mode = "local"; Local.load(); } });
+    },
+    state: function () {
+      if (this.mode === "local") return Local.state();
+      return fetch("api/state", { cache: "no-store", credentials: "same-origin" }).then(function (r) {
+        if (r.status === 401) throw new LoginNeeded();
+        if (!r.ok) throw new Error("Сервер ответил " + r.status);
+        return r.json();
+      });
+    },
+    post: function (path, body) {
+      if (this.mode === "local") return Local.act(path, body || {});
+      return fetch(path.slice(1), { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}) })
+        .then(function (r) {
+          return r.json().catch(function () { return {}; }).then(function (j) {
+            if (r.status === 401) throw new LoginNeeded();
+            if (!r.ok) throw new Error(j.error || ("Ошибка " + r.status));
+            return j;
+          });
+        });
+    }
+  };
+
+  /* ================= Состояние интерфейса ================= */
+  var S = { st: null, tab: "today", part: null, partManual: false, offset: 0, fetchedAt: 0, edit: null, confirm: null, vitrina: {}, busy: false };
+  function nowMinutes() {
+    var d = new Date(Date.now() + S.offset);
+    return { m: d.getHours() * 60 + d.getMinutes(), label: pad(d.getHours()) + ":" + pad(d.getMinutes()) };
+  }
+  function serverOffset(nowStr) {
+    var p = nowStr.split("T"), d = p[0].split("-"), t = p[1].split(":");
+    var server = new Date(+d[0], +d[1] - 1, +d[2], +t[0], +t[1]).getTime();
+    return server - Date.now();
+  }
+
+  /* ================= Отрисовка ================= */
+  function renderTop() {
+    var st = S.st, n = nowMinutes();
+    $("biz").textContent = st.business.name ? st.business.name + (st.business.city ? ", " + st.business.city : "") : "Личный кабинет";
+    $("clock").textContent = n.label + " · " + dayLabel(st.today.date);
+    $("top-actions").innerHTML = API.mode === "server"
+      ? '<button class="btn btn-ghost btn-sm" data-act="logout">Выйти</button>'
+      : '<button class="btn btn-ghost btn-sm" data-act="reset">Сбросить пример</button>';
+    $("local-note").hidden = API.mode !== "local";
+    $("brand").setAttribute("href", API.mode === "server" ? "#" : "index.html");
+  }
+
+  function renderDay() {
+    var st = S.st, t = st.times, n = nowMinutes(), ph = phaseOf(t, n.m);
+    var a = mins(t.morning), b = mins(t.evening), c = mins(t.closing), end = Math.min(c + 120, 24 * 60);
+    var spans = [Math.max(b - a, 30), Math.max(c - b, 30), Math.max(end - c, 30)];
+    var cur = PART_OF[ph], heads = {
+      night: "Ночь: план на сегодня уже готов", morning: "Утро и день: работаем по плану",
+      evening: "Вечер: проверьте витрину", closing: "Конец дня: отметьте итоги" };
+    var parts = [["plan", "План на день", t.morning, "сколько сделать и заказать"],
+                 ["vitrina", "Витрина и скидки", t.evening, "что уценить, чтобы не выбросить"],
+                 ["itogi", "Итоги дня", t.closing, "минута на отметки"]];
+    var idxNow = { plan: 0, vitrina: 1, itogi: 2 }[cur];
+    var pct = Math.max(0, Math.min(100, (n.m - a) / (end - a) * 100));
+    var h = '<div class="day-head"><h1>' + esc(heads[ph]) + '</h1><span class="upd"><span class="pulse" aria-hidden="true"></span>обновляется автоматически · ' + esc(n.label) + "</span></div>";
+    h += '<div class="ribbon" style="--cols:' + spans.map(function (s) { return s + "fr"; }).join(" ") + '">';
+    parts.forEach(function (p, i) {
+      var cls = "seg" + (i === idxNow && ph !== "night" ? " now" : i < idxNow ? " past" : "");
+      h += '<button class="' + cls + '" data-part="' + p[0] + '" aria-pressed="' + (S.part === p[0]) + '"><span class="t">' + p[2] + "</span>" +
+           (i === idxNow && ph !== "night" ? '<span class="now-tag">сейчас</span>' : "") + "<b>" + p[1] + '</b><span class="desc">' + p[3] + "</span></button>";
+    });
+    h += '</div><div class="track" aria-hidden="true"><i style="width:' + pct.toFixed(1) + '%"></i><span style="left:' + pct.toFixed(1) + '%"></span></div>';
+    $("day").innerHTML = h;
+  }
+
+  function expiringCount() { return S.st.batches.filter(function (b) { return b.left <= 1; }).length; }
+
+  function renderTabs() {
+    document.querySelectorAll(".tabs button").forEach(function (b) {
+      var t = b.getAttribute("data-tab");
+      b.setAttribute("aria-selected", String(S.tab === t));
+      if (t === "batches") { var n = expiringCount(); b.innerHTML = "Сроки годности" + (n ? '<span class="cnt">' + n + "</span>" : ""); }
+    });
+  }
+
+  function whyText(it) { return it.reasons.filter(function (x) { return x.indexOf("дождь") !== 0 && x.indexOf("событие") !== 0; }).slice(0, 2).join("; "); }
+
+  function viewPlan() {
+    var st = S.st, items = st.today.items, total = items.reduce(function (a, i) { return a + i.qty; }, 0), exp = st.batches.filter(function (b) { return b.left <= 1; });
+    var h = '<div class="kpis"><div class="kpi"><b class="num">' + total + '</b><span>штук сделать сегодня</span></div>' +
+      '<div class="kpi"><b class="num">' + items.length + "</b><span>" + plural(items.length, "позиция", "позиции", "позиций") + " в плане</span></div>" +
+      '<div class="kpi' + (exp.length ? " bad" : "") + '"><b class="num">' + exp.length + "</b><span>" + plural(exp.length, "партия истекает", "партии истекают", "партий истекают") + " сегодня–завтра</span></div>" +
+      '<div class="kpi"><b>' + (st.today.event !== 1 ? M.signed((st.today.event - 1) * 100) : st.today.rain ? "дождь" : "обычный") + "</b><span>" +
+      (st.today.event !== 1 ? "событие сегодня" : st.today.rain ? "спрос ниже обычного" : "день по прогнозу") + "</span></div></div>";
+    if (!items.length) return h + emptyData();
+    h += '<div class="card"><h2>План на ' + dayLabel(st.today.date) + '</h2><p class="sub">Количество зафиксировано утром. Новые товары появляются в плане сразу после добавления.</p><div class="table-wrap"><table class="t"><thead><tr><th>Позиция</th><th class="r">Спрос</th><th class="r">Сделать</th></tr></thead><tbody>';
+    items.forEach(function (it) {
+      var w = whyText(it);
+      h += "<tr><td><div class=\"name\">" + esc(it.product) + (it["new"] ? ' <span class="chip new">новый</span>' : "") + "</div>" + (w ? '<div class="why">' + esc(w) + "</div>" : "") +
+        '</td><td class="r num">≈' + Math.round(it.mean) + ' <span class="muted">±' + Math.round(it.sd) + '</span></td><td class="r"><span class="big">' + it.qty + "</span></td></tr>";
+    });
+    h += '</tbody><tfoot><tr><td>Всего</td><td></td><td class="r"><span class="big">' + total + "</span></td></tr></tfoot></table></div></div>";
+    if (exp.length) {
+      h += '<div class="card"><h2>Пора пустить в работу</h2><p class="sub">Партии, у которых срок заканчивается сегодня или завтра.</p>' + batchRows(exp, true) + "</div>";
+    }
+    return h;
+  }
+
+  function viewVitrina() {
+    var items = S.st.today.items;
+    if (!items.length) return emptyData();
+    var h = '<div class="card"><h2>Проверьте витрину</h2><p class="sub">После ' + esc(S.st.times.evening) + " обычно уходит около пятой части дневных продаж. Если на витрине больше порога — ставьте скидку, иначе остаток уйдёт в списание. Впишите, сколько сейчас лежит, и получите совет.</p>" +
+      '<div class="table-wrap"><table class="t"><thead><tr><th>Позиция</th><th class="r">Сделали</th><th class="r">Скидка, если больше</th><th>Сейчас на витрине</th><th>Совет</th></tr></thead><tbody>';
+    items.slice().sort(function (a, b) { return a.product < b.product ? -1 : 1; }).forEach(function (it) {
+      var v = S.vitrina[it.product], adv = "";
+      if (v !== undefined && v !== "") {
+        var a = M.discountAdvice({ mean: it.mean }, +v);
+        adv = a.pct ? '<span class="chip warn">скидка ' + a.pct + "%</span>" : '<span class="chip ok">без скидки</span>';
+      }
+      h += "<tr><td class=\"name\">" + esc(it.product) + '</td><td class="r num">' + it.qty + '</td><td class="r num"><b>' + it.threshold + " шт</b></td>" +
+        '<td><input class="small" type="number" min="0" inputmode="numeric" data-vitrina="' + esc(it.product) + '" value="' + esc(v == null ? "" : v) + '" aria-label="Сейчас на витрине: ' + esc(it.product) + '"></td><td data-adv="' + esc(it.product) + '">' + adv + "</td></tr>";
+    });
+    return h + "</tbody></table></div></div>";
+  }
+
+  function viewItogi() {
+    var items = S.st.today.items;
+    if (!items.length) return emptyData();
+    var done = items.filter(function (i) { return i.record; }).length;
+    var h = '<div class="card"><h2>Итоги дня · ' + dayLabel(S.st.today.date) + '</h2><p class="sub">Отметьте по каждой позиции, когда она закончилась или сколько осталось. По этим отметкам сервис узнаёт реальный спрос и завтра считает точнее. То же можно сделать в боте.</p>' +
+      '<p class="hint">Отмечено ' + done + " из " + items.length + '</p><div class="progress"><i style="width:' + (done / items.length * 100).toFixed(0) + '%"></i></div>' +
+      '<div class="table-wrap" style="margin-top:14px"><table class="t"><thead><tr><th>Позиция</th><th class="r">Сделали</th><th>Закончилась</th><th>Или осталось</th><th>Отметка</th></tr></thead><tbody>';
+    items.slice().sort(function (a, b) { return a.product < b.product ? -1 : 1; }).forEach(function (it) {
+      var r = it.record, mark = !r ? '<span class="chip mute">нет</span>' : r.soldout ? '<span class="chip ok">✓ кончились ' + esc(r.soldout) + "</span>" : '<span class="chip ok">✓ осталось ' + r.left + "</span>";
+      h += '<tr><td class="name">' + esc(it.product) + '</td><td class="r num">' + it.qty + '</td><td><div class="slots">' +
+        SLOTS.map(function (s) { return '<button class="slot" data-act="soldout" data-p="' + esc(it.product) + '" data-t="' + s[1] + '">' + s[0] + "</button>"; }).join("") +
+        '</div></td><td><div class="left-in"><input type="number" min="0" inputmode="numeric" data-left="' + esc(it.product) + '" aria-label="Осталось: ' + esc(it.product) + '"><button class="btn btn-quiet btn-sm" data-act="left" data-p="' + esc(it.product) + '">OK</button></div></td><td>' + mark + "</td></tr>";
+    });
+    return h + "</tbody></table></div></div>";
+  }
+
+  function emptyData() {
+    return '<div class="empty">Пока нет товаров и продаж. Добавьте товары на вкладке «Товары» или загрузите выгрузку продаж в «Данные и настройки».</div>';
+  }
+
+  function viewTomorrow() {
+    var t = S.st.tomorrow, items = t.items, total = 0, habit = 0, hasH = false;
+    var weather = t.rain === true ? "Ожидается дождь: спрос ниже на " + Math.abs(Math.round(t.rain_effect * 100)) + "%" : t.rain === false ? "Без осадков" :
+      API.mode === "local" ? "В примере погода не учитывается" : "Прогноз погоды пока недоступен";
+    var opts = [[1, "Обычный день"], [1.1, "Небольшое событие +10%"], [1.2, "Праздник, ярмарка +20%"], [1.3, "Большое событие +30%"], [0.8, "Меньше людей −20%"]];
+    var h = '<div class="card"><div class="day-head" style="margin:0 0 10px"><div><h2>Завтра, ' + dayLabel(t.date) + '</h2><p class="sub" style="margin:0">' + esc(weather) + '</p></div>' +
+      '<label style="display:grid;gap:4px;font-size:12.5px;color:var(--ink-3);min-width:220px">Событие завтра<select data-act="event">' +
+      opts.map(function (o) { return '<option value="' + o[0] + '"' + (Math.abs(o[0] - t.event) < 1e-9 ? " selected" : "") + ">" + o[1] + "</option>"; }).join("") + "</select></label></div>";
+    if (!items.length) return h + emptyData() + "</div>";
+    h += '<div class="table-wrap"><table class="t"><thead><tr><th>Позиция</th><th class="r">Спрос</th><th class="r">Сделать</th><th class="r">Обычно</th></tr></thead><tbody>';
+    items.forEach(function (it) {
+      total += it.qty; if (it.habit != null) { habit += it.habit; hasH = true; } else habit += it.qty;
+      var w = whyText(it);
+      h += "<tr><td><div class=\"name\">" + esc(it.product) + (it["new"] ? ' <span class="chip new">новый</span>' : "") + "</div>" + (w ? '<div class="why">' + esc(w) + "</div>" : "") +
+        '</td><td class="r num">≈' + Math.round(it.mean) + '</td><td class="r"><span class="big">' + it.qty + '</span></td><td class="r num muted">' + (it.habit != null ? it.habit : "—") + "</td></tr>";
+    });
+    h += '</tbody><tfoot><tr><td>Всего</td><td></td><td class="r"><span class="big">' + total + '</span></td><td class="r num">' + (hasH ? Math.round(habit) : "—") + "</td></tr></tfoot></table></div>" +
+      '<p class="hint" style="margin-top:10px">«Обычно» — сколько в среднем делали в этот день недели за 4 недели. Утром в ' + esc(S.st.times.morning) + " план зафиксируется и придёт в Telegram.</p></div>";
+    return h;
+  }
+
+  function productForm(p) {
+    p = p || {};
+    return '<label class="wide">Название<input type="text" name="name" maxlength="60" required value="' + esc(p.name || "") + '" placeholder="Например, Салат «Оливье»"></label>' +
+      '<label>Цена, ₽<input type="number" name="price" min="0" step="any" value="' + esc(p.price == null ? "" : p.price) + '"></label>' +
+      '<label>Себестоимость, ₽<input type="number" name="cost" min="0" step="any" value="' + esc(p.cost == null ? "" : p.cost) + '"></label>' +
+      '<label>Срок хранения, дней<input type="number" name="shelf_life" min="0" step="1" value="' + esc(p.shelf_life == null ? "" : p.shelf_life) + '"></label>' +
+      '<label>Обычно в день, шт<input type="number" name="default_qty" min="0" step="any" value="' + esc(p.default_qty == null ? "" : p.default_qty) + '"></label>';
+  }
+
+  function viewProducts() {
+    var st = S.st;
+    var h = '<div class="card"><h2>Добавить товар</h2><p class="sub">Цена и себестоимость нужны, чтобы понимать, что дороже: остаток или пустая полка. Срок хранения подставляет дату «годен до» в партиях. «Обычно в день» — для нового товара без истории продаж: план будет таким, пока не накопятся продажи.</p>' +
+      '<form class="form" data-form="product-add">' + productForm() + '<button class="btn btn-primary" type="submit">Добавить</button></form></div>';
+    h += '<div class="card"><h2>Товары · ' + st.products.length + '</h2><p class="sub">Убранный товар исчезает из планов, но его история продаж сохраняется — его можно вернуть.</p>';
+    if (!st.products.length) h += '<div class="empty">Товаров пока нет.</div>';
+    else {
+      h += '<div class="table-wrap"><table class="t"><thead><tr><th>Товар</th><th class="r">Цена</th><th class="r">Себест.</th><th class="r">Маржа</th><th class="r">Срок</th><th>История</th><th></th></tr></thead><tbody>';
+      st.products.forEach(function (p) {
+        if (S.edit === p.name) {
+          h += '<tr><td colspan="7"><form class="form" data-form="product-edit" data-old="' + esc(p.name) + '">' + productForm(p) +
+            '<div class="acts"><button class="btn btn-primary btn-sm" type="submit">Сохранить</button><button class="btn btn-quiet btn-sm" type="button" data-act="edit-cancel">Отмена</button></div></form></td></tr>';
+          return;
+        }
+        var margin = p.price && p.cost != null ? Math.round((p.price - p.cost) / p.price * 100) + "%" : "—";
+        var acts = S.confirm === p.name
+          ? '<span class="hint">Убрать из планов?</span><button class="btn btn-danger btn-sm" data-act="remove" data-p="' + esc(p.name) + '">Да, убрать</button><button class="btn btn-quiet btn-sm" data-act="confirm-cancel">Нет</button>'
+          : '<button class="btn btn-quiet btn-sm" data-act="edit" data-p="' + esc(p.name) + '">Изменить</button><button class="btn btn-quiet btn-sm" data-act="ask-remove" data-p="' + esc(p.name) + '">Убрать</button>';
+        h += '<tr><td class="name">' + esc(p.name) + '</td><td class="r num">' + (p.price != null ? fmt(p.price) : "—") + '</td><td class="r num">' + (p.cost != null ? fmt(p.cost) : "—") +
+          '</td><td class="r num">' + margin + '</td><td class="r num">' + (p.shelf_life != null ? p.shelf_life + " дн." : "—") + "</td><td>" +
+          (p.history_days ? '<span class="chip mute">' + p.history_days + " дн. продаж</span>" : '<span class="chip new">новый' + (p.default_qty ? ", " + fmt(p.default_qty) + " шт/день" : "") + "</span>") +
+          '</td><td><div class="acts">' + acts + "</div></td></tr>";
+      });
+      h += "</tbody></table></div>";
+    }
+    if (st.removed.length) {
+      h += '<div class="removed" style="margin-top:14px"><span class="hint">Убранные:</span>' + st.removed.map(function (n) {
+        return '<span class="chip mute">' + esc(n) + '</span><button class="btn btn-quiet btn-sm" data-act="restore" data-p="' + esc(n) + '">Вернуть</button>';
+      }).join("") + "</div>";
+    }
+    return h + "</div>";
+  }
+
+  function batchRows(list, compact) {
+    if (!list.length) return '<div class="empty">Партий нет. Добавьте продукт, количество и срок годности.</div>';
+    var glyph = { ok: "●", warn: "▲", bad: "✕" };
+    var h = '<div class="table-wrap"><table class="t"><thead><tr><th>Продукт</th><th>Количество</th><th>Годен до</th><th>Статус</th>' + (compact ? "" : "<th></th>") + "</tr></thead><tbody>";
+    list.forEach(function (b) {
+      h += '<tr><td><div class="name">' + esc(b.item) + "</div>" + (b.tip ? '<div class="why">→ ' + esc(b.tip) + "</div>" : "") + "</td><td>" + esc(b.qty || "—") +
+        '</td><td class="num">' + dayLabel(b.expires) + '</td><td><span class="chip ' + b.level + '">' + glyph[b.level] + " " + esc(b.label) + "</span></td>" +
+        (compact ? "" : '<td><div class="acts"><button class="btn btn-quiet btn-sm" data-act="batch" data-id="' + b.id + '" data-s="used">Использовано</button><button class="btn btn-quiet btn-sm" data-act="batch" data-id="' + b.id + '" data-s="written_off">Списано</button><button class="btn btn-quiet btn-sm" data-act="batch" data-id="' + b.id + '" data-s="deleted" aria-label="Удалить запись">Удалить</button></div></td>') + "</tr>";
+    });
+    return h + "</tbody></table></div>";
+  }
+
+  function viewBatches() {
+    var st = S.st, today = st.today.date;
+    var h = '<div class="card"><h2>Добавить партию</h2><p class="sub">Выберите товар со сроком хранения — дата «годен до» посчитается сама. Для сырья (сливки, творог) укажите дату с упаковки.</p>' +
+      '<form class="form" data-form="batch-add"><label class="wide">Продукт<input type="text" name="item" list="prodlist" maxlength="60" required placeholder="Сливки 33% или товар из списка"></label>' +
+      '<label>Количество<input type="text" name="qty" maxlength="20" placeholder="2 л, 20 шт"></label>' +
+      '<label>Изготовлено / поставлено<input type="date" name="made" value="' + today + '"></label>' +
+      '<label>Годен до<input type="date" name="expires"></label><button class="btn btn-primary" type="submit">Добавить</button></form>' +
+      '<datalist id="prodlist">' + st.products.map(function (p) { return '<option value="' + esc(p.name) + '">' + (p.shelf_life ? "срок " + p.shelf_life + " дн." : "") + "</option>"; }).join("") + "</datalist></div>";
+    h += '<div class="card"><h2>Партии и сроки · ' + st.batches.length + '</h2><p class="sub">За день до конца срока сервис напомнит в Telegram и подскажет, куда пустить продукт.</p>' + batchRows(st.batches, false) + "</div>";
+    return h;
+  }
+
+  function viewData() {
+    var st = S.st, d = st.data, sm = st.summary;
+    var h = '<div class="grid2"><div class="card"><h2>Заведение и расписание</h2><p class="sub">Время рассылок в Telegram и смены частей дня в кабинете.</p>' +
+      '<form class="form" data-form="settings"><label class="wide">Название<input type="text" name="business" maxlength="80" value="' + esc(st.business.name) + '" placeholder="Булочная на Ленина"></label>' +
+      '<label>План утром<input type="time" name="morning" value="' + esc(st.times.morning) + '"></label><label>Витрина вечером<input type="time" name="evening" value="' + esc(st.times.evening) + '"></label>' +
+      '<label>Итоги дня<input type="time" name="closing" value="' + esc(st.times.closing) + '"></label><button class="btn btn-primary" type="submit">Сохранить</button></form></div>';
+    h += '<div class="card"><h2>Данные продаж</h2><p class="sub">' + (d.rows ? d.rows + " " + plural(d.rows, "строка", "строки", "строк") + " с " + dayLabel(d.first) + " по " + dayLabel(d.last) + (st.business.is_example ? ". Сейчас загружен пример — условная пекарня." : ".") : "Продаж пока нет.") + "</p>" +
+      '<div class="form"><label class="wide">Выгрузка из кассы или Excel (CSV)<input type="file" accept=".csv,.txt,text/csv" data-act="upload"></label></div>' +
+      '<p class="hint" style="margin-top:8px">Колонки: <span class="mono">дата;товар;продано</span>, по желанию <span class="mono">испечено (или заказано);закончилось;цена;себестоимость;дождь</span>. Свои данные заменят пример.</p>' +
+      '<div class="acts" style="justify-content:flex-start;margin-top:12px">' + (S.confirm === "__example"
+        ? '<span class="hint">Заменить все данные примером?</span><button class="btn btn-danger btn-sm" data-act="example">Да, загрузить пример</button><button class="btn btn-quiet btn-sm" data-act="confirm-cancel">Нет</button>'
+        : '<button class="btn btn-quiet btn-sm" data-act="ask-example">Загрузить пример пекарни</button>') + "</div></div></div>";
+    if (sm) {
+      var max = Math.max(sm.waste_now + sm.lost_now, sm.waste_new + sm.lost_new);
+      var row = function (label, a, b) {
+        return '<div style="margin-top:14px"><b>' + label + ' <span class="hint">' + M.signed((b / a - 1) * 100) + '</span></b>' +
+          '<div class="cmp"><span>Как было</span><div class="bar"><i style="width:' + (a / max * 100).toFixed(1) + '%;background:var(--ink-3)"></i></div><span class="v">' + money(a) + "</span></div>" +
+          '<div class="cmp"><span>По плану</span><div class="bar"><i style="width:' + (b / max * 100).toFixed(1) + '%;background:var(--stamp)"></i></div><span class="v">' + money(b) + "</span></div></div>";
+      };
+      h += '<div class="card"><h2>Проверка на истории</h2><p class="sub">Что было бы за последние ' + sm.days + " " + plural(sm.days, "день", "дня", "дней") + ", если бы работали по плану сервиса. Для каждого дня модель видит только продажи до него." +
+        (st.business.is_example ? " Данные условной пекарни смоделированы." : "") + "</p>" +
+        row("Списания по себестоимости", sm.waste_now, sm.waste_new) + row("Упущенная прибыль, когда товар закончился", sm.lost_now, sm.lost_new) +
+        row("Итого потери", sm.waste_now + sm.lost_now, sm.waste_new + sm.lost_new) + "</div>";
+    }
+    return h;
+  }
+
+  function render() {
+    if (!S.st) return;
+    renderTop(); renderDay(); renderTabs();
+    var v = "";
+    if (S.tab === "today") v = S.part === "vitrina" ? viewVitrina() : S.part === "itogi" ? viewItogi() : viewPlan();
+    else if (S.tab === "tomorrow") v = viewTomorrow();
+    else if (S.tab === "products") v = viewProducts();
+    else if (S.tab === "batches") v = viewBatches();
+    else v = viewData();
+    $("view").innerHTML = v;
+  }
+
+  /* ================= Данные ================= */
+  function refresh(force) {
+    if (!force && (S.busy || isTyping())) return Promise.resolve();
+    return API.state().then(function (st) {
+      S.st = st; S.offset = serverOffset(st.now); S.fetchedAt = Date.now();
+      var cur = PART_OF[phaseOf(st.times, nowMinutes().m)];
+      if (!S.part || !S.partManual) S.part = cur;
+      $("loading").hidden = true; $("login").hidden = true; $("app").hidden = false;
+      render();
+    }).catch(function (e) {
+      if (e && e.login) return showLogin();
+      $("loading").textContent = "Не удалось загрузить кабинет: " + (e && e.message ? e.message : e);
+    });
+  }
+  function isTyping() {
+    var a = document.activeElement;
+    return a && $("view").contains(a) && /INPUT|SELECT|TEXTAREA/.test(a.tagName) && a.type !== "file";
+  }
+  function post(path, body, okMsg) {
+    S.busy = true;
+    return API.post(path, body).then(function (r) {
+      S.busy = false; if (okMsg) toast(okMsg);
+      return refresh(true).then(function () { return r; });
+    }).catch(function (e) {
+      S.busy = false;
+      if (e && e.login) return showLogin();
+      toast(e && e.message ? e.message : "Не получилось");
+      throw e;
+    });
+  }
+  function showLogin() {
+    $("loading").hidden = true; $("app").hidden = true; $("login").hidden = false;
+    $("local-note").hidden = true; $("top-actions").innerHTML = ""; $("clock").textContent = "";
+    var u = "https://t.me/" + BOT_USERNAME;
+    $("login-bot").href = u; $("login-bot").textContent = "@" + BOT_USERNAME;
+    setTimeout(function () { $("code").focus(); }, 50);
+  }
+
+  /* ================= События ================= */
+  document.addEventListener("click", function (e) {
+    var t = e.target.closest("[data-act],[data-part],[data-tab]");
+    if (!t) return;
+    if (t.hasAttribute("data-tab")) { S.tab = t.getAttribute("data-tab"); S.edit = null; S.confirm = null; render(); return; }
+    if (t.hasAttribute("data-part")) { S.part = t.getAttribute("data-part"); S.partManual = true; S.tab = "today"; render(); return; }
+    var a = t.getAttribute("data-act"), p = t.getAttribute("data-p");
+    if (a === "logout") { API.post("/api/logout").catch(function () {}).then(function () { S.st = null; showLogin(); }); }
+    else if (a === "reset") { Local.reset(); S.vitrina = {}; refresh(true).then(function () { toast("Пример восстановлен"); }); }
+    else if (a === "soldout") post("/api/record", { product: p, soldout: t.getAttribute("data-t") }, "Отмечено: " + p);
+    else if (a === "left") {
+      var inp = document.querySelector('[data-left="' + CSS.escape(p) + '"]');
+      if (!inp || inp.value === "") { toast("Впишите, сколько осталось"); return; }
+      post("/api/record", { product: p, left: inp.value }, "Отмечено: " + p);
+    }
+    else if (a === "edit") { S.edit = p; S.confirm = null; render(); }
+    else if (a === "edit-cancel") { S.edit = null; render(); }
+    else if (a === "ask-remove") { S.confirm = p; S.edit = null; render(); }
+    else if (a === "ask-example") { S.confirm = "__example"; render(); }
+    else if (a === "confirm-cancel") { S.confirm = null; render(); }
+    else if (a === "remove") { S.confirm = null; post("/api/product/remove", { name: p }, "Убрано из планов: " + p); }
+    else if (a === "restore") post("/api/product/restore", { name: p }, "Вернули: " + p);
+    else if (a === "batch") {
+      var s = t.getAttribute("data-s");
+      post("/api/batch/close", { id: +t.getAttribute("data-id"), status: s }, s === "used" ? "Отмечено: использовано" : s === "written_off" ? "Списание учтено" : "Запись удалена");
+    }
+    else if (a === "example") { S.confirm = null; S.vitrina = {}; post("/api/example", {}, "Загружен пример пекарни"); }
+  });
+  document.addEventListener("input", function (e) {
+    var t = e.target;
+    if (t.hasAttribute("data-vitrina")) {
+      var p = t.getAttribute("data-vitrina"); S.vitrina[p] = t.value;
+      var it = S.st.today.items.filter(function (x) { return x.product === p; })[0], cell = document.querySelector('[data-adv="' + CSS.escape(p) + '"]');
+      if (it && cell) {
+        if (t.value === "") cell.innerHTML = "";
+        else { var a = M.discountAdvice({ mean: it.mean }, +t.value); cell.innerHTML = a.pct ? '<span class="chip warn">скидка ' + a.pct + "%</span>" : '<span class="chip ok">без скидки</span>'; }
+      }
+    }
+    if (t.form && t.form.getAttribute("data-form") === "batch-add" && (t.name === "item" || t.name === "made")) {
+      var f = t.form, prod = S.st.products.filter(function (x) { return x.name === f.item.value.trim(); })[0];
+      if (prod && prod.shelf_life && f.made.value) f.expires.value = M.diso(M.dnum(f.made.value) + prod.shelf_life);
+    }
+  });
+  document.addEventListener("change", function (e) {
+    var t = e.target, a = t.getAttribute("data-act");
+    if (a === "event") post("/api/event", { factor: +t.value }, "Прогноз на завтра обновлён");
+    if (a === "upload" && t.files && t.files[0]) {
+      var file = t.files[0], rd = new FileReader();
+      rd.onload = function () {
+        var text;
+        try { text = new TextDecoder("utf-8", { fatal: true }).decode(rd.result); } catch (x) { text = new TextDecoder("windows-1251").decode(rd.result); }
+        post("/api/upload", { csv: text }).then(function (r) { toast("Загружено строк: " + r.rows); }).catch(function () {});
+      };
+      rd.readAsArrayBuffer(file); t.value = "";
+    }
+  });
+  document.addEventListener("submit", function (e) {
+    var f = e.target, kind = f.getAttribute("data-form");
+    if (f.id === "login-form") {
+      e.preventDefault();
+      var code = $("code").value.replace(/\D/g, "");
+      $("login-err").hidden = true;
+      API.post("/api/login", { code: code }).then(function () { $("code").value = ""; return refresh(true); })
+        .catch(function (x) { $("login-err").textContent = x && x.message ? x.message : "Не получилось войти"; $("login-err").hidden = false; });
+      return;
+    }
+    if (!kind) return;
+    e.preventDefault();
+    var data = {};
+    Array.prototype.forEach.call(f.elements, function (el) { if (el.name) data[el.name] = el.value; });
+    if (kind === "product-add") post("/api/product", data, "Товар добавлен: " + data.name).then(function () {}).catch(function () {});
+    else if (kind === "product-edit") { data.old_name = f.getAttribute("data-old"); S.edit = null; post("/api/product", data, "Сохранено").catch(function () {}); }
+    else if (kind === "batch-add") { if (!data.expires) delete data.expires; post("/api/batch", data, "Партия добавлена").catch(function () {}); }
+    else if (kind === "settings") post("/api/settings", data, "Настройки сохранены").catch(function () {});
+  });
+  document.addEventListener("visibilitychange", function () { if (!document.hidden && S.st) refresh(); });
+
+  // часы и смена частей дня
+  var lastPhase = null;
+  setInterval(function () {
+    if (!S.st) return;
+    var ph = phaseOf(S.st.times, nowMinutes().m);
+    if (lastPhase && ph !== lastPhase) { S.partManual = false; refresh(true); }
+    lastPhase = ph;
+    renderTop(); renderDay();
+  }, 15000);
+  setInterval(function () { if (S.st) refresh(); }, 60000);
+
+  /* ================= Старт ================= */
+  API.init().then(function () {
+    var m = location.search.match(/[?&]code=(\d{6})/);
+    if (API.mode === "server" && m) {
+      history.replaceState(null, "", location.pathname);
+      return API.post("/api/login", { code: m[1] }).catch(function () {}).then(function () { return refresh(true); });
+    }
+    return refresh(true);
+  });
+})();
+</script>
+
+</body>
+</html>

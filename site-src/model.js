@@ -67,7 +67,13 @@
     var hist = sales.filter(function (s) { return s.product === product.name && s.day < target; })
                     .sort(function (x, y) { return y.day - x.day; });
     var cr = criticalRatio(product.price, product.cost), reasons = [];
-    if (!hist.length) return { product: product.name, mean: 0, sd: 0, qty: 0, ratio: cr, reasons: ["нет истории продаж"], n: 0 };
+    if (!hist.length) {
+      if (product.default_qty) {
+        var dq = +product.default_qty;
+        return { product: product.name, mean: dq, sd: Math.sqrt(dq), qty: Math.max(0, Math.floor(dq + 0.5)), ratio: cr, reasons: ["новый товар: истории пока нет, берём ваш обычный объём"], n: 0 };
+      }
+      return { product: product.name, mean: 0, sd: 0, qty: 0, ratio: cr, reasons: ["нет истории продаж"], n: 0 };
+    }
 
     var clean = {}, days = [];
     hist.forEach(function (s) {

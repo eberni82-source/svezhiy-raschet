@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS chats (
 );
 CREATE TABLE IF NOT EXISTS products (
     chat_id INTEGER, name TEXT, price REAL, cost REAL,
+    shelf_life INTEGER, default_qty REAL, active INTEGER DEFAULT 1,
     PRIMARY KEY (chat_id, name)
 );
 CREATE TABLE IF NOT EXISTS sales (
@@ -40,6 +41,12 @@ CREATE TABLE IF NOT EXISTS batches (
     chat_id INTEGER, item TEXT, qty TEXT, expires TEXT,
     status TEXT DEFAULT 'active', created_at TEXT
 );
+CREATE TABLE IF NOT EXISTS login_codes (
+    code TEXT PRIMARY KEY, chat_id INTEGER, expires REAL
+);
+CREATE TABLE IF NOT EXISTS sessions (
+    token TEXT PRIMARY KEY, chat_id INTEGER, created REAL
+);
 CREATE TABLE IF NOT EXISTS leads (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     chat_id INTEGER, username TEXT, business TEXT, city TEXT, kind TEXT, contact TEXT,
@@ -53,6 +60,11 @@ class Storage:
         self.db = sqlite3.connect(path, check_same_thread=False)
         self.db.row_factory = sqlite3.Row
         self.db.executescript(SCHEMA)
+        # миграция старых баз: новые колонки товаров
+        cols = {r["name"] for r in self.db.execute("PRAGMA table_info(products)")}
+        for col, typ in (("shelf_life", "INTEGER"), ("default_qty", "REAL"), ("active", "INTEGER DEFAULT 1")):
+            if col not in cols:
+                self.db.execute(f"ALTER TABLE products ADD COLUMN {col} {typ}")
         self.db.commit()
 
     # --- чаты ---
@@ -75,15 +87,46 @@ class Storage:
         self.db.commit()
 
     # --- товары и продажи ---
-    def products(self, chat_id: int) -> dict[str, Product]:
-        rows = self.db.execute("SELECT name, price, cost FROM products WHERE chat_id=? ORDER BY name", (chat_id,))
-        return {r["name"]: Product(r["name"], r["price"], r["cost"]) for r in rows}
+    def products(self, chat_id: int, include_inactive: bool = False) -> dict[str, Product]:
+        sql = "SELECT * FROM products WHERE chat_id=?" + ("" if include_inactive else " AND COALESCE(active, 1)=1")
+        rows = self.db.execute(sql + " ORDER BY name", (chat_id,))
+        return {r["name"]: Product(r["name"], r["price"], r["cost"], r["shelf_life"], r["default_qty"]) for r in rows}
+
+    def inactive_products(self, chat_id: int) -> set[str]:
+        return {r["name"] for r in self.db.execute(
+            "SELECT name FROM products WHERE chat_id=? AND active=0", (chat_id,))}
 
     def upsert_product(self, chat_id: int, p: Product):
         self.db.execute(
-            "INSERT INTO products (chat_id, name, price, cost) VALUES (?,?,?,?) "
+            "INSERT INTO products (chat_id, name, price, cost, shelf_life, default_qty, active) VALUES (?,?,?,?,?,?,1) "
             "ON CONFLICT(chat_id, name) DO UPDATE SET price=COALESCE(excluded.price, price), "
-            "cost=COALESCE(excluded.cost, cost)", (chat_id, p.name, p.price, p.cost))
+            "cost=COALESCE(excluded.cost, cost), shelf_life=COALESCE(excluded.shelf_life, shelf_life), "
+            "default_qty=COALESCE(excluded.default_qty, default_qty), active=1",
+            (chat_id, p.name, p.price, p.cost, p.shelf_life, p.default_qty))
+
+    def save_product(self, chat_id: int, p: Product, old_name: str | None = None):
+        """Сохранить карточку товара из кабинета (значения заменяются целиком)."""
+        if old_name and old_name != p.name:
+            for t in ("sales", "plans"):
+                self.db.execute(f"UPDATE {t} SET product=? WHERE chat_id=? AND product=?", (p.name, chat_id, old_name))
+            self.db.execute("DELETE FROM products WHERE chat_id=? AND name=?", (chat_id, old_name))
+        self.db.execute(
+            "INSERT INTO products (chat_id, name, price, cost, shelf_life, default_qty, active) VALUES (?,?,?,?,?,?,1) "
+            "ON CONFLICT(chat_id, name) DO UPDATE SET price=excluded.price, cost=excluded.cost, "
+            "shelf_life=excluded.shelf_life, default_qty=excluded.default_qty, active=1",
+            (chat_id, p.name, p.price, p.cost, p.shelf_life, p.default_qty))
+        self.db.commit()
+
+    def set_product_active(self, chat_id: int, name: str, active: bool):
+        self.db.execute("INSERT INTO products (chat_id, name, active) VALUES (?,?,?) "
+                        "ON CONFLICT(chat_id, name) DO UPDATE SET active=excluded.active", (chat_id, name, int(active)))
+        if not active:  # убираем из сегодняшних и будущих планов
+            self.db.execute("DELETE FROM plans WHERE chat_id=? AND product=? AND day>=date('now','-1 day')", (chat_id, name))
+        self.db.commit()
+
+    def history_days(self, chat_id: int) -> dict[str, int]:
+        return {r["product"]: r["n"] for r in self.db.execute(
+            "SELECT product, COUNT(DISTINCT day) AS n FROM sales WHERE chat_id=? GROUP BY product", (chat_id,))}
 
     def upsert_sale(self, chat_id: int, s: Sale):
         self.db.execute(
@@ -149,8 +192,47 @@ class Storage:
         return self.db.execute("SELECT * FROM batches WHERE chat_id=? AND status='active' ORDER BY expires, id",
                                (chat_id,)).fetchall()
 
+    def batch_count(self, chat_id: int) -> int:
+        return self.db.execute("SELECT COUNT(*) FROM batches WHERE chat_id=? AND status='active'", (chat_id,)).fetchone()[0]
+
     def close_batch(self, chat_id: int, batch_id: int, status: str):
         self.db.execute("UPDATE batches SET status=? WHERE chat_id=? AND id=?", (status, chat_id, batch_id))
+        self.db.commit()
+
+    # --- вход в веб-кабинет ---
+    def create_code(self, chat_id: int, ttl: int = 600) -> str:
+        import secrets, time as _t
+        self.db.execute("DELETE FROM login_codes WHERE expires < ? OR chat_id=?", (_t.time(), chat_id))
+        while True:
+            code = f"{secrets.randbelow(900000) + 100000}"
+            if not self.db.execute("SELECT 1 FROM login_codes WHERE code=?", (code,)).fetchone():
+                break
+        self.db.execute("INSERT INTO login_codes (code, chat_id, expires) VALUES (?,?,?)", (code, chat_id, _t.time() + ttl))
+        self.db.commit()
+        return code
+
+    def use_code(self, code: str) -> str | None:
+        """Код из бота → токен сессии (код одноразовый)."""
+        import secrets, time as _t
+        r = self.db.execute("SELECT chat_id FROM login_codes WHERE code=? AND expires>=?", (code.strip(), _t.time())).fetchone()
+        if not r:
+            return None
+        self.db.execute("DELETE FROM login_codes WHERE code=?", (code.strip(),))
+        token = secrets.token_hex(24)
+        self.db.execute("INSERT INTO sessions (token, chat_id, created) VALUES (?,?,?)", (token, r["chat_id"], _t.time()))
+        self.db.commit()
+        return token
+
+    def session_chat(self, token: str | None) -> int | None:
+        import time as _t
+        if not token:
+            return None
+        r = self.db.execute("SELECT chat_id FROM sessions WHERE token=? AND created>=?",
+                            (token, _t.time() - 30 * 86400)).fetchone()
+        return r["chat_id"] if r else None
+
+    def drop_session(self, token: str):
+        self.db.execute("DELETE FROM sessions WHERE token=?", (token,))
         self.db.commit()
 
     # --- заявки на пилот ---

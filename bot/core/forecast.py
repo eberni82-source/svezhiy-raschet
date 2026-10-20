@@ -42,6 +42,8 @@ class Product:
     name: str
     price: float | None = None
     cost: float | None = None
+    shelf_life: int | None = None      # срок хранения, дней
+    default_qty: float | None = None   # обычный объём в день — для нового товара без истории
 
 
 @dataclass
@@ -111,8 +113,12 @@ def forecast(sales: list[Sale], product: Product, target: date, rain_tomorrow: b
     reasons: list[str] = []
 
     if not hist:
-        return Recommendation(product.name, 0, 0, 0, critical_ratio(product.price, product.cost),
-                              ["нет истории продаж"], 0)
+        cr = critical_ratio(product.price, product.cost)
+        if product.default_qty:
+            dq = float(product.default_qty)
+            return Recommendation(product.name, dq, math.sqrt(dq), max(0, int(math.floor(dq + 0.5))), cr,
+                                  ["новый товар: истории пока нет, берём ваш обычный объём"], 0)
+        return Recommendation(product.name, 0, 0, 0, cr, ["нет истории продаж"], 0)
 
     # спрос, очищенный от дождя, за последние 8 недель
     window = [s for s in hist if (target - s.day).days <= 56]

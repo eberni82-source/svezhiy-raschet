@@ -362,6 +362,8 @@ input[type="range"] { width: 100%; accent-color: var(--stamp); }
 .pilot-cta { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 26px; align-items: center; }
 .pilot .btn-ghost { color: var(--kraft-ink); }
 .bot-addr { font: 600 14px var(--f-mono); }
+.pilot-kab { margin-top: 22px; font-size: 15px; max-width: 52ch; }
+.pilot-kab a { font-weight: 700; }
 
 footer { padding-block: 32px; font-size: 14px; color: var(--ink-3); }
 .foot { display: flex; justify-content: space-between; gap: 16px 32px; flex-wrap: wrap; }
@@ -377,6 +379,7 @@ footer { padding-block: 32px; font-size: 14px; color: var(--ink-3); }
       <a href="#demo">Пример</a>
       <a href="#calc">Экономия</a>
       <a href="#price">Цена</a>
+      <a href="kabinet.html">Кабинет</a>
       <a class="btn btn-primary" href="#pilot">Подключить</a>
     </nav>
   </div>
@@ -692,11 +695,12 @@ footer { padding-block: 32px; font-size: 14px; color: var(--ink-3); }
         <h2>Месяц бесплатно для вашей точки</h2>
         <p class="lead">В конце месяца покажем, сколько вы списывали до и после. Решение о подписке — по цифрам.</p>
         <div class="pilot-cta" id="pilot-cta"></div>
+        <p class="pilot-kab">Всё, что приходит в Telegram, видно и в личном кабинете на сайте: план на день, витрина, итоги, товары и сроки годности. <a href="kabinet.html">Посмотреть кабинет на примере пекарни →</a></p>
       </div>
       <ol class="steps">
         <li><div><b>Откройте бота в Telegram</b><span>Нажмите «Старт» и ответьте на 4 вопроса: заведение, город, тип, контакт.</span></div></li>
         <li><div><b>Пришлите выгрузку продаж</b><span>Файл из кассы или Excel за последние 4 недели: что и сколько продали по дням. Поможем выгрузить.</span></div></li>
-        <li><div><b>Утром получите первый план</b><span>Дальше — по 3 сообщения в день. Через месяц сравним списания.</span></div></li>
+        <li><div><b>Утром получите первый план</b><span>Дальше — по 3 сообщения в день и личный кабинет на сайте. Через месяц сравним списания.</span></div></li>
       </ol>
     </div>
   </section>
@@ -778,7 +782,13 @@ footer { padding-block: 32px; font-size: 14px; color: var(--ink-3); }
     var hist = sales.filter(function (s) { return s.product === product.name && s.day < target; })
                     .sort(function (x, y) { return y.day - x.day; });
     var cr = criticalRatio(product.price, product.cost), reasons = [];
-    if (!hist.length) return { product: product.name, mean: 0, sd: 0, qty: 0, ratio: cr, reasons: ["нет истории продаж"], n: 0 };
+    if (!hist.length) {
+      if (product.default_qty) {
+        var dq = +product.default_qty;
+        return { product: product.name, mean: dq, sd: Math.sqrt(dq), qty: Math.max(0, Math.floor(dq + 0.5)), ratio: cr, reasons: ["новый товар: истории пока нет, берём ваш обычный объём"], n: 0 };
+      }
+      return { product: product.name, mean: 0, sd: 0, qty: 0, ratio: cr, reasons: ["нет истории продаж"], n: 0 };
+    }
 
     var clean = {}, days = [];
     hist.forEach(function (s) {

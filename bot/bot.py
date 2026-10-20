@@ -12,6 +12,7 @@ import math
 import os
 import re
 import sys
+import threading
 import time
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
@@ -29,6 +30,7 @@ try:
     from core.storage import Storage
     from core.tg import Telegram, TelegramError
     from core.weather import WeatherCache, geocode
+    from core.web import start_web
 except ModuleNotFoundError as e:
     if (e.name or "").startswith("core"):
         raise SystemExit(f"Не нашёл папку core рядом с bot.py ({Path(__file__).resolve().parent}).\n"
@@ -51,9 +53,11 @@ ROOT = Path(__file__).resolve().parent
 log = logging.getLogger("bot")
 esc = html.escape
 
-MENU = [["План на завтра", "Итоги дня"], ["Скидка сейчас", "Сроки годности"], ["Добавить партию", "Помощь"]]
+MENU = [["План на завтра", "Итоги дня"], ["Скидка сейчас", "Сроки годности"], ["Добавить партию", "Личный кабинет"],
+        ["Помощь"]]
 BUTTON_TO_CMD = {"План на завтра": "/plan", "Итоги дня": "/itogi", "Скидка сейчас": "/skidka",
-                 "Сроки годности": "/batches", "Добавить партию": "/batch", "Помощь": "/help"}
+                 "Сроки годности": "/batches", "Добавить партию": "/batch", "Личный кабинет": "/web",
+                 "Помощь": "/help"}
 SOLDOUT_SLOTS = [("до 12:00", "11:00"), ("12–15", "13:30"), ("15–18", "16:30"), ("после 18", "19:30")]
 KINDS = ["Пекарня", "Кофейня", "Кулинария", "Столовая", "Другое"]
 
@@ -75,7 +79,8 @@ HELP = """<b>Что умеет бот</b>
 /price Круассан 120 40 — задать цену и себестоимость
 /time утро 06:00 — поменять время рассылки (утро, вечер, итоги)
 /city — сменить город (для погоды и часового пояса)
-/demo — загрузить демо-данные пекарни
+/web — войти в личный кабинет на сайте
+/demo — загрузить пример: условная пекарня
 /stop — выключить рассылку, /start — включить
 
 <b>Свои продажи</b> — пришлите CSV-файл (выгрузку из кассы или Excel → «Сохранить как CSV») с колонками:
@@ -134,6 +139,8 @@ class FreshBot:
         self.state: dict[int, dict] = {}
         self.offset: int | None = None
         self.last_tick = 0.0
+        self.lock = threading.RLock()   # бот и веб-кабинет работают с одной базой
+        self.web_url: str | None = None
 
     # ------------------------------------------------------------------ время
     def tz(self, chat) -> timezone:
@@ -155,14 +162,16 @@ class FreshBot:
         cid = chat["chat_id"]
         sales = self.db.sales(cid)
         products = self.db.products(cid)
+        removed = self.db.inactive_products(cid)
         for s in sales:  # позиции из продаж, у которых нет карточки товара
-            products.setdefault(s.product, Product(s.product))
+            if s.product not in removed:
+                products.setdefault(s.product, Product(s.product))
         rain = self.weather.is_rain(chat["lat"], chat["lon"], day, time.time()) if not chat["is_demo"] else None
         event = self.db.event(cid, day)
         eff, learned = rain_effect(sales, chat["open_h"], chat["close_h"])
         recs = [forecast(sales, p, day, bool(rain), event, chat["open_h"], chat["close_h"], eff)
                 for p in products.values()]
-        recs = [r for r in recs if r.history_days > 0]
+        recs = [r for r in recs if r.history_days > 0 or r.qty > 0]
         recs.sort(key=lambda r: -r.qty)
         habit = {}
         for r in recs:
@@ -283,6 +292,7 @@ class FreshBot:
                 {"command": "batch", "description": "Добавить партию со сроком"},
                 {"command": "batches", "description": "Что скоро испортится"},
                 {"command": "event", "description": "Событие завтра"},
+                {"command": "web", "description": "Личный кабинет на сайте"},
                 {"command": "help", "description": "Помощь"},
             ])
         except Exception as e:
@@ -297,11 +307,13 @@ class FreshBot:
             for u in updates:
                 self.offset = u["update_id"] + 1
                 try:
-                    self.handle(u)
+                    with self.lock:
+                        self.handle(u)
                 except Exception:
                     log.exception("update failed")
             try:
-                self.tick()
+                with self.lock:
+                    self.tick()
             except Exception:
                 log.exception("tick failed")
 
@@ -405,21 +417,38 @@ class FreshBot:
         self.tg.send(chat["chat_id"], HELP.format(morning=chat["morning"], evening=chat["evening"],
                                                   closing=chat["closing"]), reply_keyboard=MENU)
 
+    def cmd_web(self, chat):
+        cid = chat["chat_id"]
+        if not self.web_url:
+            return self.tg.send(cid, "Личный кабинет выключен. Включается настройкой WEB=on при запуске бота.")
+        code = self.db.create_code(cid)
+        text = (f"<b>Вход в личный кабинет</b>\nКод: <code>{code}</code> — действует 10 минут, один раз.\n"
+                f"Адрес: {esc(self.web_url)}\n\nОткройте адрес в браузере и введите код. "
+                "В кабинете — план на день, витрина, итоги, товары и сроки годности.")
+        if os.environ.get("PUBLIC_URL"):
+            try:
+                return self.tg.send(cid, text, keyboard=[[{"text": "Открыть кабинет", "url": f"{self.web_url}/?code={code}"}]])
+            except TelegramError:
+                pass
+        self.tg.send(cid, text)
+
+    def cmd_kabinet(self, chat):
+        self.cmd_web(chat)
+
     def cmd_stop(self, chat):
         self.db.set_chat(chat["chat_id"], muted=1)
         self.tg.send(chat["chat_id"], "Рассылка выключена. Включить снова: /start")
 
-    def cmd_demo(self, chat, arg: str = ""):
+    def load_example(self, chat):
+        """Пример: условная пекарня — 8 недель продаж и несколько партий со сроками годности."""
         cid = chat["chat_id"]
-        if self.db.sales(cid) and not chat["is_demo"] and arg != "да":
-            return self.tg.send(cid, "У вас уже есть свои данные. Заменить их демо-данными?",
-                                keyboard=[[{"text": "Да, заменить", "callback_data": "demo:yes"},
-                                           {"text": "Отмена", "callback_data": "x"}]])
         text = (ROOT / "data" / "demo_sales.csv").read_text(encoding="utf-8")
         sales, products = parse_csv(text)
         shift = (self.today(chat) - timedelta(days=1)) - max(s.day for s in sales)
         for s in sales:
             s.day += shift
+        for p in products.values():  # срок хранения: выпечка — день, эклеры и сэндвичи — два
+            p.shelf_life = 2 if p.name in ("Эклер", "Сэндвич с курицей") else 1
         self.db.clear_sales(cid)
         self.db.import_sales(cid, sales, products)
         self.db.set_chat(cid, is_demo=1)
@@ -428,6 +457,15 @@ class FreshBot:
                                 ("Филе куриное", "1,5 кг", 0), ("Вишня замороженная", "2 кг", 20)]:
             self.db.add_batch(cid, item, qty, today + timedelta(days=days))
         self.plan_text(self.db.chat(cid), today, "План")  # сохраняем план на сегодня для вечерних советов
+        return sales, products
+
+    def cmd_demo(self, chat, arg: str = ""):
+        cid = chat["chat_id"]
+        if self.db.sales(cid) and not chat["is_demo"] and arg != "да":
+            return self.tg.send(cid, "У вас уже есть свои данные. Заменить их демо-данными?",
+                                keyboard=[[{"text": "Да, заменить", "callback_data": "demo:yes"},
+                                           {"text": "Отмена", "callback_data": "x"}]])
+        sales, products = self.load_example(chat)
         bt = backtest(sales, products)
         lines = [f"Загрузил <b>демо-данные</b> условной пекарни: {len(products)} позиций, 8 недель продаж. "
                  "Это не реальные продажи, а пример, чтобы посмотреть, как работает бот."]
@@ -832,6 +870,10 @@ def main():
     bot = FreshBot(token, admins, os.environ.get("DB_PATH", str(ROOT / "fresh.db")),
                    os.environ.get("API_BASE", "https://api.telegram.org"),
                    os.environ.get("WEATHER", "on") != "off")
+    if os.environ.get("WEB", "on") != "off":
+        port = int(os.environ.get("WEB_PORT") or 8080)
+        if start_web(bot, os.environ.get("WEB_HOST") or "127.0.0.1", port, ROOT):
+            bot.web_url = (os.environ.get("PUBLIC_URL") or f"http://localhost:{port}").rstrip("/")
     bot.run()
 
 
