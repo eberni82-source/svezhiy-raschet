@@ -68,7 +68,7 @@
   function renderTicket() {
     var day = TODAY + 1, c = compute(DEMO, day, false, 1), total = 0, habit = 0, h = [];
     h.push('<div class="t-head"><span>СВЕЖИЙ РАСЧЁТ</span><span>06:00</span></div>');
-    h.push('<div class="t-sub">План на завтра · ' + dayLabel(day) + '</div><div class="t-sub">Демо-пекарня · без осадков</div>');
+    h.push('<div class="t-sub">План на завтра · ' + dayLabel(day) + '</div><div class="t-sub">Условная пекарня · без осадков</div>');
     h.push('<hr class="t-cut">');
     c.recs.forEach(function (r) {
       total += r.qty; habit += c.habit[r.product] || r.qty;
@@ -99,7 +99,7 @@
     var n = $("data-note"), d = S.data, days = d.sales.map(function (s) { return s.day; });
     var first = Math.min.apply(null, days), last = Math.max.apply(null, days), np = Object.keys(allProducts(d)).length;
     var h = S.source === "demo"
-      ? '<span class="tag">Демо-данные</span><span>Пример: условная пекарня, ' + np + " позиций, 8 недель продаж до вчерашнего дня. Не реальные продажи.</span>"
+      ? '<span class="tag">Пример</span><span>Условная пекарня: ' + np + " позиций, 8 недель продаж до вчерашнего дня. Данные смоделированы для примера.</span>"
       : '<span class="tag own">Ваш файл</span><span>' + esc(S.fileName) + ": " + d.sales.length + " " + plural(d.sales.length, "строка", "строки", "строк") + ", " + np + " " + plural(np, "позиция", "позиции", "позиций") + ", " + M.ddmm(first) + "–" + M.ddmm(last) + ". Данные остаются в вашем браузере.</span>";
     if (S.err) h += '<span class="err">Не получилось прочитать файл: ' + esc(S.err) + "</span>";
     if (S.source === "demo") h += '<span>Свой файл: колонки <span class="mono">дата;товар;продано</span>, по желанию <span class="mono">испечено (или заказано);закончилось;цена;себестоимость;дождь</span></span>';
@@ -243,7 +243,7 @@
       '<p class="note">За последние ' + b.days + " " + plural(b.days, "день", "дня", "дней") + ": доля списаний от выпечки " + shareNow.toFixed(1).replace(".", ",") + "% → <b>" + shareNew.toFixed(1).replace(".", ",") + "%</b>. " +
       "Для каждого дня модель видит только продажи до него, как в жизни. Где товар закончился, реальный спрос оценивается с поправкой на время распродажи. " +
       "Модель печёт впритык там, где остаток дороже упущенной продажи, поэтому иногда товар заканчивается раньше, но общие потери ниже." +
-      (S.source === "demo" ? " Данные демо-пекарни сгенерированы: реальный эффект покажет пилот." : "") + "</p>";
+      (S.source === "demo" ? " Данные условной пекарни смоделированы: реальный эффект покажет пилот." : "") + "</p>";
   }
 
   /* ---------------- сообщение в Telegram ---------------- */
@@ -305,15 +305,16 @@
 
   /* ---------------- калькулятор ---------------- */
   var DEMO_CUT = null;
+  var SUBSCRIPTION = 3500; // ₽ в месяц за точку
   function renderCalc() {
     var rev = +$("c-rev").value, w = +$("c-waste").value / 100, cost = +$("c-cost").value / 100, cut = +$("c-cut").value / 100, days = 30;
     $("o-rev").textContent = money(rev); $("o-waste").textContent = Math.round(w * 100) + "%";
     $("o-cost").textContent = Math.round(cost * 100) + "%"; $("o-cut").textContent = "−" + Math.round(cut * 100) + "%";
-    var loss = rev / (1 - w) * w * cost * days, save = loss * cut, net = save - 2500;
+    var loss = rev / (1 - w) * w * cost * days, save = loss * cut, net = save - SUBSCRIPTION;
     $("r-loss").textContent = money(loss); $("r-save").textContent = money(save);
     $("r-net").textContent = (net < 0 ? "−" : "") + money(Math.abs(net));
-    $("r-roi").textContent = net > 0 ? "Подписка окупается в " + (save / 2500).toFixed(1).replace(".", ",") + " раза" : "При таких цифрах подписка не окупается — честнее не подключаться.";
-    $("r-formula").textContent = "товар на полке = выручка ÷ (1 − " + Math.round(w * 100) + "%); списания = товар × " + Math.round(w * 100) + "% × себестоимость " + Math.round(cost * 100) + "% × 30 дней";
+    $("r-roi").textContent = net > 0 ? "Подписка окупается в " + (save / SUBSCRIPTION).toFixed(1).replace(".", ",") + " раза" : "При таких цифрах подписка не окупается — честнее не подключаться.";
+    $("r-formula").textContent = "товар на полке = выручка ÷ (1 − " + Math.round(w * 100) + "%); потери на просрочке = товар × " + Math.round(w * 100) + "% × себестоимость " + Math.round(cost * 100) + "% × 30 дней";
   }
 
   /* ---------------- подключение ---------------- */
@@ -330,7 +331,7 @@
     if (BOT_USERNAME) {
       var url = "https://t.me/" + encodeURIComponent(BOT_USERNAME);
       box.innerHTML = '<a class="btn btn-primary" href="' + url + '?start=pilot" target="_blank" rel="noopener">Открыть бота в Telegram</a>' +
-        '<a class="btn btn-ghost" href="' + url + '?start=demo" target="_blank" rel="noopener">Попробовать на демо</a>' +
+        '<a class="btn btn-ghost" href="' + url + '?start=demo" target="_blank" rel="noopener">Посмотреть пример в боте</a>' +
         '<span class="bot-addr">@' + esc(BOT_USERNAME) + "</span>";
     } else {
       box.innerHTML = '<span class="btn btn-primary" aria-disabled="true">Бот запускается</span><span>Ссылка на Telegram-бота появится здесь в ближайшее время.</span>';
@@ -396,7 +397,7 @@
   if (bt0) {
     var cutPct = Math.round((1 - bt0.wasteNew / bt0.wasteNow) * 100);
     $("hf-waste").textContent = "−" + cutPct + "%";
-    $("cut-note").textContent = "На демо-данных модель снизила списания на " + cutPct + "%, но в расчёте берём осторожную цифру. Реальную покажет пилот.";
+    $("cut-note").textContent = "На примере условной пекарни модель снизила списания на " + cutPct + "%, но в расчёте берём осторожную цифру. Реальную покажет пилот.";
   }
   renderTicket(); renderAll(); renderCalc(); renderPilot();
 })();

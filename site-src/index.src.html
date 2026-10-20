@@ -366,7 +366,7 @@ footer { padding-block: 32px; font-size: 14px; color: var(--ink-3); }
     <nav class="nav" aria-label="Разделы">
       <a href="#who">Для кого</a>
       <a href="#how">Как работает</a>
-      <a href="#demo">Демо</a>
+      <a href="#demo">Пример</a>
       <a href="#calc">Экономия</a>
       <a href="#price">Цена</a>
       <a class="btn btn-primary" href="#pilot">Подключить</a>
@@ -386,7 +386,7 @@ footer { padding-block: 32px; font-size: 14px; color: var(--ink-3); }
           <a class="btn btn-ghost" href="#pilot" data-bot="start=pilot">Подключить в Telegram</a>
         </div>
         <div class="hero-facts">
-          <div><b class="num" id="hf-waste">−55%</b>списаний в демо-пекарне</div>
+          <div><b class="num" id="hf-waste">−55%</b>списаний на примере пекарни</div>
           <div><b>1 мин</b>в день на отметки</div>
           <div><b>0 ₽</b>на оборудование</div>
         </div>
@@ -441,7 +441,7 @@ footer { padding-block: 32px; font-size: 14px; color: var(--ink-3); }
       </div>
       <div class="who-list" role="table" aria-label="Кому подходит сервис">
         <div class="who-row head" role="row"><span role="columnheader">Бизнес</span><span role="columnheader">Что портится</span><span role="columnheader">Срок</span><span role="columnheader">Что считает сервис</span></div>
-        <div class="who-row" role="row"><span class="seg-name" role="cell">Пекарни и кондитерские <span class="tag-demo">пример в демо</span></span><span class="goods" role="cell"><span class="mob">Портится:</span>хлеб, выпечка, десерты</span><span class="life" role="cell"><span class="mob">Срок:</span>1 день</span><span class="does" role="cell">Сколько испечь утром и с какого остатка уценять вечером</span></div>
+        <div class="who-row" role="row"><span class="seg-name" role="cell">Пекарни и кондитерские <span class="tag-demo">пример на сайте</span></span><span class="goods" role="cell"><span class="mob">Портится:</span>хлеб, выпечка, десерты</span><span class="life" role="cell"><span class="mob">Срок:</span>1 день</span><span class="does" role="cell">Сколько испечь утром и с какого остатка уценять вечером</span></div>
         <div class="who-row" role="row"><span class="seg-name" role="cell">Кофейни и кулинарии</span><span class="goods" role="cell"><span class="mob">Портится:</span>сэндвичи, салаты, готовые блюда</span><span class="life" role="cell"><span class="mob">Срок:</span>1–3 дня</span><span class="does" role="cell">Сколько приготовить или заказать у фабрики-кухни на каждый день</span></div>
         <div class="who-row" role="row"><span class="seg-name" role="cell">Магазины у дома</span><span class="goods" role="cell"><span class="mob">Портится:</span>молочка, мясо, хлеб, готовая еда</span><span class="life" role="cell"><span class="mob">Срок:</span>3–10 дней</span><span class="does" role="cell">Сколько заказать у поставщика и что уценить до конца срока</span></div>
         <div class="who-row" role="row"><span class="seg-name" role="cell">Овощные и фермерские лавки</span><span class="goods" role="cell"><span class="mob">Портится:</span>зелень, ягоды, фрукты, фермерская молочка</span><span class="life" role="cell"><span class="mob">Срок:</span>2–7 дней</span><span class="does" role="cell">Объём закупки на базе с учётом погоды и дня недели</span></div>
@@ -492,7 +492,7 @@ footer { padding-block: 32px; font-size: 14px; color: var(--ink-3); }
   <section class="section" id="demo">
     <div class="wrap">
       <div class="section-head">
-        <p class="eyebrow">Живое демо · пример пекарни</p>
+        <p class="eyebrow">Попробуйте сами</p>
         <h2>Посчитайте план на примере пекарни</h2>
         <p class="lead">Пекарня — самый наглядный случай: товар живёт один день. Модель та же, что в боте. Меняйте погоду и события, нажмите на позицию, чтобы увидеть её историю, или загрузите продажи своего бизнеса в CSV: подойдут любые товары.</p>
       </div>
@@ -601,9 +601,9 @@ footer { padding-block: 32px; font-size: 14px; color: var(--ink-3); }
             <input type="range" id="c-rev" min="10000" max="300000" step="5000" value="50000">
           </div>
           <div class="field">
-            <div class="field-top"><label for="c-waste">Списания, % от выпуска или закупки</label><output id="o-waste" class="num"></output></div>
+            <div class="field-top"><label for="c-waste">Списания из-за просрочки, % от выпуска или закупки</label><output id="o-waste" class="num"></output></div>
             <input type="range" id="c-waste" min="2" max="30" step="1" value="12">
-            <small>Не знаете точно? Посчитайте за неделю: сколько списали ÷ сколько было на полке.</small>
+            <small>Считаем только товар, который испортился или не продался вовремя: просрочку и неверное распределение — сделали или заказали больше, чем купили в этот день, или не те позиции. Брак, бой и кражи сюда не входят. Как посчитать: за неделю списано по сроку ÷ сколько было на полке.</small>
           </div>
           <div class="field">
             <div class="field-top"><label for="c-cost">Себестоимость, % от цены</label><output id="o-cost" class="num"></output></div>
@@ -612,13 +612,13 @@ footer { padding-block: 32px; font-size: 14px; color: var(--ink-3); }
           <div class="field">
             <div class="field-top"><label for="c-cut">Насколько снизятся списания</label><output id="o-cut" class="num"></output></div>
             <input type="range" id="c-cut" min="10" max="60" step="5" value="30">
-            <small id="cut-note">На демо-данных модель снизила списания сильнее, но в расчёте берём осторожную цифру. Реальную покажет пилот.</small>
+            <small id="cut-note">На примере условной пекарни модель снизила списания сильнее, но в расчёте берём осторожную цифру. Реальную покажет пилот.</small>
           </div>
         </div>
         <div class="calc-out" aria-live="polite">
-          <div class="row"><span>Сейчас списываете в месяц</span><b id="r-loss" class="num"></b></div>
+          <div class="row"><span>Сейчас теряете на просрочке в месяц</span><b id="r-loss" class="num"></b></div>
           <div class="row"><span>Сэкономите в месяц</span><b id="r-save" class="num"></b></div>
-          <div class="row"><span>Подписка</span><b class="num">2 500 ₽</b></div>
+          <div class="row"><span>Подписка</span><b class="num">3 500 ₽</b></div>
           <div>
             <span style="opacity:.75">Чистая выгода в месяц</span>
             <div class="hero-num num" id="r-net"></div>
@@ -649,7 +649,7 @@ footer { padding-block: 32px; font-size: 14px; color: var(--ink-3); }
         </div>
         <div class="plan-card main">
           <h3>Точка</h3>
-          <div class="price">2 500 ₽ <small>в месяц</small></div>
+          <div class="price">3 500 ₽ <small>в месяц</small></div>
           <ul>
             <li>Всё, что в пилоте</li>
             <li>Загрузка продаж из кассы</li>
@@ -697,7 +697,7 @@ footer { padding-block: 32px; font-size: 14px; color: var(--ink-3); }
 <footer>
   <div class="wrap foot">
     <p>Свежий расчёт — MVP сервиса прогноза спроса и контроля свежести для малого бизнеса: пекарен, кафе, кулинарий, магазинов у дома. Кейс-чемпионат «Ключ» 2026/27, направление «Бизнес».</p>
-    <p>Демо-данные пекарни сгенерированы для примера и не являются реальными продажами.</p>
+    <p>Данные условной пекарни в примере смоделированы и не являются реальными продажами.</p>
   </div>
 </footer>
 

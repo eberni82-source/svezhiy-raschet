@@ -374,7 +374,7 @@ footer { padding-block: 32px; font-size: 14px; color: var(--ink-3); }
     <nav class="nav" aria-label="Разделы">
       <a href="#who">Для кого</a>
       <a href="#how">Как работает</a>
-      <a href="#demo">Демо</a>
+      <a href="#demo">Пример</a>
       <a href="#calc">Экономия</a>
       <a href="#price">Цена</a>
       <a class="btn btn-primary" href="#pilot">Подключить</a>
@@ -394,7 +394,7 @@ footer { padding-block: 32px; font-size: 14px; color: var(--ink-3); }
           <a class="btn btn-ghost" href="#pilot" data-bot="start=pilot">Подключить в Telegram</a>
         </div>
         <div class="hero-facts">
-          <div><b class="num" id="hf-waste">−55%</b>списаний в демо-пекарне</div>
+          <div><b class="num" id="hf-waste">−55%</b>списаний на примере пекарни</div>
           <div><b>1 мин</b>в день на отметки</div>
           <div><b>0 ₽</b>на оборудование</div>
         </div>
@@ -449,7 +449,7 @@ footer { padding-block: 32px; font-size: 14px; color: var(--ink-3); }
       </div>
       <div class="who-list" role="table" aria-label="Кому подходит сервис">
         <div class="who-row head" role="row"><span role="columnheader">Бизнес</span><span role="columnheader">Что портится</span><span role="columnheader">Срок</span><span role="columnheader">Что считает сервис</span></div>
-        <div class="who-row" role="row"><span class="seg-name" role="cell">Пекарни и кондитерские <span class="tag-demo">пример в демо</span></span><span class="goods" role="cell"><span class="mob">Портится:</span>хлеб, выпечка, десерты</span><span class="life" role="cell"><span class="mob">Срок:</span>1 день</span><span class="does" role="cell">Сколько испечь утром и с какого остатка уценять вечером</span></div>
+        <div class="who-row" role="row"><span class="seg-name" role="cell">Пекарни и кондитерские <span class="tag-demo">пример на сайте</span></span><span class="goods" role="cell"><span class="mob">Портится:</span>хлеб, выпечка, десерты</span><span class="life" role="cell"><span class="mob">Срок:</span>1 день</span><span class="does" role="cell">Сколько испечь утром и с какого остатка уценять вечером</span></div>
         <div class="who-row" role="row"><span class="seg-name" role="cell">Кофейни и кулинарии</span><span class="goods" role="cell"><span class="mob">Портится:</span>сэндвичи, салаты, готовые блюда</span><span class="life" role="cell"><span class="mob">Срок:</span>1–3 дня</span><span class="does" role="cell">Сколько приготовить или заказать у фабрики-кухни на каждый день</span></div>
         <div class="who-row" role="row"><span class="seg-name" role="cell">Магазины у дома</span><span class="goods" role="cell"><span class="mob">Портится:</span>молочка, мясо, хлеб, готовая еда</span><span class="life" role="cell"><span class="mob">Срок:</span>3–10 дней</span><span class="does" role="cell">Сколько заказать у поставщика и что уценить до конца срока</span></div>
         <div class="who-row" role="row"><span class="seg-name" role="cell">Овощные и фермерские лавки</span><span class="goods" role="cell"><span class="mob">Портится:</span>зелень, ягоды, фрукты, фермерская молочка</span><span class="life" role="cell"><span class="mob">Срок:</span>2–7 дней</span><span class="does" role="cell">Объём закупки на базе с учётом погоды и дня недели</span></div>
@@ -500,7 +500,7 @@ footer { padding-block: 32px; font-size: 14px; color: var(--ink-3); }
   <section class="section" id="demo">
     <div class="wrap">
       <div class="section-head">
-        <p class="eyebrow">Живое демо · пример пекарни</p>
+        <p class="eyebrow">Попробуйте сами</p>
         <h2>Посчитайте план на примере пекарни</h2>
         <p class="lead">Пекарня — самый наглядный случай: товар живёт один день. Модель та же, что в боте. Меняйте погоду и события, нажмите на позицию, чтобы увидеть её историю, или загрузите продажи своего бизнеса в CSV: подойдут любые товары.</p>
       </div>
@@ -609,9 +609,9 @@ footer { padding-block: 32px; font-size: 14px; color: var(--ink-3); }
             <input type="range" id="c-rev" min="10000" max="300000" step="5000" value="50000">
           </div>
           <div class="field">
-            <div class="field-top"><label for="c-waste">Списания, % от выпуска или закупки</label><output id="o-waste" class="num"></output></div>
+            <div class="field-top"><label for="c-waste">Списания из-за просрочки, % от выпуска или закупки</label><output id="o-waste" class="num"></output></div>
             <input type="range" id="c-waste" min="2" max="30" step="1" value="12">
-            <small>Не знаете точно? Посчитайте за неделю: сколько списали ÷ сколько было на полке.</small>
+            <small>Считаем только товар, который испортился или не продался вовремя: просрочку и неверное распределение — сделали или заказали больше, чем купили в этот день, или не те позиции. Брак, бой и кражи сюда не входят. Как посчитать: за неделю списано по сроку ÷ сколько было на полке.</small>
           </div>
           <div class="field">
             <div class="field-top"><label for="c-cost">Себестоимость, % от цены</label><output id="o-cost" class="num"></output></div>
@@ -620,13 +620,13 @@ footer { padding-block: 32px; font-size: 14px; color: var(--ink-3); }
           <div class="field">
             <div class="field-top"><label for="c-cut">Насколько снизятся списания</label><output id="o-cut" class="num"></output></div>
             <input type="range" id="c-cut" min="10" max="60" step="5" value="30">
-            <small id="cut-note">На демо-данных модель снизила списания сильнее, но в расчёте берём осторожную цифру. Реальную покажет пилот.</small>
+            <small id="cut-note">На примере условной пекарни модель снизила списания сильнее, но в расчёте берём осторожную цифру. Реальную покажет пилот.</small>
           </div>
         </div>
         <div class="calc-out" aria-live="polite">
-          <div class="row"><span>Сейчас списываете в месяц</span><b id="r-loss" class="num"></b></div>
+          <div class="row"><span>Сейчас теряете на просрочке в месяц</span><b id="r-loss" class="num"></b></div>
           <div class="row"><span>Сэкономите в месяц</span><b id="r-save" class="num"></b></div>
-          <div class="row"><span>Подписка</span><b class="num">2 500 ₽</b></div>
+          <div class="row"><span>Подписка</span><b class="num">3 500 ₽</b></div>
           <div>
             <span style="opacity:.75">Чистая выгода в месяц</span>
             <div class="hero-num num" id="r-net"></div>
@@ -657,7 +657,7 @@ footer { padding-block: 32px; font-size: 14px; color: var(--ink-3); }
         </div>
         <div class="plan-card main">
           <h3>Точка</h3>
-          <div class="price">2 500 ₽ <small>в месяц</small></div>
+          <div class="price">3 500 ₽ <small>в месяц</small></div>
           <ul>
             <li>Всё, что в пилоте</li>
             <li>Загрузка продаж из кассы</li>
@@ -705,7 +705,7 @@ footer { padding-block: 32px; font-size: 14px; color: var(--ink-3); }
 <footer>
   <div class="wrap foot">
     <p>Свежий расчёт — MVP сервиса прогноза спроса и контроля свежести для малого бизнеса: пекарен, кафе, кулинарий, магазинов у дома. Кейс-чемпионат «Ключ» 2026/27, направление «Бизнес».</p>
-    <p>Демо-данные пекарни сгенерированы для примера и не являются реальными продажами.</p>
+    <p>Данные условной пекарни в примере смоделированы и не являются реальными продажами.</p>
   </div>
 </footer>
 
@@ -1017,7 +1017,7 @@ var DEMO_CSV = "дата;товар;испечено;продано;законч
   function renderTicket() {
     var day = TODAY + 1, c = compute(DEMO, day, false, 1), total = 0, habit = 0, h = [];
     h.push('<div class="t-head"><span>СВЕЖИЙ РАСЧЁТ</span><span>06:00</span></div>');
-    h.push('<div class="t-sub">План на завтра · ' + dayLabel(day) + '</div><div class="t-sub">Демо-пекарня · без осадков</div>');
+    h.push('<div class="t-sub">План на завтра · ' + dayLabel(day) + '</div><div class="t-sub">Условная пекарня · без осадков</div>');
     h.push('<hr class="t-cut">');
     c.recs.forEach(function (r) {
       total += r.qty; habit += c.habit[r.product] || r.qty;
@@ -1048,7 +1048,7 @@ var DEMO_CSV = "дата;товар;испечено;продано;законч
     var n = $("data-note"), d = S.data, days = d.sales.map(function (s) { return s.day; });
     var first = Math.min.apply(null, days), last = Math.max.apply(null, days), np = Object.keys(allProducts(d)).length;
     var h = S.source === "demo"
-      ? '<span class="tag">Демо-данные</span><span>Пример: условная пекарня, ' + np + " позиций, 8 недель продаж до вчерашнего дня. Не реальные продажи.</span>"
+      ? '<span class="tag">Пример</span><span>Условная пекарня: ' + np + " позиций, 8 недель продаж до вчерашнего дня. Данные смоделированы для примера.</span>"
       : '<span class="tag own">Ваш файл</span><span>' + esc(S.fileName) + ": " + d.sales.length + " " + plural(d.sales.length, "строка", "строки", "строк") + ", " + np + " " + plural(np, "позиция", "позиции", "позиций") + ", " + M.ddmm(first) + "–" + M.ddmm(last) + ". Данные остаются в вашем браузере.</span>";
     if (S.err) h += '<span class="err">Не получилось прочитать файл: ' + esc(S.err) + "</span>";
     if (S.source === "demo") h += '<span>Свой файл: колонки <span class="mono">дата;товар;продано</span>, по желанию <span class="mono">испечено (или заказано);закончилось;цена;себестоимость;дождь</span></span>';
@@ -1192,7 +1192,7 @@ var DEMO_CSV = "дата;товар;испечено;продано;законч
       '<p class="note">За последние ' + b.days + " " + plural(b.days, "день", "дня", "дней") + ": доля списаний от выпечки " + shareNow.toFixed(1).replace(".", ",") + "% → <b>" + shareNew.toFixed(1).replace(".", ",") + "%</b>. " +
       "Для каждого дня модель видит только продажи до него, как в жизни. Где товар закончился, реальный спрос оценивается с поправкой на время распродажи. " +
       "Модель печёт впритык там, где остаток дороже упущенной продажи, поэтому иногда товар заканчивается раньше, но общие потери ниже." +
-      (S.source === "demo" ? " Данные демо-пекарни сгенерированы: реальный эффект покажет пилот." : "") + "</p>";
+      (S.source === "demo" ? " Данные условной пекарни смоделированы: реальный эффект покажет пилот." : "") + "</p>";
   }
 
   /* ---------------- сообщение в Telegram ---------------- */
@@ -1254,15 +1254,16 @@ var DEMO_CSV = "дата;товар;испечено;продано;законч
 
   /* ---------------- калькулятор ---------------- */
   var DEMO_CUT = null;
+  var SUBSCRIPTION = 3500; // ₽ в месяц за точку
   function renderCalc() {
     var rev = +$("c-rev").value, w = +$("c-waste").value / 100, cost = +$("c-cost").value / 100, cut = +$("c-cut").value / 100, days = 30;
     $("o-rev").textContent = money(rev); $("o-waste").textContent = Math.round(w * 100) + "%";
     $("o-cost").textContent = Math.round(cost * 100) + "%"; $("o-cut").textContent = "−" + Math.round(cut * 100) + "%";
-    var loss = rev / (1 - w) * w * cost * days, save = loss * cut, net = save - 2500;
+    var loss = rev / (1 - w) * w * cost * days, save = loss * cut, net = save - SUBSCRIPTION;
     $("r-loss").textContent = money(loss); $("r-save").textContent = money(save);
     $("r-net").textContent = (net < 0 ? "−" : "") + money(Math.abs(net));
-    $("r-roi").textContent = net > 0 ? "Подписка окупается в " + (save / 2500).toFixed(1).replace(".", ",") + " раза" : "При таких цифрах подписка не окупается — честнее не подключаться.";
-    $("r-formula").textContent = "товар на полке = выручка ÷ (1 − " + Math.round(w * 100) + "%); списания = товар × " + Math.round(w * 100) + "% × себестоимость " + Math.round(cost * 100) + "% × 30 дней";
+    $("r-roi").textContent = net > 0 ? "Подписка окупается в " + (save / SUBSCRIPTION).toFixed(1).replace(".", ",") + " раза" : "При таких цифрах подписка не окупается — честнее не подключаться.";
+    $("r-formula").textContent = "товар на полке = выручка ÷ (1 − " + Math.round(w * 100) + "%); потери на просрочке = товар × " + Math.round(w * 100) + "% × себестоимость " + Math.round(cost * 100) + "% × 30 дней";
   }
 
   /* ---------------- подключение ---------------- */
@@ -1279,7 +1280,7 @@ var DEMO_CSV = "дата;товар;испечено;продано;законч
     if (BOT_USERNAME) {
       var url = "https://t.me/" + encodeURIComponent(BOT_USERNAME);
       box.innerHTML = '<a class="btn btn-primary" href="' + url + '?start=pilot" target="_blank" rel="noopener">Открыть бота в Telegram</a>' +
-        '<a class="btn btn-ghost" href="' + url + '?start=demo" target="_blank" rel="noopener">Попробовать на демо</a>' +
+        '<a class="btn btn-ghost" href="' + url + '?start=demo" target="_blank" rel="noopener">Посмотреть пример в боте</a>' +
         '<span class="bot-addr">@' + esc(BOT_USERNAME) + "</span>";
     } else {
       box.innerHTML = '<span class="btn btn-primary" aria-disabled="true">Бот запускается</span><span>Ссылка на Telegram-бота появится здесь в ближайшее время.</span>';
@@ -1345,7 +1346,7 @@ var DEMO_CSV = "дата;товар;испечено;продано;законч
   if (bt0) {
     var cutPct = Math.round((1 - bt0.wasteNew / bt0.wasteNow) * 100);
     $("hf-waste").textContent = "−" + cutPct + "%";
-    $("cut-note").textContent = "На демо-данных модель снизила списания на " + cutPct + "%, но в расчёте берём осторожную цифру. Реальную покажет пилот.";
+    $("cut-note").textContent = "На примере условной пекарни модель снизила списания на " + cutPct + "%, но в расчёте берём осторожную цифру. Реальную покажет пилот.";
   }
   renderTicket(); renderAll(); renderCalc(); renderPilot();
 })();
