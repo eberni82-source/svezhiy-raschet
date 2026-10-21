@@ -67,9 +67,6 @@ a { color: inherit; }
 .btn-sm { min-height: 32px; padding: 0 12px; font-size: 13px; }
 .btn:disabled { opacity: .5; cursor: default; }
 
-.local-note { background: var(--stamp-soft); color: var(--ink); font-size: 14px; }
-.local-note .wrap { padding-block: 10px; display: flex; gap: 8px 16px; align-items: center; flex-wrap: wrap; }
-.local-note b { font-weight: 700; }
 
 /* лента дня */
 .day { margin-top: 22px; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 16px 18px 14px; box-shadow: var(--shadow); }
@@ -176,9 +173,6 @@ input.small { width: 84px; }
     <span id="top-actions"></span>
   </div>
 </header>
-<div class="local-note" id="local-note" hidden>
-  <div class="wrap"><span><b>Пример кабинета условной пекарни.</b> Данные хранятся только в этом браузере. Чтобы работать со своими данными, подключите бота <a id="bot-link" href="https://t.me/svezhiy_raschet_bot" target="_blank" rel="noopener">@svezhiy_raschet_bot</a> и войдите по коду из команды /web.</span></div>
-</div>
 <main class="wrap">
   <div class="loading" id="loading">Загружаю кабинет…</div>
   <section class="login" id="login" hidden aria-labelledby="login-h">
@@ -690,7 +684,6 @@ var DEMO_CSV = "дата;товар;испечено;продано;законч
     $("top-actions").innerHTML = API.mode === "server"
       ? '<button class="btn btn-ghost btn-sm" data-act="logout">Выйти</button>'
       : '<button class="btn btn-ghost btn-sm" data-act="reset">Сбросить пример</button>';
-    $("local-note").hidden = API.mode !== "local";
     $("brand").setAttribute("href", API.mode === "server" ? "#" : "index.html");
   }
 
@@ -945,7 +938,7 @@ var DEMO_CSV = "дата;товар;испечено;продано;законч
   }
   function showLogin() {
     $("loading").hidden = true; $("app").hidden = true; $("login").hidden = false;
-    $("local-note").hidden = true; $("top-actions").innerHTML = ""; $("clock").textContent = "";
+    $("top-actions").innerHTML = ""; $("clock").textContent = "";
     var u = "https://t.me/" + BOT_USERNAME;
     $("login-bot").href = u; $("login-bot").textContent = "@" + BOT_USERNAME;
     setTimeout(function () { $("code").focus(); }, 50);

@@ -237,7 +237,6 @@
     $("top-actions").innerHTML = API.mode === "server"
       ? '<button class="btn btn-ghost btn-sm" data-act="logout">Выйти</button>'
       : '<button class="btn btn-ghost btn-sm" data-act="reset">Сбросить пример</button>';
-    $("local-note").hidden = API.mode !== "local";
     $("brand").setAttribute("href", API.mode === "server" ? "#" : "index.html");
   }
 
@@ -492,7 +491,7 @@
   }
   function showLogin() {
     $("loading").hidden = true; $("app").hidden = true; $("login").hidden = false;
-    $("local-note").hidden = true; $("top-actions").innerHTML = ""; $("clock").textContent = "";
+    $("top-actions").innerHTML = ""; $("clock").textContent = "";
     var u = "https://t.me/" + BOT_USERNAME;
     $("login-bot").href = u; $("login-bot").textContent = "@" + BOT_USERNAME;
     setTimeout(function () { $("code").focus(); }, 50);
