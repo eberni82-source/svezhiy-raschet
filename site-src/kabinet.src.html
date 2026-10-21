@@ -2,7 +2,7 @@
 <meta name="description" content="Личный кабинет заведения: план на день, витрина, итоги, товары и сроки годности.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,400..700&family=Manrope:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400..800&display=swap">
 <style>
 /* Layout: рабочий пульт заведения — лента дня сверху (план → витрина → итоги), под ней вкладки с таблицами */
 :root {
@@ -11,9 +11,9 @@
   --stamp: #2346C8; --stamp-ink: #FFFFFF; --stamp-soft: #E7ECFB;
   --ok: #2B7A4B; --ok-soft: #E2F1E7; --warn: #9A6210; --warn-soft: #F6ECD8; --bad: #B3371F; --bad-soft: #F8E3DE;
   --shadow: 0 1px 0 rgba(33,27,22,.06), 0 12px 28px -14px rgba(33,27,22,.28);
-  --f-display: "Literata", Georgia, "Times New Roman", serif;
-  --f-body: "Manrope", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --f-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --f-display: "Golos Text", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  --f-body: "Golos Text", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  --f-mono: "Golos Text", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
@@ -47,7 +47,7 @@ a { color: inherit; }
 .top-in { display: flex; align-items: center; gap: 12px 20px; padding-block: 14px; flex-wrap: wrap; }
 .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: inherit; margin-right: auto; min-width: 0; }
 .brand-mark { width: 32px; height: 32px; border-radius: 50%; border: 2px solid currentColor; display: grid; place-items: center; font: 700 11px var(--f-mono); transform: rotate(-8deg); flex: none; }
-.brand-name { font: 600 18px/1.1 var(--f-display); }
+.brand-name { font: 700 18px/1.1 var(--f-display); }
 .brand small { display: block; font: 500 13px/1.2 var(--f-body); opacity: .8; }
 .clock { font: 600 14px var(--f-mono); white-space: nowrap; }
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 40px; padding: 0 16px; border-radius: 999px; font: 600 14px/1 var(--f-body); border: 1.5px solid transparent; cursor: pointer; text-decoration: none; background: none; color: inherit; white-space: nowrap; }
@@ -66,7 +66,7 @@ a { color: inherit; }
 /* лента дня */
 .day { margin-top: 22px; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 16px 18px 14px; box-shadow: var(--shadow); }
 .day-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px 16px; flex-wrap: wrap; margin-bottom: 14px; }
-.day-head h1 { font: 600 clamp(22px, 3vw, 28px)/1.15 var(--f-display); }
+.day-head h1 { font: 700 clamp(22px, 3vw, 28px)/1.15 var(--f-display); }
 .day-head .upd { font-size: 13px; color: var(--ink-3); display: inline-flex; align-items: center; gap: 6px; }
 .pulse { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); animation: pulse 2s ease-in-out infinite; }
 @keyframes pulse { 50% { opacity: .3; } }
@@ -78,7 +78,7 @@ a { color: inherit; }
 .seg.now { background: var(--stamp-soft); }
 .seg.now b { color: var(--stamp); }
 .seg[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--stamp); }
-.now-tag { font: 700 10.5px/1 var(--f-mono); letter-spacing: .08em; text-transform: uppercase; background: var(--stamp); color: var(--stamp-ink); padding: 3px 6px; border-radius: 5px; margin-left: 6px; vertical-align: 1px; }
+.now-tag { font: 700 12.5px/1 var(--f-mono); background: var(--stamp); color: var(--stamp-ink); padding: 3px 6px; border-radius: 5px; margin-left: 6px; vertical-align: 1px; }
 .track { position: relative; height: 4px; background: var(--line); border-radius: 2px; margin-top: 10px; }
 .track i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--stamp); border-radius: 2px; }
 .track span { position: absolute; top: 50%; width: 12px; height: 12px; border-radius: 50%; background: var(--stamp); border: 2px solid var(--surface); transform: translate(-50%, -50%); }
@@ -98,18 +98,18 @@ a { color: inherit; }
 
 .view { padding-bottom: 56px; display: grid; gap: 18px; }
 .card { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 18px; min-width: 0; }
-.card h2 { font: 600 20px/1.25 var(--f-display); margin-bottom: 4px; }
+.card h2 { font: 700 20px/1.25 var(--f-display); margin-bottom: 4px; }
 .card .sub { color: var(--ink-2); font-size: 14px; margin-bottom: 14px; }
 .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
 .kpi { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; }
-.kpi b { display: block; font: 600 30px/1.05 var(--f-display); }
+.kpi b { display: block; font: 700 30px/1.05 var(--f-display); }
 .kpi span { color: var(--ink-2); font-size: 13px; }
 .kpi.warn b { color: var(--warn); }
 .kpi.bad b { color: var(--bad); }
 
 .table-wrap { overflow-x: auto; }
 table.t { width: 100%; border-collapse: collapse; font-size: 14.5px; }
-.t th { text-align: left; font: 600 11px/1.2 var(--f-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); padding: 0 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.t th { text-align: left; font: 600 12.5px/1.2 var(--f-mono); color: var(--ink-3); padding: 0 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
 .t td { padding: 11px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
 .t tr:last-child td { border-bottom: 0; }
 .t .r { text-align: right; white-space: nowrap; }
@@ -153,7 +153,7 @@ input.small { width: 84px; }
 
 /* вход */
 .login { max-width: 440px; margin: 48px auto; background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 26px; box-shadow: var(--shadow); display: grid; gap: 14px; }
-.login h1 { font: 600 26px/1.15 var(--f-display); }
+.login h1 { font: 700 26px/1.15 var(--f-display); }
 .login ol { margin: 0; padding-left: 20px; color: var(--ink-2); display: grid; gap: 6px; }
 .code-in { font: 600 26px/1 var(--f-mono) !important; letter-spacing: .3em; text-align: center; }
 

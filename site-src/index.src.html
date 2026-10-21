@@ -2,7 +2,7 @@
 <meta name="description" content="Сервис для малого бизнеса со скоропортящимся товаром: прогноз продаж, план производства и заказа на утро, вечерние скидки и контроль сроков годности в Telegram.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,400..700&family=Manrope:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400..800&display=swap">
 <style>
 /* Layout: утро в пекарне — крафтовый лоток с чеком-планом из «печи» наверху, ниже производственная доска: ритм дня, живой пульт расчёта, экономика, подключение */
 :root {
@@ -30,9 +30,10 @@
   --bubble-ink: #1B1F24;
   --tg-link: #2A7AB8;
   --shadow: 0 1px 0 rgba(33,27,22,.06), 0 12px 28px -12px rgba(33,27,22,.28);
-  --f-display: "Literata", Georgia, "Times New Roman", serif;
-  --f-body: "Manrope", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --f-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --f-display: "Golos Text", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  --f-body: "Golos Text", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  --f-mono: "Golos Text", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  --f-receipt: ui-monospace, "SFMono-Regular", Menlo, Consolas, "Courier New", monospace;
   --r: 14px;
 }
 @media (prefers-color-scheme: dark) {
@@ -70,11 +71,11 @@ a { color: inherit; }
 .mono { font-family: var(--f-mono); }
 
 .wrap { max-width: 1160px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
-.eyebrow { font: 600 12px/1.2 var(--f-mono); letter-spacing: .14em; text-transform: uppercase; color: var(--ink-2); }
+.unused-eyebrow { font: 600 13px/1.2 var(--f-mono); color: var(--ink-2); }
 .lead { font-size: 18px; color: var(--ink-2); max-width: 60ch; }
 .section { padding-block: 72px; }
-.section-head { display: grid; gap: 12px; margin-bottom: 36px; max-width: 760px; }
-.section-head h2 { font: 600 clamp(28px, 4vw, 40px)/1.12 var(--f-display); letter-spacing: -.01em; }
+.section-head { display: grid; gap: 10px; margin-bottom: 28px; max-width: 760px; }
+.section-head h2 { font: 700 clamp(28px, 4vw, 40px)/1.12 var(--f-display); letter-spacing: -.01em; }
 
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 0 22px; border-radius: 999px; font: 600 16px/1 var(--f-body); text-decoration: none; cursor: pointer; border: 1.5px solid transparent; transition: transform .15s ease, background .15s ease; }
 .btn:hover { transform: translateY(-1px); }
@@ -96,12 +97,9 @@ a { color: inherit; }
 
 /* ---------- первый экран ---------- */
 .hero { background: var(--kraft); color: var(--kraft-ink); padding-bottom: 72px; position: relative; overflow: hidden; }
-.hero::before { content: ""; position: absolute; inset: 0; pointer-events: none; opacity: .5;
-  background-image: radial-gradient(circle at 20% 30%, var(--kraft-2) 0 1px, transparent 1.5px), radial-gradient(circle at 70% 80%, var(--kraft-2) 0 1px, transparent 1.5px);
-  background-size: 23px 19px, 31px 27px; }
 .hero-in { position: relative; display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr); gap: 48px; align-items: start; padding-top: 40px; }
-.hero h1 { font: 600 clamp(36px, 5.6vw, 68px)/1.04 var(--f-display); letter-spacing: -.015em; margin: 14px 0 22px; }
-.hero h1 em { font-style: normal; color: var(--stamp); }
+.hero h1 { font: 700 clamp(34px, 5vw, 58px)/1.08 var(--f-display); letter-spacing: -.02em; margin: 14px 0 22px; }
+.hero h1 em { font-style: normal; }
 .hero .lead { color: var(--kraft-ink); opacity: .86; }
 .hero-cta { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 30px; }
 .hero .btn-ghost { color: var(--kraft-ink); }
@@ -112,7 +110,7 @@ a { color: inherit; }
 /* чек-план */
 .ticket-slot { position: relative; justify-self: center; width: min(100%, 370px); }
 .slot { height: 14px; border-radius: 8px; background: var(--kraft-ink); opacity: .85; margin: 0 -10px; position: relative; z-index: 2; }
-.ticket { position: relative; z-index: 1; margin: -6px 6px 0; background: var(--paper); color: #231C15; font: 400 13px/1.5 var(--f-mono); padding: 22px 20px 96px; box-shadow: var(--shadow); animation: feed .9s cubic-bezier(.2,.8,.2,1) both; }
+.ticket { position: relative; z-index: 1; margin: -6px 6px 0; background: var(--paper); color: #231C15; font: 400 13px/1.5 var(--f-receipt); padding: 22px 20px 26px; box-shadow: var(--shadow); animation: feed .9s cubic-bezier(.2,.8,.2,1) both; }
 .ticket::after { content: ""; position: absolute; left: 0; right: 0; bottom: -11px; height: 12px;
   background: linear-gradient(135deg, var(--paper) 50%, transparent 50%) 0 0 / 12px 12px repeat-x, linear-gradient(-135deg, var(--paper) 50%, transparent 50%) 0 0 / 12px 12px repeat-x; }
 @keyframes feed { from { transform: translateY(-14px); } to { transform: translateY(0); } }
@@ -126,7 +124,7 @@ a { color: inherit; }
 .t-big { font-weight: 700; font-size: 15px; }
 .t-warn { color: #8C3A1E; }
 .t-foot { position: absolute; left: 20px; bottom: 26px; color: #6B6157; font-size: 12px; }
-.stamp { position: absolute; right: 16px; bottom: 20px; z-index: 3; color: var(--stamp); border: 2.5px solid currentColor; border-radius: 10px; padding: 6px 10px; font: 700 10.5px/1.3 var(--f-mono); letter-spacing: .12em; text-transform: uppercase; transform: rotate(-11deg); background: color-mix(in srgb, var(--paper) 30%, transparent); text-align: center; }
+.stamp { position: absolute; right: 16px; bottom: 20px; z-index: 3; color: var(--stamp); border: 2.5px solid currentColor; border-radius: 10px; padding: 6px 10px; font: 700 10.5px/1.3 var(--f-mono); transform: rotate(-11deg); background: color-mix(in srgb, var(--paper) 30%, transparent); text-align: center; }
 :root[data-theme="dark"] .stamp { color: #2346C8; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .stamp { color: #2346C8; } }
 .ticket-note { margin-top: 26px; text-align: center; font-size: 13px; opacity: .8; }
@@ -135,7 +133,7 @@ a { color: inherit; }
 .facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; border-top: 2px solid var(--ink); }
 .fact { padding: 26px 24px 8px 0; display: grid; gap: 10px; align-content: start; }
 .fact + .fact { padding-left: 24px; border-left: 1px solid var(--line); }
-.fact .big { font: 600 clamp(40px, 5vw, 58px)/1 var(--f-display); letter-spacing: -.02em; }
+.fact .big { font: 700 clamp(40px, 5vw, 58px)/1 var(--f-display); letter-spacing: -.02em; }
 .fact p { color: var(--ink-2); }
 .src { font-size: 13px; color: var(--ink-3); }
 .src a { color: var(--ink-3); }
@@ -149,23 +147,24 @@ a { color: inherit; }
 /* ---------- для кого ---------- */
 .who-list { border-top: 2px solid var(--ink); }
 .who-row { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1.3fr) 112px minmax(0, 1.6fr); gap: 8px 24px; padding: 18px 0; border-bottom: 1px solid var(--line); align-items: baseline; }
-.who-row.head { font: 600 11px/1.2 var(--f-mono); letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); padding: 12px 0; }
+.who-row.head { font: 600 13px/1.2 var(--f-mono); color: var(--ink-3); padding: 12px 0; }
 .who-row .seg-name { font-weight: 700; font-size: 17px; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
 .who-row .goods { color: var(--ink-2); }
 .who-row .life { font: 700 15px/1.3 var(--f-mono); }
 .who-row .does { color: var(--ink); }
-.who-row .tag-demo { font: 600 11px/1 var(--f-mono); letter-spacing: .08em; text-transform: uppercase; background: var(--stamp-soft); color: var(--stamp); padding: 5px 8px; border-radius: 6px; }
-.who-row .mob { display: none; font: 600 11px/1.2 var(--f-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); margin-right: 6px; }
+.who-row .tag-demo { font: 600 13px/1 var(--f-mono); background: var(--stamp-soft); color: var(--stamp); padding: 5px 8px; border-radius: 6px; }
+.who-row .mob { display: none; font: 600 13px/1.2 var(--f-mono); color: var(--ink-3); margin-right: 6px; }
 @media (max-width: 760px) {
   .who-row { grid-template-columns: minmax(0, 1fr); gap: 6px; }
   .who-row.head { display: none; }
   .who-row .mob { display: inline; }
 }
+.who-note { margin-top: 18px; color: var(--ink-2); max-width: 70ch; }
 .who-modes { margin-top: 32px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
 .who-modes div { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 20px; display: grid; gap: 6px; }
-.who-modes .life { font: 700 13px/1.2 var(--f-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--stamp); }
+.who-modes .life { font: 700 13px/1.2 var(--f-mono); color: var(--stamp); }
 .who-modes p { color: var(--ink-2); }
-.soon { font: 600 11px/1 var(--f-mono); letter-spacing: .08em; text-transform: uppercase; background: var(--warn-soft); color: var(--warn); padding: 4px 7px; border-radius: 6px; margin-left: 6px; vertical-align: 2px; }
+.soon { font: 600 13px/1 var(--f-mono); background: var(--warn-soft); color: var(--warn); padding: 4px 7px; border-radius: 6px; margin-left: 6px; vertical-align: 2px; }
 @media (max-width: 760px) { .who-modes { grid-template-columns: minmax(0, 1fr); } }
 
 /* ---------- ритм дня ---------- */
@@ -173,7 +172,7 @@ a { color: inherit; }
 .rhythm { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 28px; position: relative; }
 .rhythm::before { content: ""; position: absolute; left: 0; right: 0; top: 30px; border-top: 2px dashed var(--line); }
 .beat { position: relative; display: grid; gap: 10px; align-content: start; }
-.beat .time { font: 600 44px/1 var(--f-display); color: var(--stamp); background: var(--surface); justify-self: start; padding-right: 12px; }
+.beat .time { font: 700 44px/1 var(--f-display); color: var(--stamp); background: var(--surface); justify-self: start; padding-right: 12px; }
 .beat h3 { font: 600 19px/1.3 var(--f-body); }
 .beat p { color: var(--ink-2); }
 .beat .snip { font: 400 13px/1.5 var(--f-mono); background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; color: var(--ink-2); }
@@ -186,7 +185,7 @@ a { color: inherit; }
 .console { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; box-shadow: var(--shadow); overflow: hidden; }
 .controls { display: flex; flex-wrap: wrap; gap: 14px 22px; align-items: end; padding: 18px 20px; border-bottom: 1px solid var(--line); background: var(--bg); }
 .ctl { display: grid; gap: 6px; min-width: 0; }
-.ctl > span { font: 600 11px/1 var(--f-mono); letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); }
+.ctl > span { font: 600 13px/1 var(--f-mono); color: var(--ink-3); }
 .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; padding: 3px; background: var(--surface); flex-wrap: wrap; }
 .seg button { border: 0; background: transparent; color: var(--ink-2); font: 500 14px/1 var(--f-body); padding: 9px 14px; border-radius: 999px; cursor: pointer; min-height: 36px; }
 .seg button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
@@ -195,7 +194,7 @@ select, input[type="text"], input[type="number"], input[type="date"] { font: 500
 .file-btn input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
 .data-note { font-size: 13px; color: var(--ink-3); padding: 10px 20px; border-bottom: 1px solid var(--line); display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .data-note .mono { overflow-wrap: anywhere; }
-.data-note .tag { font: 600 11px/1 var(--f-mono); letter-spacing: .1em; text-transform: uppercase; background: var(--warn-soft); color: var(--warn); padding: 5px 8px; border-radius: 6px; }
+.data-note .tag { font: 600 13px/1 var(--f-mono); background: var(--warn-soft); color: var(--warn); padding: 5px 8px; border-radius: 6px; }
 .data-note .tag.own { background: var(--ok-soft); color: var(--ok); }
 .err { color: var(--bad); font-weight: 500; }
 
@@ -209,7 +208,7 @@ select, input[type="text"], input[type="number"], input[type="date"] { font: 500
 
 .table-wrap { overflow-x: auto; }
 table.plan { width: 100%; border-collapse: collapse; font-size: 15px; }
-.plan th { text-align: left; font: 600 11px/1.2 var(--f-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); padding: 0 10px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.plan th { text-align: left; font: 600 13px/1.2 var(--f-mono); color: var(--ink-3); padding: 0 10px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
 .plan td { padding: 12px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
 .plan th.r, .plan td.r { text-align: right; white-space: nowrap; }
 @media (max-width: 560px) { .plan td, .plan th { padding-left: 6px; padding-right: 6px; } .plan .sdv { display: none; } .plan .why { font-size: 12.5px; } }
@@ -315,7 +314,7 @@ input[type="range"] { width: 100%; accent-color: var(--stamp); }
 .calc-out .row { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; border-bottom: 1px solid color-mix(in srgb, var(--bg) 18%, transparent); padding-bottom: 12px; }
 .calc-out .row span { opacity: .75; }
 .calc-out .row b { font: 700 20px var(--f-mono); white-space: nowrap; }
-.calc-out .hero-num { font: 600 clamp(40px, 5vw, 56px)/1 var(--f-display); color: var(--bg); }
+.calc-out .hero-num { font: 700 clamp(40px, 5vw, 56px)/1 var(--f-display); color: var(--bg); }
 .calc-out .formula { font: 400 12.5px/1.6 var(--f-mono); opacity: .7; }
 
 /* ---------- цены ---------- */
@@ -324,7 +323,7 @@ input[type="range"] { width: 100%; accent-color: var(--stamp); }
 .plan-card { border: 1px solid var(--line); border-radius: 18px; padding: 26px; display: grid; gap: 14px; align-content: start; background: var(--surface); }
 .plan-card.main { border: 2px solid var(--ink); }
 .plan-card h3 { font: 600 18px/1.3 var(--f-body); }
-.plan-card .price { font: 600 44px/1 var(--f-display); }
+.plan-card .price { font: 700 44px/1 var(--f-display); }
 .plan-card .price small { font: 500 16px var(--f-body); color: var(--ink-2); }
 .plan-card ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; color: var(--ink-2); }
 .plan-card li { display: flex; gap: 10px; }
@@ -344,7 +343,7 @@ input[type="range"] { width: 100%; accent-color: var(--stamp); }
 .pilot { background: var(--kraft); color: var(--kraft-ink); }
 .pilot-in { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 40px; align-items: start; }
 @media (max-width: 860px) { .pilot-in { grid-template-columns: minmax(0, 1fr); } }
-.pilot h2 { font: 600 clamp(30px, 4.4vw, 46px)/1.08 var(--f-display); margin: 12px 0 16px; }
+.pilot h2 { font: 700 clamp(30px, 4.4vw, 46px)/1.08 var(--f-display); margin: 12px 0 16px; }
 .pilot .lead { color: var(--kraft-ink); opacity: .85; }
 .steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; counter-reset: s; }
 .steps li { counter-increment: s; display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 12px; align-items: start; background: var(--paper); color: #231C15; border-radius: 14px; padding: 16px; }
@@ -381,26 +380,20 @@ footer { padding-block: 32px; font-size: 14px; color: var(--ink-3); }
   <section class="hero">
     <div class="wrap hero-in">
       <div>
-        <p class="eyebrow">Для малого бизнеса со свежим товаром</p>
-        <h1>Готовьте и заказывайте столько, сколько <em>купят</em></h1>
-        <p class="lead">Пекарня, кофейня, кулинария или магазин у дома: каждое утро в Telegram приходит план — сколько испечь, приготовить или заказать каждой позиции с учётом дня недели, погоды и ваших продаж. Вечером сервис подскажет, когда ставить скидку, и напомнит о товарах с истекающим сроком.</p>
+        <h1>Готовьте и заказывайте столько, сколько купят</h1>
+        <p class="lead">Каждое утро сервис присылает в Telegram план: сколько испечь, приготовить или заказать. Вечером подсказывает, что уценить, и напоминает о сроках годности.</p>
         <div class="hero-cta">
-          <a class="btn btn-primary" href="#demo">Посмотреть на примере пекарни</a>
+          <a class="btn btn-primary" href="#demo">Посмотреть пример</a>
           <a class="btn btn-ghost" href="#pilot" data-bot="start=pilot">Подключить в Telegram</a>
-        </div>
-        <div class="hero-facts">
-          <div><b class="num" id="hf-waste">−55%</b>списаний на примере пекарни</div>
-          <div><b>1 мин</b>в день на отметки</div>
-          <div><b>0 ₽</b>на оборудование</div>
         </div>
       </div>
       <div class="ticket-slot" aria-label="Пример утреннего плана">
         <div class="slot" aria-hidden="true"></div>
         <div class="ticket" id="ticket">
           <div class="t-head"><span>СВЕЖИЙ РАСЧЁТ</span><span>06:00</span></div>
-          <div class="t-sub">План выпечки</div>
+          <div class="t-sub">План на день</div>
         </div>
-        <p class="ticket-note">Пример: настоящий расчёт модели для условной пекарни</p>
+        <p class="ticket-note">Пример утреннего плана для пекарни</p>
       </div>
     </div>
   </section>
@@ -408,29 +401,24 @@ footer { padding-block: 32px; font-size: 14px; color: var(--ink-3); }
   <section class="section" id="problem">
     <div class="wrap">
       <div class="section-head">
-        <p class="eyebrow">Проблема</p>
-        <h2>Свежий товар заказывают на глаз, а лишнее уходит в мусор</h2>
+        <h2>Свежий товар заказывают на глаз, а лишнее выбрасывают</h2>
       </div>
       <div class="facts">
         <div class="fact">
           <div class="big num">≈19%</div>
-          <p>продовольствия выбрасывается в рознице, общепите и дома. Это ровно то звено, где работает малый бизнес.</p>
-          <p class="src">Источник: ЮНЕП, Food Waste Index Report 2024</p>
+          <p>еды выбрасывается в рознице, общепите и дома.</p>
+          <p class="src">ЮНЕП, Food Waste Index Report 2024</p>
         </div>
         <div class="fact">
           <div class="big num">≈15%</div>
-          <p>выпечки в пекарнях уходит в возвраты и списание. Оценка по Германии: официальной статистики нет ни там, ни в России.</p>
-          <p class="src">Источник: <a href="https://delicious-data.com/en/blog/ursachen-fuer-backwaren-retouren" target="_blank" rel="noopener">Delicious Data, 2025</a></p>
+          <p>выпечки в пекарнях уходит в списание (оценка по Германии).</p>
+          <p class="src"><a href="https://delicious-data.com/en/blog/ursachen-fuer-backwaren-retouren" target="_blank" rel="noopener">Delicious Data, 2025</a></p>
         </div>
         <div class="fact">
           <div class="big num">210 тыс.</div>
-          <p>компаний работает в общепите России, 71% из них — ИП. У сетей есть свои системы прогноза, у малого бизнеса — опыт управляющего и Excel.</p>
-          <p class="src">Источник: <a href="https://finance.mail.ru/article/rusprofile-v-rossii-zamedlilos-razvitie-sferyi-obschepita-69195602/" target="_blank" rel="noopener">Rusprofile через ТАСС, январь 2026</a></p>
+          <p>компаний в общепите России, 71% из них ИП.</p>
+          <p class="src"><a href="https://finance.mail.ru/article/rusprofile-v-rossii-zamedlilos-razvitie-sferyi-obschepita-69195602/" target="_blank" rel="noopener">Rusprofile, январь 2026</a></p>
         </div>
-      </div>
-      <div class="pain">
-        <div><b>Заказали «с запасом»</b><p>В дождливый вторник к вечеру на полке остаются выпечка, салаты и молочка. Остатки уходят в списание или по скидке, которая приучает покупателей ждать вечера.</p></div>
-        <div><b>Недозаказали хит</b><p>В субботу круассаны или сэндвичи заканчиваются к обеду. Покупатель уходит к соседям, а в кассе этого не видно: продажи просто равны тому, что было на полке.</p></div>
       </div>
     </div>
   </section>
@@ -438,56 +426,41 @@ footer { padding-block: 32px; font-size: 14px; color: var(--ink-3); }
   <section class="section" id="who" style="padding-top: 0">
     <div class="wrap">
       <div class="section-head">
-        <p class="eyebrow">Для кого</p>
-        <h2>Для любого бизнеса, где товар живёт дни, а не месяцы</h2>
-        <p class="lead">Логика одна: понять, сколько купят, и сравнить, что дороже — остаток или пустая полка. Меняются только срок жизни товара и то, что нужно решить утром.</p>
+        <h2>Кому подходит</h2>
       </div>
       <div class="who-list" role="table" aria-label="Кому подходит сервис">
         <div class="who-row head" role="row"><span role="columnheader">Бизнес</span><span role="columnheader">Что портится</span><span role="columnheader">Срок</span><span role="columnheader">Что считает сервис</span></div>
-        <div class="who-row" role="row"><span class="seg-name" role="cell">Пекарни и кондитерские <span class="tag-demo">пример на сайте</span></span><span class="goods" role="cell"><span class="mob">Портится:</span>хлеб, выпечка, десерты</span><span class="life" role="cell"><span class="mob">Срок:</span>1 день</span><span class="does" role="cell">Сколько испечь утром и с какого остатка уценять вечером</span></div>
-        <div class="who-row" role="row"><span class="seg-name" role="cell">Кофейни и кулинарии</span><span class="goods" role="cell"><span class="mob">Портится:</span>сэндвичи, салаты, готовые блюда</span><span class="life" role="cell"><span class="mob">Срок:</span>1–3 дня</span><span class="does" role="cell">Сколько приготовить или заказать у фабрики-кухни на каждый день</span></div>
-        <div class="who-row" role="row"><span class="seg-name" role="cell">Магазины у дома</span><span class="goods" role="cell"><span class="mob">Портится:</span>молочка, мясо, хлеб, готовая еда</span><span class="life" role="cell"><span class="mob">Срок:</span>3–10 дней</span><span class="does" role="cell">Сколько заказать у поставщика и что уценить до конца срока</span></div>
-        <div class="who-row" role="row"><span class="seg-name" role="cell">Овощные и фермерские лавки</span><span class="goods" role="cell"><span class="mob">Портится:</span>зелень, ягоды, фрукты, фермерская молочка</span><span class="life" role="cell"><span class="mob">Срок:</span>2–7 дней</span><span class="does" role="cell">Объём закупки на базе с учётом погоды и дня недели</span></div>
-        <div class="who-row" role="row"><span class="seg-name" role="cell">Столовые и кафе</span><span class="goods" role="cell"><span class="mob">Портится:</span>порции, заготовки</span><span class="life" role="cell"><span class="mob">Срок:</span>часы</span><span class="does" role="cell">Сколько порций каждого блюда готовить по дням недели</span></div>
+        <div class="who-row" role="row"><span class="seg-name" role="cell">Пекарни и кондитерские</span><span class="goods" role="cell"><span class="mob">Портится:</span>хлеб, выпечка, десерты</span><span class="life" role="cell"><span class="mob">Срок:</span>1 день</span><span class="does" role="cell">Сколько испечь и с какого остатка уценять</span></div>
+        <div class="who-row" role="row"><span class="seg-name" role="cell">Кофейни и кулинарии</span><span class="goods" role="cell"><span class="mob">Портится:</span>сэндвичи, салаты, готовые блюда</span><span class="life" role="cell"><span class="mob">Срок:</span>1–3 дня</span><span class="does" role="cell">Сколько приготовить или заказать на день</span></div>
+        <div class="who-row" role="row"><span class="seg-name" role="cell">Магазины у дома</span><span class="goods" role="cell"><span class="mob">Портится:</span>молочка, мясо, готовая еда</span><span class="life" role="cell"><span class="mob">Срок:</span>3–10 дней</span><span class="does" role="cell">Сколько заказать и что уценить до конца срока</span></div>
+        <div class="who-row" role="row"><span class="seg-name" role="cell">Овощные и фермерские лавки</span><span class="goods" role="cell"><span class="mob">Портится:</span>зелень, ягоды, фрукты</span><span class="life" role="cell"><span class="mob">Срок:</span>2–7 дней</span><span class="does" role="cell">Объём закупки с учётом погоды и дня недели</span></div>
+        <div class="who-row" role="row"><span class="seg-name" role="cell">Столовые и кафе</span><span class="goods" role="cell"><span class="mob">Портится:</span>порции, заготовки</span><span class="life" role="cell"><span class="mob">Срок:</span>часы</span><span class="does" role="cell">Сколько порций готовить по дням недели</span></div>
       </div>
-      <div class="who-modes">
-        <div><span class="life">Срок до 2 дней</span><b>План производства на день</b><p>Пекарни, кулинарии, столовые. Сервис считает, сколько сделать сегодня, чтобы к вечеру остаток был минимальным, а хиты не кончались к обеду. Работает в боте уже сейчас.</p></div>
-        <div><span class="life">Срок несколько дней</span><b>Заказ до следующей поставки <span class="soon">в разработке</span></b><p>Магазины и лавки. Сервис учтёт остатки на полке, сроки партий и график поставщика и посчитает заказ так, чтобы товар продался раньше, чем испортится.</p></div>
-      </div>
+      <p class="who-note">Для товаров со сроком до 2 дней сервис работает уже сейчас. Заказ товаров со сроком в несколько дней с учётом остатков и поставок в разработке.</p>
     </div>
   </section>
 
   <section class="section day" id="how">
     <div class="wrap">
       <div class="section-head">
-        <p class="eyebrow">Как это работает</p>
-        <h2>Три сообщения в день вместо расчётов в голове</h2>
-        <p class="lead">Сервис живёт в Telegram: ничего не нужно устанавливать и учить. Расписание подстраивается под часы работы.</p>
+        <h2>Как это работает</h2>
       </div>
       <div class="rhythm">
         <div class="beat">
           <span class="time">06:00</span>
           <h3>План на день</h3>
-          <p>Сколько испечь, приготовить или заказать каждой позиции с учётом дня недели, погоды, событий и маржи. Плюс товары, которые пора пустить в работу или уценить.</p>
-          <div class="snip">Круассан — 43 шт<br>понедельник: обычно −17%</div>
+          <p>Сколько сделать или заказать каждой позиции.</p>
         </div>
         <div class="beat">
           <span class="time">17:00</span>
-          <h3>Проверка витрины</h3>
-          <p>При каком остатке ставить скидку 30%, чтобы распродать сегодня и не выбросить. Точный совет по любой позиции — одной командой.</p>
-          <div class="snip">Салат «Оливье» — больше 4 шт → скидка</div>
+          <h3>Витрина</h3>
+          <p>С какого остатка ставить скидку, чтобы не выбросить.</p>
         </div>
         <div class="beat">
           <span class="time">21:00</span>
-          <h3>Итоги дня</h3>
-          <p>Минута на кнопки: что закончилось и во сколько, что осталось. Так сервис узнаёт реальный спрос и завтра считает точнее.</p>
-          <div class="snip">Кефир 1% ✓ осталось 3</div>
+          <h3>Итоги</h3>
+          <p>Пара кнопок: что закончилось и что осталось. Завтра прогноз точнее.</p>
         </div>
-      </div>
-      <div class="needs">
-        <span>Выгрузка продаж за 4+ недели из кассы или Excel</span>
-        <span>Telegram у управляющего</span>
-        <span>1 минута вечером</span>
       </div>
     </div>
   </section>
@@ -495,9 +468,8 @@ footer { padding-block: 32px; font-size: 14px; color: var(--ink-3); }
   <section class="section" id="demo">
     <div class="wrap">
       <div class="section-head">
-        <p class="eyebrow">Попробуйте сами</p>
-        <h2>Посчитайте план на примере пекарни</h2>
-        <p class="lead">Пекарня — самый наглядный случай: товар живёт один день. Модель та же, что в боте. Меняйте погоду и события, нажмите на позицию, чтобы увидеть её историю, или загрузите продажи своего бизнеса в CSV: подойдут любые товары.</p>
+        <h2>Попробуйте на примере пекарни</h2>
+        <p class="lead">Меняйте погоду и события, нажмите на позицию, чтобы увидеть её историю. Можно загрузить свои продажи в CSV.</p>
       </div>
 
       <div class="console">
@@ -593,9 +565,8 @@ footer { padding-block: 32px; font-size: 14px; color: var(--ink-3); }
   <section class="section" id="calc" style="padding-top: 24px">
     <div class="wrap">
       <div class="section-head">
-        <p class="eyebrow">Калькулятор</p>
-        <h2>Сколько сэкономит ваш бизнес</h2>
-        <p class="lead">Подставьте свои цифры: подходит для пекарни, кафе и магазина. По умолчанию — небольшая пекарня у метро.</p>
+        <h2>Сколько вы сэкономите</h2>
+        <p class="lead">По умолчанию стоят цифры небольшой пекарни.</p>
       </div>
       <div class="calc">
         <div class="calc-in">
@@ -606,7 +577,7 @@ footer { padding-block: 32px; font-size: 14px; color: var(--ink-3); }
           <div class="field">
             <div class="field-top"><label for="c-waste">Списания из-за просрочки, % от выпуска или закупки</label><output id="o-waste" class="num"></output></div>
             <input type="range" id="c-waste" min="2" max="30" step="1" value="12">
-            <small>Считаем только товар, который испортился или не продался вовремя: просрочку и неверное распределение — сделали или заказали больше, чем купили в этот день, или не те позиции. Брак, бой и кражи сюда не входят. Как посчитать: за неделю списано по сроку ÷ сколько было на полке.</small>
+            <small>Только просрочка и лишний товар. Брак и кражи не считаем.</small>
           </div>
           <div class="field">
             <div class="field-top"><label for="c-cost">Себестоимость, % от цены</label><output id="o-cost" class="num"></output></div>
@@ -615,7 +586,7 @@ footer { padding-block: 32px; font-size: 14px; color: var(--ink-3); }
           <div class="field">
             <div class="field-top"><label for="c-cut">Насколько снизятся списания</label><output id="o-cut" class="num"></output></div>
             <input type="range" id="c-cut" min="10" max="60" step="5" value="30">
-            <small id="cut-note">На примере условной пекарни модель снизила списания сильнее, но в расчёте берём осторожную цифру. Реальную покажет пилот.</small>
+            <small id="cut-note">Осторожная оценка. Точную цифру покажет пилот.</small>
           </div>
         </div>
         <div class="calc-out" aria-live="polite">
@@ -627,7 +598,6 @@ footer { padding-block: 32px; font-size: 14px; color: var(--ink-3); }
             <div class="hero-num num" id="r-net"></div>
           </div>
           <p id="r-roi" style="font-weight:600"></p>
-          <p class="formula" id="r-formula"></p>
         </div>
       </div>
     </div>
@@ -636,8 +606,7 @@ footer { padding-block: 32px; font-size: 14px; color: var(--ink-3); }
   <section class="section day" id="price">
     <div class="wrap">
       <div class="section-head">
-        <p class="eyebrow">Цена</p>
-        <h2>Первый месяц бесплатно, дальше — одна цена за точку</h2>
+        <h2>Цена</h2>
       </div>
       <div class="plans">
         <div class="plan-card">
@@ -661,21 +630,19 @@ footer { padding-block: 32px; font-size: 14px; color: var(--ink-3); }
           </ul>
         </div>
       </div>
-      <p class="guarantee">Сеть от 3 точек — цена по договорённости.</p>
+      <p class="guarantee">Для сетей от 3 точек цена по договорённости.</p>
     </div>
   </section>
 
   <section class="section" id="faq">
     <div class="wrap">
-      <div class="section-head"><p class="eyebrow">Вопросы</p><h2>Частые вопросы</h2></div>
+      <div class="section-head"><h2>Вопросы</h2></div>
       <div class="faq">
-        <details><summary>Подойдёт ли, если у меня не пекарня?</summary><p>Да, если товар портится за дни: кофейня, кулинария, столовая, магазин у дома, овощная или фермерская лавка. Для товаров со сроком до 2 дней сервис работает уже сейчас. Расчёт заказа для товаров со сроком в несколько дней, с учётом остатков и графика поставок, — в разработке, пилотные точки получат его первыми.</p></details>
-        <details><summary>Нужна специальная касса?</summary><p>Нет. Подойдёт выгрузка продаж в Excel или CSV с тремя колонками: дата, товар, продано. Если кассы нет, бот сам соберёт продажи из вечерних отметок «что осталось».</p></details>
-        <details><summary>Сколько нужно данных?</summary><p>Хватит 4 недель. С 2 неделями прогноз будет грубым, а дальше точность растёт каждый день.</p></details>
-        <details><summary>Сколько времени это занимает?</summary><p>Утром прочитать план. Вечером за минуту отметить кнопками, что закончилось и во сколько или сколько осталось.</p></details>
-        <details><summary>Как учитывается погода?</summary><p>Сервис берёт прогноз осадков для вашего города (Open-Meteo) и по вашей же истории продаж считает, насколько дождь снижает спрос именно у вас.</p></details>
-        <details><summary>Почему иногда советует сделать меньше, чем обычно?</summary><p>Если остаток стоит дороже, чем упущенная продажа (низкая маржа), выгоднее готовить и заказывать впритык. У позиций с высокой маржой сервис, наоборот, оставляет запас.</p></details>
-        <details><summary>Кто видит мои данные?</summary><p>Данные о продажах видит только ваша команда в чате с ботом. Мы не передаём их третьим лицам.</p></details>
+        <details><summary>Подойдёт, если у меня не пекарня?</summary><p>Да, если товар портится за несколько дней: кофейня, кулинария, столовая, магазин у дома, овощная лавка.</p></details>
+        <details><summary>Нужна специальная касса?</summary><p>Нет. Хватит выгрузки продаж в Excel или CSV: дата, товар, продано.</p></details>
+        <details><summary>Сколько нужно данных?</summary><p>Достаточно 4 недель продаж. Дальше прогноз уточняется каждый день.</p></details>
+        <details><summary>Почему иногда советует сделать меньше обычного?</summary><p>Если остаток обходится дороже, чем упущенная продажа, выгоднее делать впритык.</p></details>
+        <details><summary>Кто видит мои данные?</summary><p>Только ваша команда. Мы не передаём данные третьим лицам.</p></details>
       </div>
     </div>
   </section>
@@ -683,16 +650,15 @@ footer { padding-block: 32px; font-size: 14px; color: var(--ink-3); }
   <section class="section pilot" id="pilot">
     <div class="wrap pilot-in">
       <div>
-        <p class="eyebrow" style="color:inherit;opacity:.75">Подключение</p>
-        <h2>Месяц бесплатно для вашей точки</h2>
-        <p class="lead">В конце месяца покажем, сколько вы списывали до и после. Решение о подписке — по цифрам.</p>
+        <h2>Первый месяц бесплатно</h2>
+        <p class="lead">Через месяц сравним, сколько вы списывали до и после.</p>
         <div class="pilot-cta" id="pilot-cta"></div>
-        <p class="pilot-kab">Всё, что приходит в Telegram, видно и в личном кабинете на сайте: план на день, витрина, итоги, товары и сроки годности. <a href="kabinet.html">Посмотреть кабинет на примере пекарни →</a></p>
+        <p class="pilot-kab">То же самое есть в личном кабинете на сайте. <a href="kabinet.html">Открыть пример кабинета</a></p>
       </div>
       <ol class="steps">
-        <li><div><b>Откройте бота в Telegram</b><span>Нажмите «Старт» и ответьте на 4 вопроса: заведение, город, тип, контакт.</span></div></li>
-        <li><div><b>Пришлите выгрузку продаж</b><span>Файл из кассы или Excel за последние 4 недели: что и сколько продали по дням. Поможем выгрузить.</span></div></li>
-        <li><div><b>Утром получите первый план</b><span>Дальше — по 3 сообщения в день и личный кабинет на сайте. Через месяц сравним списания.</span></div></li>
+        <li><div><b>Откройте бота</b><span>Нажмите «Старт» и ответьте на 4 вопроса.</span></div></li>
+        <li><div><b>Пришлите продажи</b><span>Выгрузка из кассы или Excel за 4 недели.</span></div></li>
+        <li><div><b>Получите план</b><span>Первый план придёт на следующее утро.</span></div></li>
       </ol>
     </div>
   </section>
@@ -700,15 +666,14 @@ footer { padding-block: 32px; font-size: 14px; color: var(--ink-3); }
 
 <footer>
   <div class="wrap foot">
-    <p>Свежий расчёт — MVP сервиса прогноза спроса и контроля свежести для малого бизнеса: пекарен, кафе, кулинарий, магазинов у дома. Кейс-чемпионат «Ключ» 2026/27, направление «Бизнес».</p>
-    <p>Данные условной пекарни в примере смоделированы и не являются реальными продажами.</p>
+    <p>© 2026 Свежий расчёт</p>
+    <p>Пример пекарни на сайте построен на смоделированных данных.</p>
   </div>
 </footer>
 
 <script>/*MODEL*/</script>
 <script>
 "use strict";
-// Адрес Telegram-бота без @ (например "svezhiy_raschet_bot"). Пока пусто — кнопка подключения показывает подсказку.
 var BOT_USERNAME = "svezhiy_raschet_bot";
 var DEMO_CSV = __DEMO_CSV__;
 </script>
