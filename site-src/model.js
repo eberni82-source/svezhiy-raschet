@@ -61,7 +61,74 @@
   }
   function signed(x) { var v = Math.round(x); return (v > 0 ? "+" : v < 0 ? "−" : "") + Math.abs(v) + "%"; }
 
-  function forecast(sales, product, target, rainTomorrow, eventFactor, rainEff) {
+  function avg(xs) { return xs.reduce(function (a, x) { return a + x; }, 0) / xs.length; }
+  function signedDeg(x) { return Math.abs(Math.round(x)) + "°"; }
+  var TEMP_WINDOW = 365, TEMP_NEAR = 15, TEMP_MIN_DAYS = 60, TEMP_MIN_T = 2.5;
+
+  // на сколько (доля) меняется спрос на каждый градус; 0 — если данных мало или связь ненадёжна
+  function temperatureSlope(hist, target, cleanValue, wf) {
+    var N = TEMP_WINDOW, y = new Array(N + 1).fill(null), tt = new Array(N + 1).fill(null);
+    hist.forEach(function (s) {
+      var age = target - s.day;
+      if (age >= 1 && age <= N) {
+        var f = wf(wday(s.day)) || 1;
+        y[age] = (y[age] || 0) + cleanValue(s) / f;
+        if (s.temp != null) tt[age] = s.temp;
+      }
+    });
+    function prefix(arr) {
+      var sums = [0], cnts = [0];
+      arr.forEach(function (v) { sums.push(sums[sums.length - 1] + (v != null ? v : 0)); cnts.push(cnts[cnts.length - 1] + (v != null ? 1 : 0)); });
+      return [sums, cnts];
+    }
+    var py = prefix(y), pt = prefix(tt), xs = [], rs = [];
+    for (var age = 1; age <= N; age++) {
+      if (y[age] == null || tt[age] == null) continue;
+      var lo = Math.max(0, age - TEMP_NEAR), hi = Math.min(N, age + TEMP_NEAR) + 1;
+      if (py[1][hi] - py[1][lo] === 0 || pt[1][hi] - pt[1][lo] === 0) continue;
+      var localY = (py[0][hi] - py[0][lo]) / (py[1][hi] - py[1][lo]);
+      var localT = (pt[0][hi] - pt[0][lo]) / (pt[1][hi] - pt[1][lo]);
+      if (localY > 0) { xs.push(tt[age] - localT); rs.push(y[age] / localY); }
+    }
+    var n = xs.length;
+    if (n < TEMP_MIN_DAYS) return 0;
+    var mx = avg(xs), mr = avg(rs), vx = 0, cov = 0, i;
+    for (i = 0; i < n; i++) { vx += (xs[i] - mx) * (xs[i] - mx); cov += (xs[i] - mx) * (rs[i] - mr); }
+    vx /= n; cov /= n;
+    if (vx < 4) return 0;
+    var slope = cov / vx, res = 0;
+    for (i = 0; i < n; i++) { var e = rs[i] - mr - slope * (xs[i] - mx); res += e * e; }
+    res /= (n - 2);
+    var se = res > 0 ? Math.sqrt(res / (n * vx)) : 0;
+    if (se === 0 || Math.abs(slope / se) < TEMP_MIN_T) return 0;
+    return Math.max(-0.02, Math.min(0.02, slope * n / (n + 30)));
+  }
+
+  // сезон по прошлому году: во сколько раз спрос всей точки в неделю с этой даты год назад отличался
+  // от двух недель до неё; 1 — если года истории нет или разница в пределах шума
+  function seasonChange(sales, target, rainEff) {
+    var total = {}, a, after = [], before = [], pairs = [];
+    sales.forEach(function (s) {
+      var age = target - s.day;
+      if ((age >= 1 && age <= 56) || (age >= 359 && age <= 379)) {
+        var d = demand(s);
+        total[age] = (total[age] || 0) + (s.rain === true ? d / (1 + rainEff) : d);
+      }
+    });
+    for (a = 359; a <= 379; a++) { if (!(a in total)) return 1; (a <= 365 ? after : before).push(total[a]); }
+    // шум: насколько расходятся одни и те же дни недели с разницей в неделю за последние 8 недель
+    for (a = 1; a < 50; a++) {
+      if (a in total && (a + 7) in total && total[a] + total[a + 7] > 0) {
+        var r = (total[a] - total[a + 7]) / ((total[a] + total[a + 7]) / 2);
+        pairs.push(r * r / 2);
+      }
+    }
+    if (pairs.length < 7 || avg(before) <= 0) return 1;
+    var se = Math.sqrt(avg(pairs) * (1 / 7 + 1 / 14)), ratio = avg(after) / avg(before);
+    return Math.abs(ratio - 1) >= Math.max(0.08, 3 * se) ? ratio : 1;
+  }
+
+  function forecast(sales, product, target, rainTomorrow, eventFactor, rainEff, tempTomorrow) {
     eventFactor = eventFactor || 1;
     if (rainEff == null) rainEff = rainEffect(sales).eff;
     var hist = sales.filter(function (s) { return s.product === product.name && s.day < target; })
@@ -74,24 +141,25 @@
       }
       return { product: product.name, mean: 0, sd: 0, qty: 0, ratio: cr, reasons: ["нет истории продаж"], n: 0 };
     }
+    function cleanValue(s) { var d = demand(s); return s.rain === true ? d / (1 + rainEff) : d; }
 
-    var clean = {}, days = [];
+    // спрос, очищенный от дождя, за последние 8 недель
+    var clean = {}, temps = {}, days = [];
     hist.forEach(function (s) {
       if (target - s.day > 56) return;
-      var d = demand(s);
-      if (s.rain === true) d = d / (1 + rainEff);
       if (!(s.day in clean)) { clean[s.day] = 0; days.push(s.day); }
-      clean[s.day] += d;
+      clean[s.day] += cleanValue(s);
+      if (s.temp != null) temps[s.day] = s.temp;
     });
-    var all = days.map(function (k) { return clean[k]; });
-    var recent = days.filter(function (k) { return target - k <= 14; }).map(function (k) { return clean[k]; });
-    if (recent.length < 5) recent = all;
-    var level = recent.reduce(function (a, x) { return a + x; }, 0) / recent.length;
-    var overall = all.reduce(function (a, x) { return a + x; }, 0) / all.length;
+    // уровень: среднее за последние 14 дней (сам следует за сезоном)
+    var recentDays = days.filter(function (k) { return target - k <= 14; });
+    if (recentDays.length < 5) recentDays = days.slice();
+    var level = avg(recentDays.map(function (k) { return clean[k]; }));
+    var overall = avg(days.map(function (k) { return clean[k]; }));
     function wf(w) {
       var v = days.filter(function (k) { return wday(k) === w; }).map(function (k) { return clean[k]; });
       if (v.length < 2 || overall <= 0) return 1;
-      return (v.reduce(function (a, x) { return a + x; }, 0) / v.length) / overall;
+      return avg(v) / overall;
     }
     var f = wf(wday(target));
     if (days.length < 14) reasons.push("истории меньше 2 недель — прогноз грубый");
@@ -100,10 +168,28 @@
     var resid = [];
     days.forEach(function (k) { if (target - k <= 28) { var g = wf(wday(k)); if (g > 0) resid.push(clean[k] / g - level); } });
     var v = resid.length >= 4 ? resid.reduce(function (a, r) { return a + r * r; }, 0) / resid.length * 1.25 * f * f : 0;
+    var base = level * f;
 
-    var base = level * f, mean = base;
+    // сезон 1: температура — за год истории узнаём, как жара и холод меняют спрос на позицию;
+    // каждый день сравниваем с соседними (±15 дней) и верим связи, только если она надёжна
+    var tempF = 1;
+    var levelTemps = recentDays.filter(function (k) { return k in temps; }).map(function (k) { return temps[k]; });
+    if (tempTomorrow != null && levelTemps.length) {
+      var slope = temperatureSlope(hist, target, cleanValue, wf);
+      if (slope) {
+        var diff = Math.max(-12, Math.min(12, tempTomorrow - avg(levelTemps)));
+        tempF = Math.max(0.75, Math.min(1.3, 1 + slope * diff));
+        if (Math.abs(tempF - 1) >= 0.03) reasons.push((diff < 0 ? "холоднее" : "теплее") + " на " + signedDeg(diff) + ": " + signed((tempF - 1) * 100) + " к спросу");
+      }
+    }
+
+    // сезон 2: прошлый год — праздники, дачный сезон, каникулы
+    var yoy = seasonChange(sales, target, rainEff), yoyF = Math.max(0.6, Math.min(1.6, 1 + 0.7 * (yoy - 1)));
+    if (yoy !== 1) reasons.push("сезон: год назад в эти дни спрос " + (yoy > 1 ? "вырос" : "снизился") + " на " + Math.round(Math.abs(yoy - 1) * 100) + "%");
+
     var lastSame = null;
     for (var i = 0; i < hist.length; i++) if (wday(hist[i].day) === wday(target)) { lastSame = hist[i]; break; }
+    var mean = base * tempF * yoyF;
     if (rainTomorrow) { mean *= 1 + rainEff; reasons.push("дождь: " + signed(rainEff * 100) + " к спросу"); }
     if (eventFactor !== 1) { mean *= eventFactor; reasons.push("событие: " + signed((eventFactor - 1) * 100)); }
     if (lastSame && lastSame.soldout && target - lastSame.day <= 7)
@@ -139,7 +225,7 @@
       withBaked.forEach(function (s) {
         if (s.day !== d) return;
         var p = products[s.product] || { name: s.product }, price = p.price || 0, cost = p.cost != null ? p.cost : price * 0.4;
-        var rec = forecast(past, p, d, s.rain === true, 1, eff), dem = demand(s), soldNew = Math.min(rec.qty, dem);
+        var rec = forecast(past, p, d, s.rain === true, 1, eff, s.temp), dem = demand(s), soldNew = Math.min(rec.qty, dem);
         r.wasteNow += (s.baked - s.sold) * cost; r.wasteNew += (rec.qty - soldNew) * cost;
         r.wasteUnitsNow += s.baked - s.sold; r.wasteUnitsNew += rec.qty - soldNew;
         r.lostNow += Math.max(0, dem - s.sold) * (price - cost); r.lostNew += Math.max(0, dem - rec.qty) * (price - cost);
@@ -173,7 +259,7 @@
     date: ["дата", "date", "день"], product: ["товар", "product", "позиция", "наименование", "item"],
     sold: ["продано", "sold", "продажи", "количество", "qty", "кол-во"], baked: ["испечено", "baked", "произведено", "выпечено", "приготовлено", "заказано", "закуплено", "поставлено"],
     soldout: ["закончилось", "soldout", "распродано_в", "закончился"], price: ["цена", "price"],
-    cost: ["себестоимость", "cost", "себес"], rain: ["дождь", "rain", "осадки"]
+    cost: ["себестоимость", "cost", "себес"], rain: ["дождь", "rain", "осадки"], temp: ["температура", "temp", "темп", "t"]
   };
   function num(v) { v = String(v == null ? "" : v).replace(/[\s ]/g, "").replace(",", "."); if (!v) return null; var x = Number(v); return isNaN(x) ? null : x; }
   function parseDate(v) {
@@ -220,7 +306,7 @@
       if (!name || sold == null) continue;
       var rr = String(get("rain")).trim().toLowerCase();
       var rain = rr === "" ? null : ["1", "да", "yes", "true", "дождь"].indexOf(rr) >= 0;
-      sales.push({ day: day, product: name, sold: sold, baked: num(get("baked")), soldout: String(get("soldout")).trim() || null, rain: rain });
+      sales.push({ day: day, product: name, sold: sold, baked: num(get("baked")), soldout: String(get("soldout")).trim() || null, rain: rain, temp: num(get("temp")) });
       var p = products[name] || (products[name] = { name: name, price: null, cost: null });
       var pr = num(get("price")), co = num(get("cost"));
       if (pr != null) p.price = pr;
@@ -230,8 +316,31 @@
     return { sales: sales, products: products };
   }
 
+  // прогноз Open-Meteo (бесплатно, без ключа): номер дня → { rain, temp }, как в bot/core/weather.py
+  function loadWeather(lat, lon, days) {
+    if (typeof fetch !== "function") return Promise.resolve({});
+    var url = "https://api.open-meteo.com/v1/forecast?latitude=" + lat + "&longitude=" + lon +
+      "&daily=precipitation_sum,temperature_2m_max,temperature_2m_min&forecast_days=" + (days || 3) + "&timezone=auto";
+    return fetch(url).then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
+      var d = j && j.daily, out = {};
+      if (d) d.time.forEach(function (iso, i) {
+        var hi = d.temperature_2m_max[i], lo = d.temperature_2m_min[i], mm = d.precipitation_sum[i];
+        out[dnum(iso)] = { rain: mm == null ? null : mm >= 1, temp: hi == null || lo == null ? null : Math.round((hi + lo) * 5) / 10 };
+      });
+      return out;
+    }).catch(function () { return {}; });
+  }
+  function deg(t) { var r = Math.round(t); return (r > 0 ? "+" : r < 0 ? "−" : "") + Math.abs(r) + "°"; }
+  // средняя температура за две недели до дня — от неё модель считает «холоднее/теплее»
+  function recentTemp(sales, day) {
+    var seen = {}, xs = [];
+    sales.forEach(function (s) { if (s.temp != null && day - s.day >= 1 && day - s.day <= 14 && !(s.day in seen)) { seen[s.day] = 1; xs.push(s.temp); } });
+    return xs.length ? avg(xs) : null;
+  }
+
   var api = { dnum: dnum, diso: diso, wday: wday, ddmm: ddmm, WD: WD, WDS: WDS, demand: demand, rainEffect: rainEffect,
     criticalRatio: criticalRatio, forecast: forecast, eveningThreshold: eveningThreshold, discountAdvice: discountAdvice,
-    backtest: backtest, expiryStatus: expiryStatus, expiryTip: expiryTip, parseCSV: parseCSV, signed: signed, SHARE_EVENING: SHARE_EVENING };
+    backtest: backtest, expiryStatus: expiryStatus, expiryTip: expiryTip, parseCSV: parseCSV, signed: signed, SHARE_EVENING: SHARE_EVENING,
+    loadWeather: loadWeather, deg: deg, recentTemp: recentTemp };
   if (typeof module !== "undefined" && module.exports) module.exports = api; else root.FreshModel = api;
 })(this);

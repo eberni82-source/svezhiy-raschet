@@ -9,7 +9,13 @@
 3. Базовый прогноз = уровень (средний спрос за 14 дней) × профиль недели
    (во сколько раз этот день недели выше среднего за 8 недель). Всё очищено
    от влияния дождя.
-4. Объём выпечки по модели «газетчика»: печём столько, чтобы вероятность
+4. Сезон. Уровень по двум неделям сам идёт за сезоном. Сверху две поправки:
+   температура — по истории модель узнаёт, как холод и жара меняют спрос на
+   каждую позицию (нужно от двух месяцев данных с температурой);
+   прошлый год — как менялся спрос всей точки в эти же дни год назад
+   (праздники, дачный сезон, каникулы). Обе включаются, только если эффект
+   заметно больше случайного разброса.
+5. Объём выпечки по модели «газетчика»: печём столько, чтобы вероятность
    продать всё была равна доле (цена - себестоимость) / цена.
 """
 from __future__ import annotations
@@ -35,6 +41,7 @@ class Sale:
     baked: float | None = None
     soldout: str | None = None   # "15:40" — время, когда товар закончился
     rain: bool | None = None
+    temp: float | None = None    # средняя температура дня, °C
 
 
 @dataclass
@@ -105,8 +112,87 @@ def critical_ratio(price: float | None, cost: float | None) -> float:
     return max(0.3, min(0.95, (price - cost) / price))
 
 
+def _mean(xs):
+    return sum(xs) / len(xs)
+
+
+TEMP_WINDOW, TEMP_NEAR, TEMP_MIN_DAYS, TEMP_MIN_T = 365, 15, 60, 2.5
+
+
+def temperature_slope(hist, target: date, clean_value, wd_factor) -> float:
+    """На сколько (доля) меняется спрос на каждый градус. 0 — если данных мало или связь ненадёжна."""
+    n_days = TEMP_WINDOW
+    y = [None] * (n_days + 1)       # индекс = сколько дней назад
+    tt = [None] * (n_days + 1)
+    for s in hist:
+        age = (target - s.day).days
+        if 1 <= age <= n_days:
+            f = wd_factor(s.day.weekday()) or 1.0
+            y[age] = (y[age] or 0) + clean_value(s) / f
+            if s.temp is not None:
+                tt[age] = s.temp
+
+    def prefix(arr):
+        sums, cnts = [0.0], [0]
+        for v in arr:
+            sums.append(sums[-1] + (v if v is not None else 0.0))
+            cnts.append(cnts[-1] + (1 if v is not None else 0))
+        return sums, cnts
+    ys, yc = prefix(y)
+    ts, tc = prefix(tt)
+    xs_, rs_ = [], []
+    for age in range(1, n_days + 1):
+        if y[age] is None or tt[age] is None:
+            continue
+        lo, hi = max(0, age - TEMP_NEAR), min(n_days, age + TEMP_NEAR) + 1
+        if yc[hi] - yc[lo] == 0 or tc[hi] - tc[lo] == 0:
+            continue
+        local_y = (ys[hi] - ys[lo]) / (yc[hi] - yc[lo])
+        local_t = (ts[hi] - ts[lo]) / (tc[hi] - tc[lo])
+        if local_y > 0:
+            xs_.append(tt[age] - local_t)
+            rs_.append(y[age] / local_y)
+    n = len(xs_)
+    if n < TEMP_MIN_DAYS:
+        return 0.0
+    mx, mr = _mean(xs_), _mean(rs_)
+    vx = _mean([(x - mx) ** 2 for x in xs_])
+    if vx < 4:
+        return 0.0
+    slope = _mean([(x - mx) * (r - mr) for x, r in zip(xs_, rs_)]) / vx
+    res = sum((r - mr - slope * (x - mx)) ** 2 for x, r in zip(xs_, rs_)) / (n - 2)
+    se = math.sqrt(res / (n * vx)) if res > 0 else 0
+    if se == 0 or abs(slope / se) < TEMP_MIN_T:
+        return 0.0
+    return max(-0.02, min(0.02, slope * n / (n + 30)))
+
+
+def season_change(sales: list[Sale], target: date, open_h=7, close_h=21, rain_eff=DEFAULT_RAIN_EFFECT) -> float:
+    """Сезон по прошлому году: во сколько раз спрос всей точки в неделю с этой даты год назад
+    отличался от двух недель до неё. 1.0 — если года истории нет или разница в пределах шума."""
+    total: dict[int, float] = {}
+    for s in sales:
+        age = (target - s.day).days
+        if 1 <= age <= 56 or 359 <= age <= 379:
+            d = demand_estimate(s, open_h, close_h)
+            total[age] = total.get(age, 0) + (d / (1 + rain_eff) if s.rain else d)
+    if any(a not in total for a in range(359, 380)):
+        return 1.0
+    after = [total[a] for a in range(359, 366)]    # неделя с этой даты год назад
+    before = [total[a] for a in range(366, 380)]   # две недели до неё
+    # шум: насколько расходятся одни и те же дни недели с разницей в неделю за последние 8 недель
+    pairs = [((total[a] - total[a + 7]) / ((total[a] + total[a + 7]) / 2)) ** 2 / 2
+             for a in range(1, 50) if a in total and a + 7 in total and total[a] + total[a + 7] > 0]
+    if len(pairs) < 7 or _mean(before) <= 0:
+        return 1.0
+    se = math.sqrt(_mean(pairs) * (1 / 7 + 1 / 14))
+    ratio = _mean(after) / _mean(before)
+    return ratio if abs(ratio - 1) >= max(0.08, 3 * se) else 1.0
+
+
 def forecast(sales: list[Sale], product: Product, target: date, rain_tomorrow: bool = False,
-             event_factor: float = 1.0, open_h=7, close_h=21, rain_eff: float | None = None) -> Recommendation:
+             event_factor: float = 1.0, open_h=7, close_h=21, rain_eff: float | None = None,
+             temp_tomorrow: float | None = None) -> Recommendation:
     hist = sorted([s for s in sales if s.product == product.name and s.day < target], key=lambda s: s.day, reverse=True)
     if rain_eff is None:
         rain_eff, _ = rain_effect(sales, open_h, close_h)
@@ -120,26 +206,33 @@ def forecast(sales: list[Sale], product: Product, target: date, rain_tomorrow: b
                                   ["новый товар: истории пока нет, берём ваш обычный объём"], 0)
         return Recommendation(product.name, 0, 0, 0, cr, ["нет истории продаж"], 0)
 
-    # спрос, очищенный от дождя, за последние 8 недель
-    window = [s for s in hist if (target - s.day).days <= 56]
-    clean = {}
-    for s in window:
+    def clean_value(s: Sale) -> float:
         d = demand_estimate(s, open_h, close_h)
-        clean[s.day] = clean.get(s.day, 0) + (d / (1 + rain_eff) if s.rain else d)
+        return d / (1 + rain_eff) if s.rain else d
 
-    # уровень: среднее за последние 14 дней (быстро ловит рост и спад)
-    recent = [v for day, v in clean.items() if (target - day).days <= 14]
-    if len(recent) < 5:
-        recent = list(clean.values())
-    level = sum(recent) / len(recent)
+    # спрос, очищенный от дождя, за последние 8 недель
+    clean: dict[date, float] = {}
+    temps: dict[date, float] = {}
+    for s in hist:
+        if (target - s.day).days <= 56:
+            clean[s.day] = clean.get(s.day, 0) + clean_value(s)
+            if s.temp is not None:
+                temps[s.day] = s.temp
+
+    # уровень: среднее за последние 14 дней (сам следует за сезоном)
+    recent_days = [day for day in clean if (target - day).days <= 14]
+    if len(recent_days) < 5:
+        recent_days = list(clean)
+    level = _mean([clean[d] for d in recent_days])
 
     # профиль недели: во сколько раз этот день недели выше среднего
-    overall = sum(clean.values()) / len(clean)
+    overall = _mean(list(clean.values()))
+
     def wd_factor(wd: int) -> float:
         vals = [v for day, v in clean.items() if day.weekday() == wd]
         if len(vals) < 2 or overall <= 0:
             return 1.0
-        return (sum(vals) / len(vals)) / overall
+        return _mean(vals) / overall
     wf = wd_factor(target.weekday())
     if len(clean) < 14:
         reasons.append("истории меньше 2 недель — прогноз грубый")
@@ -154,12 +247,30 @@ def forecast(sales: list[Sale], product: Product, target: date, rain_tomorrow: b
             if f > 0:
                 resid.append(v / f - level)
     var = (sum(r * r for r in resid) / len(resid)) * 1.25 * wf * wf if len(resid) >= 4 else 0
-
     base = level * wf
+
+    # сезон 1: температура. За год истории узнаём, как жара и холод меняют спрос на эту позицию.
+    # Каждый день сравниваем с соседними (±15 дней), чтобы сезон и рост продаж не выдавались
+    # за влияние погоды, и верим связи, только если она статистически надёжна.
+    temp_f = 1.0
+    level_temps = [temps[d] for d in recent_days if d in temps]
+    if temp_tomorrow is not None and level_temps:
+        slope = temperature_slope(hist, target, clean_value, wd_factor)
+        if slope:
+            diff = max(-12.0, min(12.0, temp_tomorrow - _mean(level_temps)))
+            temp_f = max(0.75, min(1.3, 1 + slope * diff))
+            if abs(temp_f - 1) >= 0.03:
+                reasons.append(f"{'холоднее' if diff < 0 else 'теплее'} на {abs(diff):.0f}°: {(temp_f - 1) * 100:+.0f}% к спросу")
+
+    # сезон 2: прошлый год — праздники, дачный сезон, каникулы
+    yoy = season_change(sales, target, open_h, close_h, rain_eff)
+    yoy_f = max(0.6, min(1.6, 1 + 0.7 * (yoy - 1)))
+    if yoy != 1:
+        reasons.append(f"сезон: год назад в эти дни спрос {'вырос' if yoy > 1 else 'снизился'} на {abs(yoy - 1) * 100:.0f}%")
+
     last_same = next((s for s in hist if s.day.weekday() == target.weekday()), None)
     sold_out_recent = last_same if last_same and last_same.soldout and (target - last_same.day).days <= 7 else None
-    pts = window
-    mean = base
+    mean = base * temp_f * yoy_f
     if rain_tomorrow:
         mean *= 1 + rain_eff
         reasons.append(f"дождь: {rain_eff * 100:+.0f}% к спросу")
@@ -181,7 +292,7 @@ def forecast(sales: list[Sale], product: Product, target: date, rain_tomorrow: b
             reasons.append(f"маржа {ratio * 100:.0f}% — берём с запасом")
         elif ratio <= 0.45:
             reasons.append(f"маржа {ratio * 100:.0f}% — впритык, остаток дорого обходится")
-    return Recommendation(product.name, mean, sd, qty, ratio, reasons, len(pts))
+    return Recommendation(product.name, mean, sd, qty, ratio, reasons, len(clean))
 
 
 def evening_threshold(rec: Recommendation) -> int:
@@ -225,7 +336,7 @@ def backtest(sales: list[Sale], products: dict[str, Product], days: int = 28, op
             p = products.get(s.product) or Product(s.product)
             price = p.price or 0
             cost = p.cost if p.cost is not None else price * 0.4
-            rec = forecast(past, p, d, bool(s.rain), 1.0, open_h, close_h, rain_eff)
+            rec = forecast(past, p, d, bool(s.rain), 1.0, open_h, close_h, rain_eff, s.temp)
             dem = demand_estimate(s, open_h, close_h)
             sold_new = min(rec.qty, dem)
             r.waste_now += (s.baked - s.sold) * cost

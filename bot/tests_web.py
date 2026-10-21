@@ -84,7 +84,7 @@ check(any(i["product"] == "Багет" for i in s["tomorrow"]["items"]), "тов
 req("POST", "/api/product", {"name": "Хлеб пшеничный (нарезка)", "old_name": "Хлеб пшеничный", "price": 75, "cost": 32, "shelf_life": 2})
 s = req("GET", "/api/state")
 renamed = [p for p in s["products"] if p["name"] == "Хлеб пшеничный (нарезка)"]
-check(renamed and renamed[0]["history_days"] == 56, "переименование сохранило историю продаж")
+check(renamed and renamed[0]["history_days"] == 400, "переименование сохранило историю продаж")
 
 req("POST", "/api/batch", {"item": "Салат «Оливье»", "qty": "20 шт", "made": s["today"]["date"]})
 s = req("GET", "/api/state")

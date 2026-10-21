@@ -16,6 +16,7 @@ ALIASES = {
     "price": ["цена", "price"],
     "cost": ["себестоимость", "cost", "себес"],
     "rain": ["дождь", "rain", "осадки"],
+    "temp": ["температура", "temp", "темп", "t"],
 }
 
 
@@ -81,7 +82,7 @@ def parse_csv(text: str) -> tuple[list[Sale], dict[str, Product]]:
             continue
         rain_raw = get("rain").strip().lower()
         rain = None if rain_raw == "" else rain_raw in ("1", "да", "yes", "true", "дождь")
-        sales.append(Sale(d, name, sold, _num(get("baked")), get("soldout").strip() or None, rain))
+        sales.append(Sale(d, name, sold, _num(get("baked")), get("soldout").strip() or None, rain, _num(get("temp"))))
         price, cost = _num(get("price")), _num(get("cost"))
         p = products.setdefault(name, Product(name))
         if price is not None:

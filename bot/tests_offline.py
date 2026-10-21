@@ -127,7 +127,7 @@ check(any("Загружено" in p["text"] for _, p in out), "CSV импорт�
 out = msg(USER, "/plan"); show("план по своим данным", out)
 
 out = msg(444, "/start demo"); show("/start demo с сайта", out)
-check(any("демо-данные" in p["text"] for _, p in out) and any("План на завтра" in p["text"] for _, p in out), "кнопка с сайта сразу показывает демо")
+check(any("пример" in p["text"] for _, p in out) and any("План на завтра" in p["text"] for _, p in out), "кнопка с сайта сразу показывает пример")
 
 out = msg(333, "/start pilot", username="newbakery") + msg(333, "Булочная на Ленина") + msg(333, "Тюмень") + cb(333, "k:0") + msg(333, "+7 900 000-00-00")
 show("заявка на пилот", out)
@@ -147,4 +147,49 @@ SENT.clear(); bot.last_tick = 0; bot.tick(); show("утренняя рассыл
 check(any(p["chat_id"] == USER and "План на сегодня" in p["text"] for _, p in SENT), "утренний план отправлен по расписанию")
 SENT.clear(); bot.last_tick = 0; bot.tick()
 check(not any(p["chat_id"] == USER and "План на сегодня" in p["text"] for _, p in SENT), "второй раз за день не шлёт")
+# погода: подменяем Open-Meteo, проверяем температуру в прогнозе, отметках и загрузке истории
+import sqlite3  # noqa: E402
+from datetime import date, timedelta  # noqa: E402
+from urllib.parse import parse_qs, urlparse  # noqa: E402
+import core.weather as weather  # noqa: E402
+from core.storage import Storage  # noqa: E402
+CALLS = []
+
+
+def fake_get(url, timeout=10):
+    q = {k: v[0] for k, v in parse_qs(urlparse(url).query).items()}
+    CALLS.append(urlparse(url).netloc)
+    if "archive" in url:
+        start, end = date.fromisoformat(q["start_date"]), date.fromisoformat(q["end_date"])
+    else:
+        start, end = date.today() - timedelta(days=int(q["past_days"])), date.today() + timedelta(days=int(q["forecast_days"]) - 1)
+    days = [start + timedelta(days=i) for i in range((end - start).days + 1)]
+    return {"utc_offset_seconds": 18000, "daily": {
+        "time": [d.isoformat() for d in days], "precipitation_sum": [3.0 if d.day % 3 == 0 else 0.0 for d in days],
+        "temperature_2m_max": [-2.0 + d.day % 5 for d in days], "temperature_2m_min": [-8.0 for d in days]}}
+
+
+weather._get = fake_get
+bot.weather.enabled = True
+bot.db.set_chat(USER, lat=55.16, lon=61.44)
+w = bot.weather.day(55.16, 61.44, date.today() + timedelta(days=1), time.time())
+check(w.temp == round((-2.0 + (date.today() + timedelta(days=1)).day % 5 - 8.0) / 2, 1) and w.rain is not None, "погода: средняя температура и осадки")
+SENT.clear(); out = msg(USER, "/plan"); show("план с погодой", out)
+check(any("°" in p["text"] for _, p in out), "в плане есть температура")
+recent = [s for s in bot.db.sales(USER) if (date.today() - s.day).days <= 92]
+check(recent and all(s.temp is not None and s.rain is not None for s in recent), "у прошлых продаж дописана погода")
+old_csv = "дата;товар;продано\n" + "\n".join(f"2025-03-{d:02d};Кекс;{10 + d % 4}" for d in range(1, 29))
+FILES["documents/F2.csv"] = old_csv.encode("utf-8")
+CALLS.clear(); msg(USER, doc={"file_id": "F2", "file_name": "old.csv"})
+keks = [s for s in bot.db.sales(USER) if s.product == "Кекс"]
+check(any("archive" in c for c in CALLS) and keks and all(s.temp is not None for s in keks), "старая история получила погоду из архива")
+
+legacy = tempfile.mktemp(suffix=".db")
+con = sqlite3.connect(legacy)
+con.execute("CREATE TABLE sales (chat_id INTEGER, day TEXT, product TEXT, baked REAL, sold REAL, soldout TEXT, rain INTEGER, PRIMARY KEY (chat_id, day, product))")
+con.execute("INSERT INTO sales VALUES (1, '2026-10-01', 'Багет', 30, 25, NULL, 0)")
+con.commit(); con.close()
+st = Storage(legacy)
+check(st.sales(1)[0].temp is None and "temp" in {r["name"] for r in st.db.execute("PRAGMA table_info(sales)")}, "старая база получила колонку температуры")
+
 print("\nВСЕ ПРОВЕРКИ ПРОЙДЕНЫ")

@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS products (
 );
 CREATE TABLE IF NOT EXISTS sales (
     chat_id INTEGER, day TEXT, product TEXT,
-    baked REAL, sold REAL, soldout TEXT, rain INTEGER,
+    baked REAL, sold REAL, soldout TEXT, rain INTEGER, temp REAL,
     PRIMARY KEY (chat_id, day, product)
 );
 CREATE TABLE IF NOT EXISTS plans (
@@ -60,11 +60,11 @@ class Storage:
         self.db = sqlite3.connect(path, check_same_thread=False)
         self.db.row_factory = sqlite3.Row
         self.db.executescript(SCHEMA)
-        # миграция старых баз: новые колонки товаров
-        cols = {r["name"] for r in self.db.execute("PRAGMA table_info(products)")}
-        for col, typ in (("shelf_life", "INTEGER"), ("default_qty", "REAL"), ("active", "INTEGER DEFAULT 1")):
-            if col not in cols:
-                self.db.execute(f"ALTER TABLE products ADD COLUMN {col} {typ}")
+        # миграция старых баз: новые колонки
+        for table, col, typ in (("products", "shelf_life", "INTEGER"), ("products", "default_qty", "REAL"),
+                                ("products", "active", "INTEGER DEFAULT 1"), ("sales", "temp", "REAL")):
+            if col not in {r["name"] for r in self.db.execute(f"PRAGMA table_info({table})")}:
+                self.db.execute(f"ALTER TABLE {table} ADD COLUMN {col} {typ}")
         self.db.commit()
 
     # --- чаты ---
@@ -130,17 +130,23 @@ class Storage:
 
     def upsert_sale(self, chat_id: int, s: Sale):
         self.db.execute(
-            "INSERT INTO sales (chat_id, day, product, baked, sold, soldout, rain) VALUES (?,?,?,?,?,?,?) "
+            "INSERT INTO sales (chat_id, day, product, baked, sold, soldout, rain, temp) VALUES (?,?,?,?,?,?,?,?) "
             "ON CONFLICT(chat_id, day, product) DO UPDATE SET baked=excluded.baked, sold=excluded.sold, "
-            "soldout=excluded.soldout, rain=COALESCE(excluded.rain, rain)",
+            "soldout=excluded.soldout, rain=COALESCE(excluded.rain, rain), temp=COALESCE(excluded.temp, temp)",
             (chat_id, s.day.isoformat(), s.product, s.baked, s.sold, s.soldout,
-             None if s.rain is None else int(s.rain)))
+             None if s.rain is None else int(s.rain), s.temp))
 
     def import_sales(self, chat_id: int, sales: list[Sale], products: dict[str, Product]):
         for p in products.values():
             self.upsert_product(chat_id, p)
         for s in sales:
             self.upsert_sale(chat_id, s)
+        self.db.commit()
+
+    def save_weather(self, chat_id: int, sales: list[Sale]):
+        self.db.executemany(
+            "UPDATE sales SET rain=COALESCE(rain, ?), temp=COALESCE(temp, ?) WHERE chat_id=? AND day=? AND product=?",
+            [(None if s.rain is None else int(s.rain), s.temp, chat_id, s.day.isoformat(), s.product) for s in sales])
         self.db.commit()
 
     def clear_sales(self, chat_id: int):
@@ -151,7 +157,7 @@ class Storage:
     def sales(self, chat_id: int) -> list[Sale]:
         rows = self.db.execute("SELECT * FROM sales WHERE chat_id=? ORDER BY day", (chat_id,))
         return [Sale(date.fromisoformat(r["day"]), r["product"], r["sold"], r["baked"], r["soldout"],
-                     None if r["rain"] is None else bool(r["rain"])) for r in rows]
+                     None if r["rain"] is None else bool(r["rain"]), r["temp"]) for r in rows]
 
     def sale(self, chat_id: int, day: date, product: str) -> sqlite3.Row | None:
         return self.db.execute("SELECT * FROM sales WHERE chat_id=? AND day=? AND product=?",

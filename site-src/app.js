@@ -27,12 +27,21 @@
   }
 
   var DEMO = loadDemo();
-  var S = { data: DEMO, source: "demo", fileName: "", dayIdx: 1, rain: false, event: 1, tab: "plan", sel: null,
+  var WX = {}; // прогноз погоды для Челябинска: номер дня → { rain, temp }
+  var S = { data: DEMO, source: "demo", fileName: "", dayIdx: 1, rain: false, temp: "fc", event: 1, tab: "plan", sel: null,
             msg: "morning", batches: demoBatches(), err: "" };
 
   function lastDay(data) { return Math.max.apply(null, data.sales.map(function (s) { return s.day; })); }
   function baseDay() { return S.source === "demo" ? TODAY : lastDay(S.data) + 1; }
   function target() { return baseDay() + S.dayIdx; }
+  function forecastTemp(day) { return WX[day] && WX[day].temp != null ? WX[day].temp : null; }
+  // температура для расчёта: прогноз или «как в последние дни» ± сдвиг из списка
+  function tempMode(day) { return S.temp === "fc" && forecastTemp(day) == null ? 0 : S.temp; }
+  function tempFor(day) {
+    var base = M.recentTemp(S.data.sales, day), mode = tempMode(day);
+    if (base == null) return null;
+    return mode === "fc" ? forecastTemp(day) : base + mode;
+  }
 
   function allProducts(data) {
     var p = {};
@@ -40,10 +49,10 @@
     data.sales.forEach(function (s) { if (!p[s.product]) p[s.product] = { name: s.product, price: null, cost: null }; });
     return p;
   }
-  function compute(data, day, rain, event) {
+  function compute(data, day, rain, event, temp) {
     var eff = M.rainEffect(data.sales), prods = allProducts(data), recs = [], habit = {};
     Object.keys(prods).forEach(function (k) {
-      var r = M.forecast(data.sales, prods[k], day, rain, event, eff.eff);
+      var r = M.forecast(data.sales, prods[k], day, rain, event, eff.eff, temp);
       if (r.n > 0) recs.push(r);
     });
     recs.sort(function (a, b) { return b.qty - a.qty; });
@@ -66,9 +75,9 @@
 
   /* ---------------- чек на первом экране ---------------- */
   function renderTicket() {
-    var day = TODAY + 1, c = compute(DEMO, day, false, 1), total = 0, habit = 0, h = [];
+    var day = TODAY + 1, temp = forecastTemp(day), c = compute(DEMO, day, false, 1, temp), total = 0, habit = 0, h = [];
     h.push('<div class="t-head"><span>СВЕЖИЙ РАСЧЁТ</span><span>06:00</span></div>');
-    h.push('<div class="t-sub">План на завтра · ' + dayLabel(day) + '</div>');
+    h.push('<div class="t-sub">План на завтра · ' + dayLabel(day) + (temp != null ? " · " + M.deg(temp) : "") + '</div>');
     h.push('<hr class="t-cut">');
     c.recs.forEach(function (r) {
       total += r.qty; habit += c.habit[r.product] || r.qty;
@@ -94,21 +103,29 @@
     }
     sel.innerHTML = opts.join("");
   }
+  function renderTemp() {
+    var sel = $("temp"), day = target(), base = M.recentTemp(S.data.sales, day), fc = forecastTemp(day), mode = tempMode(day), opts = [];
+    if (base == null) { sel.innerHTML = "<option>нет в данных</option>"; sel.disabled = true; return; }
+    sel.disabled = false;
+    if (fc != null) opts.push(["fc", M.deg(fc) + " по прогнозу"]);
+    [-10, -5, 0, 5, 10].forEach(function (o) { opts.push([o, M.deg(base + o) + (o === 0 ? " как сейчас" : "")]); });
+    sel.innerHTML = opts.map(function (o) { return '<option value="' + o[0] + '"' + (o[0] === mode ? " selected" : "") + ">" + o[1] + "</option>"; }).join("");
+  }
   function renderNote() {
     var n = $("data-note"), d = S.data, days = d.sales.map(function (s) { return s.day; });
     var first = Math.min.apply(null, days), last = Math.max.apply(null, days), np = Object.keys(allProducts(d)).length;
     var h = S.source === "demo"
-      ? '<span class="tag">Пример</span><span>Пекарня в Челябинске: ' + np + " позиций, продажи за 8 недель (смоделированы).</span>"
+      ? '<span class="tag">Пример</span><span>Пекарня в Челябинске: ' + np + " позиций, продажи и погода за год (смоделированы).</span>"
       : '<span class="tag own">Ваш файл</span><span>' + esc(S.fileName) + ": " + d.sales.length + " " + plural(d.sales.length, "строка", "строки", "строк") + ", " + np + " " + plural(np, "позиция", "позиции", "позиций") + ", " + M.ddmm(first) + "–" + M.ddmm(last) + ". Данные остаются в вашем браузере.</span>";
     if (S.err) h += '<span class="err">Не получилось прочитать файл: ' + esc(S.err) + "</span>";
-    if (S.source === "demo") h += '<span>Свой файл: колонки <span class="mono">дата;товар;продано</span>, по желанию <span class="mono">испечено (или заказано);закончилось;цена;себестоимость;дождь</span></span>';
+    if (S.source === "demo") h += '<span>Свой файл: колонки <span class="mono">дата;товар;продано</span>, по желанию <span class="mono">испечено (или заказано);закончилось;цена;себестоимость;дождь;температура</span></span>';
     n.innerHTML = h;
   }
 
   var C = null;
   function renderPlan() {
     var day = target();
-    C = compute(S.data, day, S.rain, S.event);
+    C = compute(S.data, day, S.rain, S.event, tempFor(day));
     if (!S.sel || !C.recs.some(function (r) { return r.product === S.sel; })) S.sel = C.recs.length ? C.recs[0].product : null;
     var rows = [], tm = 0, tq = 0, th = 0, hasHabit = Object.keys(C.habit).length > 0;
     C.recs.forEach(function (r) {
@@ -131,7 +148,8 @@
     }
     $("plan-table").tFoot.innerHTML = foot;
     var e = C.eff;
-    $("rain-note").textContent = "Дождь: " + M.signed(e.eff * 100) + " к спросу" + (e.learned ? " (по истории продаж)." : " (по умолчанию).") + " «Обычно» — среднее за 4 недели в этот день недели.";
+    $("rain-note").textContent = "Дождь: " + M.signed(e.eff * 100) + " к спросу" + (e.learned ? " (по истории продаж)." : " (по умолчанию).") +
+      " Температура меняет прогноз тех позиций, у которых по истории видна связь с погодой. «Обычно» — среднее за 4 недели в этот день недели.";
     renderChart();
   }
 
@@ -190,7 +208,7 @@
       } else {
         var h = hist[+i]; cx = L + sw * (+i + 0.5);
         if (h.none) html = "<b>" + dayLabel(h.day) + "</b><br>нет данных";
-        else html = "<b>" + dayLabel(h.day) + "</b>" + (h.s.rain ? " · дождь" : "") + "<br>продано " + h.sold + (h.s.baked != null ? " из " + h.s.baked : "") +
+        else html = "<b>" + dayLabel(h.day) + "</b>" + (h.s.rain ? " · дождь" : "") + (h.s.temp != null ? " · " + M.deg(h.s.temp) : "") + "<br>продано " + h.sold + (h.s.baked != null ? " из " + h.s.baked : "") +
           (h.s.soldout ? "<br>закончились в " + esc(h.s.soldout) + ", не хватило ≈" + Math.round(h.short) : (h.s.baked != null ? "<br>осталось " + (h.s.baked - h.sold) : ""));
       }
       tip.innerHTML = html; tip.hidden = false;
@@ -251,8 +269,8 @@
     if (S.msg === "morning") {
       var title = day === TODAY ? "План на сегодня" : day === TODAY + 1 ? "План на завтра" : "План";
       out.push("<b>" + title + " · " + dayLabel(day) + "</b>");
-      if (S.rain) out.push("Ожидается дождь — спрос ниже на " + Math.abs(Math.round(C.eff.eff * 100)) + "%");
-      else out.push("Без осадков");
+      var tt = tempFor(day);
+      out.push((S.rain ? "Ожидается дождь — спрос ниже на " + Math.abs(Math.round(C.eff.eff * 100)) + "%" : "Без осадков") + (tt != null ? " · " + M.deg(tt) : ""));
       if (S.event !== 1) out.push("Событие: " + M.signed((S.event - 1) * 100) + " к спросу");
       out.push("", "<b>Испечь</b>");
       var total = 0, habit = 0, hasH = Object.keys(C.habit).length > 0;
@@ -293,7 +311,7 @@
     if (S.tab === "plan") renderChart();
   }
   function renderAll() {
-    renderNote(); renderDays(); renderPlan(); renderBatches(); renderBacktest(); renderPhone(); renderTabs();
+    renderNote(); renderDays(); renderTemp(); renderPlan(); renderBatches(); renderBacktest(); renderPhone(); renderTabs();
     $("w-dry").setAttribute("aria-pressed", String(!S.rain)); $("w-rain").setAttribute("aria-pressed", String(S.rain));
     $("src-demo").setAttribute("aria-pressed", String(S.source === "demo")); $("src-file").setAttribute("aria-pressed", String(S.source === "file"));
     ["morning", "evening", "closing"].forEach(function (m) { $("m-" + m).setAttribute("aria-pressed", String(S.msg === m)); });
@@ -327,7 +345,8 @@
   }
 
   /* ---------------- события ---------------- */
-  $("day").addEventListener("change", function () { S.dayIdx = +this.value; renderPlan(); renderPhone(); });
+  $("day").addEventListener("change", function () { S.dayIdx = +this.value; renderTemp(); renderPlan(); renderPhone(); });
+  $("temp").addEventListener("change", function () { S.temp = this.value === "fc" ? "fc" : +this.value; renderPlan(); renderPhone(); });
   $("event").addEventListener("change", function () { S.event = +this.value; renderPlan(); renderPhone(); });
   $("w-dry").addEventListener("click", function () { S.rain = false; renderAll(); });
   $("w-rain").addEventListener("click", function () { S.rain = true; renderAll(); });
@@ -382,4 +401,5 @@
 
   /* ---------------- старт ---------------- */
   renderTicket(); renderAll(); renderCalc(); renderPilot();
+  M.loadWeather(55.16, 61.44, 8).then(function (w) { WX = w; if (Object.keys(w).length) { renderTicket(); renderAll(); } });
 })();

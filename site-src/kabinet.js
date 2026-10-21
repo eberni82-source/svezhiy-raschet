@@ -25,11 +25,11 @@
 
   /* ================= Пример в браузере (без сервера) ================= */
   var Local = (function () {
-    var KEY = "svezhiy-kabinet-v1", D = null, btCache = null;
+    var KEY = "svezhiy-kabinet-v2", D = null, btCache = null, W = {};
     function today() { var n = new Date(); return M.dnum(n.getFullYear() + "-" + pad(n.getMonth() + 1) + "-" + pad(n.getDate())); }
     function save() { try { localStorage.setItem(KEY, JSON.stringify(D)); } catch (e) { /* хранилище недоступно — работаем в памяти */ } }
     function example() {
-      var r = M.parseCSV(DEMO_CSV), T = today();
+      var r = DEMO_CSV ? M.parseCSV(DEMO_CSV) : { sales: [], products: {} }, T = today();
       var last = Math.max.apply(null, r.sales.map(function (s) { return s.day; }));
       r.sales.forEach(function (s) { s.day += (T - 1) - last; });
       var products = {};
@@ -37,16 +37,19 @@
         var p = r.products[k];
         products[k] = { name: k, price: p.price, cost: p.cost, shelf_life: (k === "Эклер" || k === "Сэндвич с курицей") ? 2 : 1, default_qty: null, active: true };
       });
-      D = { v: 1, business: "Условная пекарня", example: true, times: { morning: "06:00", evening: "17:00", closing: "21:00" },
+      D = { v: 2, business: "Условная пекарня", example: true, times: { morning: "06:00", evening: "17:00", closing: "21:00" },
             products: products, sales: r.sales, plans: {}, events: {}, nextId: 5,
             batches: [[1, "Сливки 33%", "2 л", 1], [2, "Творог 5%", "3 кг", 2], [3, "Филе куриное", "1,5 кг", 0], [4, "Вишня замороженная", "2 кг", 20]]
               .map(function (b) { return { id: b[0], item: b[1], qty: b[2], exp: T + b[3], status: "active" }; }) };
       btCache = null; save();
     }
     function load() {
-      try { var raw = localStorage.getItem(KEY); if (raw) { var d = JSON.parse(raw); if (d && d.v === 1) { D = d; return; } } } catch (e) { /* нет доступа */ }
-      example();
+      try { var raw = localStorage.getItem(KEY); if (raw) { var d = JSON.parse(raw); if (d && d.v === 2) D = d; } } catch (e) { /* нет доступа */ }
+      if (!D) example();
+      // пример — пекарня в Челябинске: берём настоящий прогноз погоды на ближайшие дни
+      M.loadWeather(55.16, 61.44, 3).then(function (w) { W = w; if (Object.keys(w).length && S.st) refresh(true); });
     }
+    function weather(day) { return (D.example && W[day]) || { rain: null, temp: null }; }
     function prodMap(includeSalesOnly) {
       var out = {}, removed = {};
       Object.keys(D.products).forEach(function (k) { var p = D.products[k]; if (p.active) out[k] = p; else removed[k] = 1; });
@@ -54,8 +57,8 @@
       return out;
     }
     function recs(day) {
-      var prods = prodMap(true), eff = M.rainEffect(D.sales).eff, ev = D.events[day] || 1, list = [], habit = {};
-      Object.keys(prods).forEach(function (k) { var r = M.forecast(D.sales, prods[k], day, false, ev, eff); if (r.n > 0 || r.qty > 0) list.push(r); });
+      var prods = prodMap(true), eff = M.rainEffect(D.sales).eff, ev = D.events[day] || 1, w = weather(day), list = [], habit = {};
+      Object.keys(prods).forEach(function (k) { var r = M.forecast(D.sales, prods[k], day, w.rain === true, ev, eff, w.temp); if (r.n > 0 || r.qty > 0) list.push(r); });
       list.sort(function (a, b) { return b.qty - a.qty; });
       list.forEach(function (r) {
         var same = D.sales.filter(function (s) { return s.product === r.product && s.baked != null && M.wday(s.day) === M.wday(day) && day - s.day > 0 && day - s.day <= 28; });
@@ -103,8 +106,8 @@
       return {
         mode: "local", business: { name: D.business, city: D.example ? "Челябинск" : "", is_example: D.example },
         now: M.diso(T) + "T" + pad(now.getHours()) + ":" + pad(now.getMinutes()), phase: phaseOf(D.times, m), times: D.times,
-        today: { date: M.diso(T), rain: null, event: D.events[T] || 1, items: items },
-        tomorrow: { date: M.diso(T + 1), rain: null, event: D.events[T + 1] || 1, rain_effect: rm.eff, items: tom },
+        today: { date: M.diso(T), rain: weather(T).rain, temp: weather(T).temp, event: D.events[T] || 1, items: items },
+        tomorrow: { date: M.diso(T + 1), rain: weather(T + 1).rain, temp: weather(T + 1).temp, event: D.events[T + 1] || 1, rain_effect: rm.eff, items: tom },
         products: products, removed: removed, batches: batches,
         data: { rows: D.sales.length, first: days.length ? M.diso(Math.min.apply(null, days)) : null, last: days.length ? M.diso(Math.max.apply(null, days)) : null },
         summary: btCache.v
@@ -151,7 +154,7 @@
           if (!so && left == null) throw new Error("укажите остаток или время, когда товар закончился");
           var baked = (D.plans[T] && D.plans[T][pr]) ? D.plans[T][pr].qty : 0;
           var s = sale(T, pr), sold = so ? baked : Math.max(0, baked - left);
-          if (s) { s.sold = sold; s.baked = baked; s.soldout = so; } else D.sales.push({ day: T, product: pr, sold: sold, baked: baked, soldout: so, rain: null });
+          if (s) { s.sold = sold; s.baked = baked; s.soldout = so; } else D.sales.push({ day: T, product: pr, sold: sold, baked: baked, soldout: so, rain: weather(T).rain, temp: weather(T).temp });
           btCache = null;
         } else if (path === "/api/event") {
           var f = num(b.factor, 0.3, 3);
@@ -335,8 +338,11 @@
 
   function viewTomorrow() {
     var t = S.st.tomorrow, items = t.items, total = 0, habit = 0, hasH = false;
-    var weather = t.rain === true ? "Ожидается дождь: спрос ниже на " + Math.abs(Math.round(t.rain_effect * 100)) + "%" : t.rain === false ? "Без осадков" :
-      API.mode === "local" ? "В примере погода не учитывается" : "Прогноз погоды пока недоступен";
+    var parts = [];
+    if (t.rain === true) parts.push("Ожидается дождь: спрос ниже на " + Math.abs(Math.round(t.rain_effect * 100)) + "%");
+    else if (t.rain === false) parts.push("Без осадков");
+    if (t.temp != null) parts.push(M.deg(t.temp));
+    var weather = parts.length ? parts.join(" · ") : "Прогноз погоды пока недоступен";
     var opts = [[1, "Обычный день"], [1.1, "Небольшое событие +10%"], [1.2, "Праздник, ярмарка +20%"], [1.3, "Большое событие +30%"], [0.8, "Меньше людей −20%"]];
     var h = '<div class="card"><div class="day-head" style="margin:0 0 10px"><div><h2>Завтра, ' + dayLabel(t.date) + '</h2><p class="sub" style="margin:0">' + esc(weather) + '</p></div>' +
       '<label style="display:grid;gap:4px;font-size:12.5px;color:var(--ink-3);min-width:220px">Событие завтра<select data-act="event">' +
@@ -428,7 +434,7 @@
       '<label>Итоги дня<input type="time" name="closing" value="' + esc(st.times.closing) + '"></label><button class="btn btn-primary" type="submit">Сохранить</button></form></div>';
     h += '<div class="card"><h2>Данные продаж</h2><p class="sub">' + (d.rows ? d.rows + " " + plural(d.rows, "строка", "строки", "строк") + " с " + dayLabel(d.first) + " по " + dayLabel(d.last) + (st.business.is_example ? ". Сейчас загружен пример — условная пекарня." : ".") : "Продаж пока нет.") + "</p>" +
       '<div class="form"><label class="wide">Выгрузка из кассы или Excel (CSV)<input type="file" accept=".csv,.txt,text/csv" data-act="upload"></label></div>' +
-      '<p class="hint" style="margin-top:8px">Колонки: <span class="mono">дата;товар;продано</span>, по желанию <span class="mono">испечено (или заказано);закончилось;цена;себестоимость;дождь</span>. Свои данные заменят пример.</p>' +
+      '<p class="hint" style="margin-top:8px">Колонки: <span class="mono">дата;товар;продано</span>, по желанию <span class="mono">испечено (или заказано);закончилось;цена;себестоимость;дождь;температура</span>. Свои данные заменят пример.</p>' +
       '<div class="acts" style="justify-content:flex-start;margin-top:12px">' + (S.confirm === "__example"
         ? '<span class="hint">Заменить все данные примером?</span><button class="btn btn-danger btn-sm" data-act="example">Да, загрузить пример</button><button class="btn btn-quiet btn-sm" data-act="confirm-cancel">Нет</button>'
         : '<button class="btn btn-quiet btn-sm" data-act="ask-example">Загрузить пример пекарни</button>') + "</div></div></div>";

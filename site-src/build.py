@@ -37,8 +37,8 @@ def read(name: str) -> str:
     return (HERE / name).read_text(encoding="utf-8")
 
 
-def build(src_name: str, app_name: str, marker: str) -> str:
-    csv = (ROOT / "bot" / "data" / "demo_sales.csv").read_text(encoding="utf-8")
+def build(src_name: str, app_name: str, marker: str, example: bool = True) -> str:
+    csv = (ROOT / "bot" / "data" / "demo_sales.csv").read_text(encoding="utf-8") if example else ""
     return (read(src_name).replace("/*MODEL*/", read("model.js"))
             .replace("__DEMO_CSV__", json.dumps(csv, ensure_ascii=False))
             .replace(marker, read(app_name))
@@ -48,10 +48,12 @@ def build(src_name: str, app_name: str, marker: str) -> str:
 def main():
     site = build("index.src.html", "app.js", "/*APP*/")
     kab = build("kabinet.src.html", "kabinet.js", "/*KABINET*/")
+    # кабинету в боте пример не нужен: там свои данные с сервера
+    kab_bot = build("kabinet.src.html", "kabinet.js", "/*KABINET*/", example=False)
     (ROOT / "index.html").write_text(head(True) + site + TAIL, encoding="utf-8")
     (ROOT / "kabinet.html").write_text(head(True) + kab + TAIL, encoding="utf-8")
     (ROOT / "bot" / "web").mkdir(exist_ok=True)
-    (ROOT / "bot" / "web" / "kabinet.html").write_text(head(False) + kab + TAIL, encoding="utf-8")
+    (ROOT / "bot" / "web" / "kabinet.html").write_text(head(False) + kab_bot + TAIL, encoding="utf-8")
     print("ok: index.html", len(site), "· kabinet.html", len(kab))
 
 

@@ -84,7 +84,7 @@ HELP = """<b>Что умеет бот</b>
 /stop — выключить рассылку, /start — включить
 
 <b>Свои продажи</b> — пришлите CSV-файл (выгрузку из кассы или Excel → «Сохранить как CSV») с колонками:
-<code>дата;товар;продано</code> и по желанию <code>испечено;закончилось;цена;себестоимость;дождь</code>"""
+<code>дата;товар;продано</code> и по желанию <code>испечено;закончилось;цена;себестоимость;дождь;температура</code>"""
 
 
 ENV_NAMES = (".env", ".env.txt", "env", "env.txt", ".env.example")
@@ -124,6 +124,10 @@ def plural(n: int, one: str, few: str, many: str) -> str:
 
 def pct(x: float) -> str:
     return f"{x:+.0f}%".replace("-", "−")
+
+
+def deg(t: float) -> str:
+    return f"{t:+.0f}°".replace("-", "−").replace("+0°", "0°").replace("−0°", "0°")
 
 
 def money(x: float) -> str:
@@ -166,10 +170,15 @@ class FreshBot:
         for s in sales:  # позиции из продаж, у которых нет карточки товара
             if s.product not in removed:
                 products.setdefault(s.product, Product(s.product))
-        rain = self.weather.is_rain(chat["lat"], chat["lon"], day, time.time()) if not chat["is_demo"] else None
+        now_ts = time.time()
+        if not chat["is_demo"]:  # у старых продаж без погоды дописываем её из архива прогнозов
+            filled = self.weather.fill(chat["lat"], chat["lon"], sales, now_ts)
+            if filled:
+                self.db.save_weather(cid, filled)
+        w = self.weather.day(chat["lat"], chat["lon"], day, now_ts)
         event = self.db.event(cid, day)
         eff, learned = rain_effect(sales, chat["open_h"], chat["close_h"])
-        recs = [forecast(sales, p, day, bool(rain), event, chat["open_h"], chat["close_h"], eff)
+        recs = [forecast(sales, p, day, bool(w.rain), event, chat["open_h"], chat["close_h"], eff, w.temp)
                 for p in products.values()]
         recs = [r for r in recs if r.history_days > 0 or r.qty > 0]
         recs.sort(key=lambda r: -r.qty)
@@ -179,7 +188,7 @@ class FreshBot:
                     and s.day.weekday() == day.weekday() and 0 < (day - s.day).days <= 28]
             if same:
                 habit[r.product] = sum(same) / len(same)
-        return recs, {"rain": rain, "event": event, "rain_eff": eff, "learned": learned,
+        return recs, {"rain": w.rain, "temp": w.temp, "event": event, "rain_eff": eff, "learned": learned,
                       "habit": habit, "products": products}
 
     def plan_text(self, chat, day: date, title: str) -> str | None:
@@ -188,10 +197,15 @@ class FreshBot:
             return None
         self.db.save_plan(chat["chat_id"], day, recs)
         head = [f"<b>{title} · {fmt_day(day)}</b>"]
+        weather = []
         if info["rain"]:
-            head.append(f"Ожидается дождь — спрос ниже на {abs(info['rain_eff']) * 100:.0f}%")
+            weather.append(f"Ожидается дождь — спрос ниже на {abs(info['rain_eff']) * 100:.0f}%")
         elif info["rain"] is False:
-            head.append("Без осадков")
+            weather.append("Без осадков")
+        if info["temp"] is not None:
+            weather.append(deg(info["temp"]))
+        if weather:
+            head.append(" · ".join(weather))
         if info["event"] != 1:
             head.append(f"Событие: {(info['event'] - 1) * 100:+.0f}% к спросу")
         lines = ["\n".join(head), "", "<b>Испечь</b>"]
@@ -443,7 +457,7 @@ class FreshBot:
         self.tg.send(chat["chat_id"], "Рассылка выключена. Включить снова: /start")
 
     def load_example(self, chat):
-        """Пример: условная пекарня — 8 недель продаж и несколько партий со сроками годности."""
+        """Пример: условная пекарня — год продаж и несколько партий со сроками годности."""
         cid = chat["chat_id"]
         text = (ROOT / "data" / "demo_sales.csv").read_text(encoding="utf-8")
         sales, products = parse_csv(text)
@@ -465,13 +479,13 @@ class FreshBot:
     def cmd_demo(self, chat, arg: str = ""):
         cid = chat["chat_id"]
         if self.db.sales(cid) and not chat["is_demo"] and arg != "да":
-            return self.tg.send(cid, "У вас уже есть свои данные. Заменить их демо-данными?",
+            return self.tg.send(cid, "У вас уже есть свои данные. Заменить их примером?",
                                 keyboard=[[{"text": "Да, заменить", "callback_data": "demo:yes"},
                                            {"text": "Отмена", "callback_data": "x"}]])
         sales, products = self.load_example(chat)
         bt = backtest(sales, products)
-        lines = [f"Загрузил <b>демо-данные</b> условной пекарни: {len(products)} позиций, 8 недель продаж. "
-                 "Это не реальные продажи, а пример, чтобы посмотреть, как работает бот."]
+        lines = [f"Загрузил <b>пример</b> условной пекарни в Челябинске: {len(products)} позиций, продажи за год с погодой. "
+                 "Продажи смоделированы — это пример, чтобы посмотреть, как работает бот."]
         if bt:
             lines += ["", "<b>Если бы последние 4 недели пекли по плану бота</b>",
                       f"Списания: {money(bt.waste_now)} → <b>{money(bt.waste_new)}</b> "
@@ -566,8 +580,8 @@ class FreshBot:
         row = next((r for r in self.db.plan(cid, day) if r["product"] == product), None)
         baked = row["qty"] if row else 0
         sold = baked if soldout else max(0, baked - (left or 0))
-        rain = self.weather.is_rain(chat["lat"], chat["lon"], day, time.time())
-        self.db.upsert_sale(cid, Sale(day, product, sold, baked, soldout, rain))
+        w = self.weather.day(chat["lat"], chat["lon"], day, time.time())
+        self.db.upsert_sale(cid, Sale(day, product, sold, baked, soldout, w.rain, w.temp))
         self.db.db.commit()
 
     def st_left(self, chat, text, st):
@@ -681,6 +695,7 @@ class FreshBot:
         if chat["is_demo"]:
             self.db.clear_sales(cid)
             self.db.set_chat(cid, is_demo=0)
+        self.weather.fill(chat["lat"], chat["lon"], sales, time.time(), archive=True)
         self.db.import_sales(cid, sales, products)
         days = sorted({s.day for s in sales})
         lines = [f"Загружено: <b>{len(sales)}</b> {plural(len(sales), 'строка', 'строки', 'строк')}, "

@@ -149,8 +149,10 @@ class Cabinet:
                          "is_example": bool(chat["is_demo"])},
             "now": now.strftime("%Y-%m-%dT%H:%M"), "phase": phase_of(chat, now),
             "times": {"morning": chat["morning"], "evening": chat["evening"], "closing": chat["closing"]},
-            "today": {"date": today.isoformat(), "rain": info_t["rain"], "event": info_t["event"], "items": items},
-            "tomorrow": {"date": tomorrow.isoformat(), "rain": info_m["rain"], "event": info_m["event"],
+            "today": {"date": today.isoformat(), "rain": info_t["rain"], "temp": info_t["temp"],
+                      "event": info_t["event"], "items": items},
+            "tomorrow": {"date": tomorrow.isoformat(), "rain": info_m["rain"], "temp": info_m["temp"],
+                         "event": info_m["event"],
                          "rain_effect": round(info_m["rain_eff"], 3), "items": tom},
             "products": products,
             "removed": sorted(db.inactive_products(cid)),
@@ -236,6 +238,7 @@ class Cabinet:
             if chat["is_demo"]:
                 db.clear_sales(cid)
                 db.set_chat(cid, is_demo=0)
+            b.weather.fill(chat["lat"], chat["lon"], sales, time.time(), archive=True)
             db.import_sales(cid, sales, products)
             self._bt_cache.pop(cid, None)
             return {"ok": True, "rows": len(sales), "products": len(products)}
