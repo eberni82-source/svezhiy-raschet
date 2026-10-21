@@ -310,28 +310,20 @@
     $("r-loss").textContent = money(loss); $("r-save").textContent = money(save);
     $("r-net").textContent = (net < 0 ? "−" : "") + money(Math.abs(net));
     $("r-roi").textContent = net > 0 ? "Подписка окупается в " + (save / SUBSCRIPTION).toFixed(1).replace(".", ",") + " раза" : "При таких цифрах подписка не окупается.";
-    if ($("r-formula")) $("r-formula").textContent = "товар на полке = выручка ÷ (1 − " + Math.round(w * 100) + "%); потери на просрочке = товар × " + Math.round(w * 100) + "% × себестоимость " + Math.round(cost * 100) + "% × 30 дней";
   }
 
   /* ---------------- подключение ---------------- */
   function renderPilot() {
     var box = $("pilot-cta");
-    if (BOT_USERNAME) {
-      var base = "https://t.me/" + encodeURIComponent(BOT_USERNAME);
-      document.querySelectorAll("[data-bot]").forEach(function (a) {
-        var q = a.getAttribute("data-bot");
-        a.href = base + (q ? "?" + q : "");
-        a.target = "_blank"; a.rel = "noopener"; a.hidden = false;
-      });
-    }
-    if (BOT_USERNAME) {
-      var url = "https://t.me/" + encodeURIComponent(BOT_USERNAME);
-      box.innerHTML = '<a class="btn btn-primary" href="' + url + '?start=pilot" target="_blank" rel="noopener">Открыть бота в Telegram</a>' +
-        '<a class="btn btn-ghost" href="' + url + '?start=demo" target="_blank" rel="noopener">Посмотреть пример в боте</a>' +
-        '<span class="bot-addr">@' + esc(BOT_USERNAME) + "</span>";
-    } else {
-      box.innerHTML = '<span class="btn btn-primary" aria-disabled="true">Бот запускается</span><span>Ссылка на Telegram-бота появится здесь в ближайшее время.</span>';
-    }
+    var url = "https://t.me/" + encodeURIComponent(BOT_USERNAME);
+    document.querySelectorAll("[data-bot]").forEach(function (a) {
+      var q = a.getAttribute("data-bot");
+      a.href = url + (q ? "?" + q : "");
+      a.target = "_blank"; a.rel = "noopener"; a.hidden = false;
+    });
+    box.innerHTML = '<a class="btn btn-primary" href="' + url + '?start=pilot" target="_blank" rel="noopener">Открыть бота в Telegram</a>' +
+      '<a class="btn btn-ghost" href="' + url + '?start=demo" target="_blank" rel="noopener">Посмотреть пример в боте</a>' +
+      '<span class="bot-addr">@' + esc(BOT_USERNAME) + "</span>";
   }
 
   /* ---------------- события ---------------- */
@@ -389,10 +381,5 @@
   }
 
   /* ---------------- старт ---------------- */
-  var bt0 = M.backtest(DEMO.sales, DEMO.products);
-  if (bt0) {
-    var cutPct = Math.round((1 - bt0.wasteNew / bt0.wasteNow) * 100);
-    if ($("hf-waste")) $("hf-waste").textContent = "−" + cutPct + "%";
-  }
   renderTicket(); renderAll(); renderCalc(); renderPilot();
 })();
