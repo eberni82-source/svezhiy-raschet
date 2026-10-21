@@ -1,5 +1,5 @@
 """
-«Свежий расчёт» — Telegram-бот: план выпечки, вечерние скидки, сроки годности.
+"Свежий расчёт" - Telegram-бот: план выпечки, вечерние скидки, сроки годности.
 
 Запуск:  python bot.py   (нужен Python 3.10+, никаких pip install)
 Настройки в файле .env рядом (см. .env.example).
@@ -20,8 +20,7 @@ from pathlib import Path
 if sys.version_info < (3, 9):
     raise SystemExit(f"Нужен Python 3.9 или новее, сейчас {sys.version.split()[0]}. Скачайте свежий с python.org")
 
-# Папка core лежит рядом с bot.py. Добавляем её в путь поиска, чтобы бот запускался
-# откуда угодно: из IDE, из другой папки, двойным кликом.
+# чтобы core находился при запуске из любой папки
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 try:
     from core.csv_import import ImportErrorRu, parse_csv
@@ -42,12 +41,10 @@ try:
 except ImportError:  # pragma: no cover
     ZoneInfo = None
 
-# ----------------------------------------------------------------------
-# НАСТРОЙКИ. Можно вписать прямо сюда или в файл .env рядом с bot.py.
-# Если вписали токен сюда — не выкладывайте файл в открытый доступ.
-# ----------------------------------------------------------------------
+# Настройки можно задать здесь или в .env рядом с bot.py.
+# Файл с токеном не выкладывайте в открытый доступ.
 BOT_TOKEN = ""   # токен от @BotFather, например "1234567890:AAH..."
-ADMIN_IDS = ""   # ваш Telegram ID от @userinfobot, несколько — через запятую
+ADMIN_IDS = ""   # ваш Telegram ID от @userinfobot, несколько - через запятую
 
 ROOT = Path(__file__).resolve().parent
 log = logging.getLogger("bot")
@@ -146,7 +143,6 @@ class FreshBot:
         self.lock = threading.RLock()   # бот и веб-кабинет работают с одной базой
         self.web_url: str | None = None
 
-    # ------------------------------------------------------------------ время
     def tz(self, chat) -> timezone:
         if ZoneInfo and chat["tz"]:
             try:
@@ -161,7 +157,6 @@ class FreshBot:
     def today(self, chat) -> date:
         return self.now(chat).date()
 
-    # --------------------------------------------------------------- прогноз
     def recommendations(self, chat, day: date) -> tuple[list[Recommendation], dict]:
         cid = chat["chat_id"]
         sales = self.db.sales(cid)
@@ -237,7 +232,6 @@ class FreshBot:
                 out.append(f"• {esc(b['item'])} ({esc(b['qty'])}) — {status} → {tip}")
         return out
 
-    # -------------------------------------------------------------- рассылки
     def tick(self):
         """Раз в ~20 секунд проверяем, кому пора отправить утренний/вечерний/итоговый пост."""
         if time.time() - self.last_tick < 20:
@@ -284,7 +278,6 @@ class FreshBot:
     def job_closing(self, chat):
         self.itogi(chat, scheduled=True)
 
-    # ------------------------------------------------------------- обработка
     def run(self):
         while True:  # проверяем токен и связь с Telegram
             try:
@@ -364,7 +357,6 @@ class FreshBot:
     def _takes_arg(fn) -> bool:
         return fn.__code__.co_argcount >= 3
 
-    # ------------------------------------------------------------- команды
     def cmd_start(self, chat, arg: str = ""):
         cid = chat["chat_id"]
         self.db.set_chat(cid, muted=0)
@@ -372,7 +364,7 @@ class FreshBot:
             self.state[cid] = {"name": "lead_business", "data": {}}
             return self.tg.send(cid, "Заявка на бесплатный месяц пилота.\n\n<b>1/4.</b> Как называется ваше заведение?",
                                 remove_keyboard=True)
-        if arg == "demo":  # кнопка «Попробовать в Telegram» на сайте
+        if arg == "demo":  # кнопка "Попробовать в Telegram" на сайте
             self.tg.send(cid, "Привет! Я <b>Свежий расчёт</b>. Покажу, как работаю, на демо-данных условной пекарни.",
                          reply_keyboard=MENU)
             return self.cmd_demo(self.db.chat(cid))
@@ -396,7 +388,7 @@ class FreshBot:
     def st_city(self, chat, text, st):
         cid = chat["chat_id"]
         g = geocode(text)
-        if not g and "челяб" in text.lower():  # без интернета к сервису погоды — знаем Челябинск сами
+        if not g and "челяб" in text.lower():  # без интернета к сервису погоды - знаем Челябинск сами
             g = {"name": "Челябинск", "lat": 55.1644, "lon": 61.4368, "tz": "Asia/Yekaterinburg"}
         if g:
             _, offset = self.weather.daily(g["lat"], g["lon"], time.time())  # запасной вариант для Windows без tzdata
@@ -457,14 +449,14 @@ class FreshBot:
         self.tg.send(chat["chat_id"], "Рассылка выключена. Включить снова: /start")
 
     def load_example(self, chat):
-        """Пример: условная пекарня — год продаж и несколько партий со сроками годности."""
+        """Пример: условная пекарня - год продаж и несколько партий со сроками годности."""
         cid = chat["chat_id"]
         text = (ROOT / "data" / "demo_sales.csv").read_text(encoding="utf-8")
         sales, products = parse_csv(text)
         shift = (self.today(chat) - timedelta(days=1)) - max(s.day for s in sales)
         for s in sales:
             s.day += shift
-        for p in products.values():  # срок хранения: выпечка — день, эклеры и сэндвичи — два
+        for p in products.values():  # срок хранения: выпечка - день, эклеры и сэндвичи - два
             p.shelf_life = 2 if p.name in ("Эклер", "Сэндвич с курицей") else 1
         self.db.clear_sales(cid)
         self.db.import_sales(cid, sales, products)
@@ -545,7 +537,6 @@ class FreshBot:
         self.db.set_chat(chat["chat_id"], **{field: value})
         self.tg.send(chat["chat_id"], f"Готово: {m.group(1)} в {value}")
 
-    # --- итоги дня
     def cmd_itogi(self, chat):
         self.itogi(chat, scheduled=False)
 
@@ -592,7 +583,6 @@ class FreshBot:
         self.state.pop(cid, None)
         self.tg.send(cid, self.itogi_text(cid, st["day"]), keyboard=self.itogi_kb(cid, st["day"]))
 
-    # --- скидка сейчас
     def cmd_skidka(self, chat):
         cid = chat["chat_id"]
         rows = self.db.plan(cid, self.today(chat))
@@ -611,7 +601,6 @@ class FreshBot:
         head = f"<b>{esc(st['product'])}: скидка {pct}%</b>" if pct else f"<b>{esc(st['product'])}: без скидки</b>"
         self.tg.send(cid, f"{head}\n{why}")
 
-    # --- партии и сроки годности
     def cmd_batch(self, chat):
         self.state[chat["chat_id"]] = {"name": "batch_item", "data": {}}
         self.tg.send(chat["chat_id"], "Что за продукт? Например: <i>Сливки 33%</i>")
@@ -672,7 +661,6 @@ class FreshBot:
                        {"text": "Списано", "callback_data": f"w:{b['id']}"}])
         self.tg.send(cid, "\n".join(lines), keyboard=kb)
 
-    # --- загрузка CSV
     def on_document(self, chat, doc):
         cid = chat["chat_id"]
         name = (doc.get("file_name") or "").lower()
@@ -714,7 +702,6 @@ class FreshBot:
         lines.append("\nПлан на завтра: /plan")
         self.tg.send(cid, "\n".join(lines), reply_keyboard=MENU)
 
-    # --- заявка на пилот (с сайта: t.me/<бот>?start=pilot)
     def st_lead_business(self, chat, text, st):
         st["data"]["business"] = text[:80]
         st["name"] = "lead_city"
@@ -750,7 +737,6 @@ class FreshBot:
             except TelegramError:
                 pass
 
-    # --- админ: рассылка и статистика
     def is_admin(self, chat) -> bool:
         return chat["chat_id"] in self.admins
 
@@ -777,7 +763,7 @@ class FreshBot:
                 fail += 1
                 if e.code == 403:
                     self.db.set_chat(c["chat_id"], muted=1)
-            time.sleep(0.05)  # лимит Telegram — до ~30 сообщений в секунду
+            time.sleep(0.05)  # лимит Telegram - до ~30 сообщений в секунду
         self.tg.send(admin_id, f"Рассылка завершена: доставлено {ok}, не доставлено {fail}.")
 
     def cmd_stats(self, chat):
@@ -794,7 +780,6 @@ class FreshBot:
         self.state.pop(chat["chat_id"], None)
         self.handle({"message": {"chat": {"id": chat["chat_id"], "type": "private"}, "from": {}, "text": text}})
 
-    # ------------------------------------------------------------- кнопки
     def on_callback(self, cq: dict):
         cid = cq["message"]["chat"]["id"]
         mid = cq["message"]["message_id"]

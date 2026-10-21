@@ -22,12 +22,10 @@
     var t = $("toast"); t.textContent = msg; t.hidden = false;
     clearTimeout(toastT); toastT = setTimeout(function () { t.hidden = true; }, 2600);
   }
-
-  /* ================= Пример в браузере (без сервера) ================= */
   var Local = (function () {
     var KEY = "svezhiy-kabinet-v2", D = null, btCache = null, W = {};
     function today() { var n = new Date(); return M.dnum(n.getFullYear() + "-" + pad(n.getMonth() + 1) + "-" + pad(n.getDate())); }
-    function save() { try { localStorage.setItem(KEY, JSON.stringify(D)); } catch (e) { /* хранилище недоступно — работаем в памяти */ } }
+    function save() { try { localStorage.setItem(KEY, JSON.stringify(D)); } catch (e) { /* без localStorage работаем в памяти */ } }
     function example() {
       var r = DEMO_CSV ? M.parseCSV(DEMO_CSV) : { sales: [], products: {} }, T = today();
       var last = Math.max.apply(null, r.sales.map(function (s) { return s.day; }));
@@ -46,7 +44,7 @@
     function load() {
       try { var raw = localStorage.getItem(KEY); if (raw) { var d = JSON.parse(raw); if (d && d.v === 2) D = d; } } catch (e) { /* нет доступа */ }
       if (!D) example();
-      // пример — пекарня в Челябинске: берём настоящий прогноз погоды на ближайшие дни
+      // пример в Челябинске, берём реальный прогноз
       M.loadWeather(55.16, 61.44, 3).then(function (w) { W = w; if (Object.keys(w).length && S.st) refresh(true); });
     }
     function weather(day) { return (D.example && W[day]) || { rain: null, temp: null }; }
@@ -187,8 +185,6 @@
     }
     return { load: load, state: function () { return Promise.resolve(state()); }, act: act, reset: example };
   })();
-
-  /* ================= Обращение к серверу бота ================= */
   function LoginNeeded() { this.login = true; }
   var API = {
     mode: null,
@@ -219,8 +215,6 @@
         });
     }
   };
-
-  /* ================= Состояние интерфейса ================= */
   var S = { st: null, tab: "today", part: null, partManual: false, offset: 0, fetchedAt: 0, edit: null, confirm: null, vitrina: {}, busy: false };
   function nowMinutes() {
     var d = new Date(Date.now() + S.offset);
@@ -231,8 +225,6 @@
     var server = new Date(+d[0], +d[1] - 1, +d[2], +t[0], +t[1]).getTime();
     return server - Date.now();
   }
-
-  /* ================= Отрисовка ================= */
   function renderTop() {
     var st = S.st, n = nowMinutes();
     $("biz").textContent = st.business.name ? st.business.name + (st.business.city ? ", " + st.business.city : "") : "Личный кабинет";
@@ -464,8 +456,6 @@
     else v = viewData();
     $("view").innerHTML = v;
   }
-
-  /* ================= Данные ================= */
   function refresh(force) {
     if (!force && (S.busy || isTyping())) return Promise.resolve();
     return API.state().then(function (st) {
@@ -502,8 +492,6 @@
     $("login-bot").href = u; $("login-bot").textContent = "@" + BOT_USERNAME;
     setTimeout(function () { $("code").focus(); }, 50);
   }
-
-  /* ================= События ================= */
   document.addEventListener("click", function (e) {
     var t = e.target.closest("[data-act],[data-part],[data-tab]");
     if (!t) return;
@@ -590,8 +578,6 @@
     renderTop(); renderDay();
   }, 15000);
   setInterval(function () { if (S.st) refresh(); }, 60000);
-
-  /* ================= Старт ================= */
   API.init().then(function () {
     var m = location.search.match(/[?&]code=(\d{6})/);
     if (API.mode === "server" && m) {

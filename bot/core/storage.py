@@ -67,7 +67,6 @@ class Storage:
                 self.db.execute(f"ALTER TABLE {table} ADD COLUMN {col} {typ}")
         self.db.commit()
 
-    # --- чаты ---
     def upsert_chat(self, chat_id: int, username: str | None, first_name: str | None):
         self.db.execute(
             "INSERT INTO chats (chat_id, username, first_name, created_at) VALUES (?,?,?,?) "
@@ -86,7 +85,6 @@ class Storage:
         self.db.execute(f"UPDATE chats SET {cols} WHERE chat_id=?", (*fields.values(), chat_id))
         self.db.commit()
 
-    # --- товары и продажи ---
     def products(self, chat_id: int, include_inactive: bool = False) -> dict[str, Product]:
         sql = "SELECT * FROM products WHERE chat_id=?" + ("" if include_inactive else " AND COALESCE(active, 1)=1")
         rows = self.db.execute(sql + " ORDER BY name", (chat_id,))
@@ -163,7 +161,6 @@ class Storage:
         return self.db.execute("SELECT * FROM sales WHERE chat_id=? AND day=? AND product=?",
                                (chat_id, day.isoformat(), product)).fetchone()
 
-    # --- планы и события ---
     def save_plan(self, chat_id: int, day: date, recs):
         for r in recs:
             self.db.execute("INSERT OR REPLACE INTO plans (chat_id, day, product, qty, mean) VALUES (?,?,?,?,?)",
@@ -187,7 +184,6 @@ class Storage:
                             (chat_id, day.isoformat())).fetchone()
         return r["factor"] if r else 1.0
 
-    # --- партии и сроки годности ---
     def add_batch(self, chat_id: int, item: str, qty: str, expires: date) -> int:
         cur = self.db.execute("INSERT INTO batches (chat_id, item, qty, expires, created_at) VALUES (?,?,?,?,?)",
                               (chat_id, item, qty, expires.isoformat(), datetime.utcnow().isoformat(timespec="seconds")))
@@ -205,7 +201,6 @@ class Storage:
         self.db.execute("UPDATE batches SET status=? WHERE chat_id=? AND id=?", (status, chat_id, batch_id))
         self.db.commit()
 
-    # --- вход в веб-кабинет ---
     def create_code(self, chat_id: int, ttl: int = 600) -> str:
         import secrets, time as _t
         self.db.execute("DELETE FROM login_codes WHERE expires < ? OR chat_id=?", (_t.time(), chat_id))
@@ -218,7 +213,7 @@ class Storage:
         return code
 
     def use_code(self, code: str) -> str | None:
-        """Код из бота → токен сессии (код одноразовый)."""
+        """Код из бота -> токен сессии (код одноразовый)."""
         import secrets, time as _t
         r = self.db.execute("SELECT chat_id FROM login_codes WHERE code=? AND expires>=?", (code.strip(), _t.time())).fetchone()
         if not r:
@@ -241,7 +236,6 @@ class Storage:
         self.db.execute("DELETE FROM sessions WHERE token=?", (token,))
         self.db.commit()
 
-    # --- заявки на пилот ---
     def add_lead(self, chat_id: int, username: str | None, data: dict) -> int:
         cur = self.db.execute(
             "INSERT INTO leads (chat_id, username, business, city, kind, contact, created_at) VALUES (?,?,?,?,?,?,?)",

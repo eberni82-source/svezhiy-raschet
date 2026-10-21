@@ -139,7 +139,7 @@ check(sum(1 for _, p in out if p["text"].startswith("Завтра добавим
 out = msg(USER, "/broadcast взлом"); check(any("только для администратора" in p["text"] for _, p in out), "рассылка закрыта для не-админа")
 out = msg(ADMIN, "/stats"); show("/stats", out)
 
-# планировщик: делаем утренний пост «пора»
+# планировщик: делаем утренний пост "пора"
 chat = bot.db.chat(USER)
 now = bot.now(chat)
 bot.db.set_chat(USER, morning=f"{now.hour:02d}:{now.minute:02d}", last_morning=None, muted=0)
@@ -147,7 +147,7 @@ SENT.clear(); bot.last_tick = 0; bot.tick(); show("утренняя рассыл
 check(any(p["chat_id"] == USER and "План на сегодня" in p["text"] for _, p in SENT), "утренний план отправлен по расписанию")
 SENT.clear(); bot.last_tick = 0; bot.tick()
 check(not any(p["chat_id"] == USER and "План на сегодня" in p["text"] for _, p in SENT), "второй раз за день не шлёт")
-# погода: подменяем Open-Meteo, проверяем температуру в прогнозе, отметках и загрузке истории
+# погода (Open-Meteo подменён)
 import sqlite3  # noqa: E402
 from datetime import date, timedelta  # noqa: E402
 from urllib.parse import parse_qs, urlparse  # noqa: E402

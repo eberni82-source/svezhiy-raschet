@@ -51,7 +51,6 @@ class Telegram:
             raise TelegramError(body.get("description", "unknown error"), body.get("error_code", 0), retry)
         raise TelegramError("too many retries")
 
-    # --- удобные обёртки ---
     def send(self, chat_id: int, text: str, keyboard=None, reply_keyboard=None, remove_keyboard=False):
         markup = None
         if keyboard is not None:

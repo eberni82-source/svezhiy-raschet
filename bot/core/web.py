@@ -1,7 +1,7 @@
 """Личный кабинет заведения: веб-сервер на стандартной библиотеке.
 
 Работает в том же процессе, что и бот, и читает ту же базу: всё, что отмечено
-в Telegram, сразу видно в кабинете, и наоборот. Вход — по коду из бота (/web).
+в Telegram, сразу видно в кабинете, и наоборот. Вход - по коду из бота (/web).
 """
 from __future__ import annotations
 
@@ -31,7 +31,7 @@ def _minutes(hhmm: str) -> int:
 
 
 def phase_of(chat, now) -> str:
-    """Где мы в рабочем дне: ночь → утро (план) → вечер (витрина) → итоги."""
+    """Где мы в рабочем дне: ночь -> утро (план) -> вечер (витрина) -> итоги."""
     t = now.hour * 60 + now.minute
     if t < _minutes(chat["morning"]):
         return "night"
@@ -68,7 +68,6 @@ class Cabinet:
         self.bot = bot
         self._bt_cache: dict[int, tuple[int, dict | None]] = {}
 
-    # ---------- состояние ----------
     def _item(self, r: Recommendation, qty=None, mean=None) -> dict:
         q = r.qty if qty is None else qty
         m = r.mean if mean is None else mean
@@ -162,7 +161,6 @@ class Cabinet:
             "summary": self._summary(cid),
         }
 
-    # ---------- действия ----------
     def act(self, chat, path: str, body: dict) -> dict:
         b, db = self.bot, self.bot.db
         cid = chat["chat_id"]

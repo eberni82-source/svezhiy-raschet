@@ -14,7 +14,6 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400..800&display=swap">
 <style>
-/* Layout: утро в пекарне — крафтовый лоток с чеком-планом из «печи» наверху, ниже производственная доска: ритм дня, живой пульт расчёта, экономика, подключение */
 :root {
   --bg: #FAF9F6;
   --surface: #FFFFFF;
@@ -91,8 +90,6 @@ a { color: inherit; }
 .btn-primary { background: var(--stamp); color: var(--stamp-ink); }
 .btn-ghost { background: transparent; color: var(--ink); border-color: currentColor; }
 .btn[aria-disabled="true"] { opacity: .55; cursor: not-allowed; transform: none; }
-
-/* ---------- шапка ---------- */
 .top { background: var(--kraft); color: var(--kraft-ink); }
 .top-in { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-block: 16px; flex-wrap: wrap; }
 .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--kraft-ink); }
@@ -103,8 +100,6 @@ a { color: inherit; }
 .nav a:hover { text-decoration: underline; text-underline-offset: 4px; }
 .nav .btn { min-height: 40px; padding: 0 18px; font-size: 15px; }
 @media (max-width: 720px) { .nav a:not(.btn) { display: none; } }
-
-/* ---------- первый экран ---------- */
 .hero { background: var(--kraft); color: var(--kraft-ink); padding-bottom: 72px; position: relative; overflow: hidden; }
 .hero-in { position: relative; display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr); gap: 48px; align-items: start; padding-top: 40px; }
 .hero h1 { font: 700 clamp(34px, 5vw, 58px)/1.08 var(--f-display); letter-spacing: -.02em; margin: 14px 0 22px; }
@@ -131,8 +126,6 @@ a { color: inherit; }
 .t-big { font-weight: 700; font-size: 15px; }
 .t-warn { color: #8C3A1E; }
 .ticket-note { margin-top: 26px; text-align: center; font-size: 13px; opacity: .8; }
-
-/* ---------- проблема ---------- */
 .facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0; border-top: 2px solid var(--ink); }
 .fact { padding: 26px 24px 8px 0; display: grid; gap: 10px; align-content: start; }
 .fact + .fact { padding-left: 24px; border-left: 1px solid var(--line); }
@@ -141,8 +134,6 @@ a { color: inherit; }
 .src { font-size: 13px; color: var(--ink-3); }
 .src a { color: var(--ink-3); }
 @media (max-width: 760px) { .facts { grid-template-columns: minmax(0, 1fr); } .fact + .fact { padding-left: 0; border-left: 0; border-top: 1px solid var(--line); } }
-
-/* ---------- для кого ---------- */
 .who-list { border-top: 2px solid var(--ink); }
 .who-row { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.2fr) 96px minmax(0, 1.5fr) minmax(0, 1fr); gap: 8px 24px; padding: 18px 0; border-bottom: 1px solid var(--line); align-items: baseline; }
 .who-row.head { font: 600 13px/1.2 var(--f-mono); color: var(--ink-3); padding: 12px 0; }
@@ -157,8 +148,6 @@ a { color: inherit; }
   .who-row.head { display: none; }
   .who-row .mob { display: inline; }
 }
-
-/* ---------- ритм дня ---------- */
 .day { background: var(--surface); border-block: 1px solid var(--line); }
 .rhythm { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 28px; position: relative; }
 .rhythm::before { content: ""; position: absolute; left: 0; right: 0; top: 30px; border-top: 2px dashed var(--line); }
@@ -167,8 +156,6 @@ a { color: inherit; }
 .beat h3 { font: 600 19px/1.3 var(--f-body); }
 .beat p { color: var(--ink-2); }
 @media (max-width: 820px) { .rhythm { grid-template-columns: minmax(0, 1fr); } .rhythm::before { display: none; } }
-
-/* ---------- пульт ---------- */
 .console { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; box-shadow: var(--shadow); overflow: hidden; }
 .controls { display: flex; flex-wrap: wrap; gap: 14px 18px; align-items: end; padding: 18px 20px; border-bottom: 1px solid var(--line); background: var(--bg); }
 .ctl { display: grid; gap: 6px; min-width: 0; }
@@ -285,8 +272,6 @@ table.plan { width: 100%; border-collapse: collapse; font-size: 15px; }
 .bubble .tm { display: block; text-align: right; font-size: 11px; opacity: .55; margin-top: 2px; }
 .tg-kb { display: grid; gap: 4px; margin-top: 4px; }
 .tg-kb span { display: block; text-align: center; background: color-mix(in srgb, var(--bubble) 70%, transparent); color: var(--bubble-ink); border-radius: 8px; padding: 7px; font-size: 12.5px; font-weight: 500; }
-
-/* ---------- калькулятор ---------- */
 .calc { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0; border: 1px solid var(--line); border-radius: 18px; overflow: hidden; background: var(--surface); }
 @media (max-width: 860px) { .calc { grid-template-columns: minmax(0, 1fr); } }
 .calc-in { padding: 26px; display: grid; gap: 22px; }
@@ -301,8 +286,6 @@ input[type="range"] { width: 100%; accent-color: var(--stamp); }
 .calc-out .row span { opacity: .75; }
 .calc-out .row b { font: 700 20px var(--f-mono); white-space: nowrap; }
 .calc-out .hero-num { font: 700 clamp(40px, 5vw, 56px)/1 var(--f-display); color: var(--bg); }
-
-/* ---------- цены ---------- */
 .plans { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
 @media (max-width: 760px) { .plans { grid-template-columns: minmax(0, 1fr); } }
 .plan-card { border: 1px solid var(--line); border-radius: 18px; padding: 26px; display: grid; gap: 14px; align-content: start; background: var(--surface); }
@@ -310,12 +293,11 @@ input[type="range"] { width: 100%; accent-color: var(--stamp); }
 .plan-card h3 { font: 600 18px/1.3 var(--f-body); }
 .plan-card .price { font: 700 44px/1 var(--f-display); }
 .plan-card .price small { font: 500 16px var(--f-body); color: var(--ink-2); }
+.plan-card .price-once { margin-top: -6px; color: var(--ink-2); }
 .plan-card ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; color: var(--ink-2); }
 .plan-card li { display: flex; gap: 10px; }
 .plan-card li::before { content: "—"; color: var(--ink-3); }
-.guarantee { margin-top: 18px; padding: 16px 20px; border-radius: 14px; background: var(--stamp-soft); color: var(--ink); font-weight: 500; }
-
-/* ---------- вопросы ---------- */
+.note-box { margin-top: 18px; padding: 16px 20px; border-radius: 14px; background: var(--stamp-soft); color: var(--ink); font-weight: 500; }
 .faq { display: grid; gap: 0; border-top: 1px solid var(--line); max-width: 820px; }
 .faq details { border-bottom: 1px solid var(--line); }
 .faq summary { cursor: pointer; list-style: none; padding: 18px 40px 18px 0; font-weight: 600; font-size: 17px; position: relative; }
@@ -323,8 +305,6 @@ input[type="range"] { width: 100%; accent-color: var(--stamp); }
 .faq summary::after { content: "+"; position: absolute; right: 6px; top: 14px; font: 400 24px/1 var(--f-mono); color: var(--ink-3); }
 .faq details[open] summary::after { content: "−"; }
 .faq details p { padding: 0 0 18px; color: var(--ink-2); max-width: 68ch; }
-
-/* ---------- подключение ---------- */
 .pilot { background: var(--kraft); color: var(--kraft-ink); }
 .pilot-in { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 40px; align-items: start; }
 @media (max-width: 860px) { .pilot-in { grid-template-columns: minmax(0, 1fr); } }
@@ -572,7 +552,7 @@ footer { padding-block: 32px; font-size: 14px; color: var(--ink-3); }
         <div class="calc-out" aria-live="polite">
           <div class="row"><span>Сейчас теряете на просрочке в месяц</span><b id="r-loss" class="num"></b></div>
           <div class="row"><span>Сэкономите в месяц</span><b id="r-save" class="num"></b></div>
-          <div class="row"><span>Подписка</span><b class="num">5 999 ₽</b></div>
+          <div class="row"><span>Подписка</span><b class="num">5 900 ₽</b></div>
           <div>
             <span style="opacity:.75">Чистая выгода в месяц</span>
             <div class="hero-num num" id="r-net"></div>
@@ -601,7 +581,8 @@ footer { padding-block: 32px; font-size: 14px; color: var(--ink-3); }
         </div>
         <div class="plan-card main">
           <h3>Точка</h3>
-          <div class="price">5 999 ₽ <small>в месяц</small></div>
+          <div class="price">5 900 ₽ <small>в месяц</small></div>
+          <p class="price-once">+ 200 ₽ за подключение, один раз</p>
           <ul>
             <li>Всё, что в пилоте</li>
             <li>Загрузка продаж из кассы</li>
@@ -610,7 +591,7 @@ footer { padding-block: 32px; font-size: 14px; color: var(--ink-3); }
           </ul>
         </div>
       </div>
-      <p class="guarantee">Для сетей от 3 точек цена по договорённости.</p>
+      <p class="note-box">Для сетей от 3 точек цена по договорённости.</p>
     </div>
   </section>
 
@@ -652,7 +633,7 @@ footer { padding-block: 32px; font-size: 14px; color: var(--ink-3); }
   </div>
 </footer>
 
-<script>/* Модель «Свежий расчёт» — та же логика, что в боте (bot/core/forecast.py). */
+<script>// модель прогноза, та же что в bot/core/forecast.py
 (function (root) {
   "use strict";
   var WD = ["понедельник", "вторник", "среда", "четверг", "пятница", "суббота", "воскресенье"];
@@ -719,7 +700,7 @@ footer { padding-block: 32px; font-size: 14px; color: var(--ink-3); }
   function signedDeg(x) { return Math.abs(Math.round(x)) + "°"; }
   var TEMP_WINDOW = 365, TEMP_NEAR = 15, TEMP_MIN_DAYS = 60, TEMP_MIN_T = 2.5;
 
-  // на сколько (доля) меняется спрос на каждый градус; 0 — если данных мало или связь ненадёжна
+  // на сколько (доля) меняется спрос на каждый градус; 0 - если данных мало или связь ненадёжна
   function temperatureSlope(hist, target, cleanValue, wf) {
     var N = TEMP_WINDOW, y = new Array(N + 1).fill(null), tt = new Array(N + 1).fill(null);
     hist.forEach(function (s) {
@@ -758,8 +739,7 @@ footer { padding-block: 32px; font-size: 14px; color: var(--ink-3); }
     return Math.max(-0.02, Math.min(0.02, slope * n / (n + 30)));
   }
 
-  // сезон по прошлому году: во сколько раз спрос всей точки в неделю с этой даты год назад отличался
-  // от двух недель до неё; 1 — если года истории нет или разница в пределах шума
+  // во сколько раз спрос точки год назад в неделю с этой даты отличался от двух недель до неё
   function seasonChange(sales, target, rainEff) {
     var total = {}, a, after = [], before = [], pairs = [];
     sales.forEach(function (s) {
@@ -770,7 +750,7 @@ footer { padding-block: 32px; font-size: 14px; color: var(--ink-3); }
       }
     });
     for (a = 359; a <= 379; a++) { if (!(a in total)) return 1; (a <= 365 ? after : before).push(total[a]); }
-    // шум: насколько расходятся одни и те же дни недели с разницей в неделю за последние 8 недель
+    // шум: разница одинаковых дней недели через неделю, последние 8 недель
     for (a = 1; a < 50; a++) {
       if (a in total && (a + 7) in total && total[a] + total[a + 7] > 0) {
         var r = (total[a] - total[a + 7]) / ((total[a] + total[a + 7]) / 2);
@@ -824,8 +804,7 @@ footer { padding-block: 32px; font-size: 14px; color: var(--ink-3); }
     var v = resid.length >= 4 ? resid.reduce(function (a, r) { return a + r * r; }, 0) / resid.length * 1.25 * f * f : 0;
     var base = level * f;
 
-    // сезон 1: температура — за год истории узнаём, как жара и холод меняют спрос на позицию;
-    // каждый день сравниваем с соседними (±15 дней) и верим связи, только если она надёжна
+    // температура: связь ищем по истории позиции, день сравниваем с соседними +-15 днями
     var tempF = 1;
     var levelTemps = recentDays.filter(function (k) { return k in temps; }).map(function (k) { return temps[k]; });
     if (tempTomorrow != null && levelTemps.length) {
@@ -837,7 +816,7 @@ footer { padding-block: 32px; font-size: 14px; color: var(--ink-3); }
       }
     }
 
-    // сезон 2: прошлый год — праздники, дачный сезон, каникулы
+    // сезон: как менялся спрос в эти дни год назад
     var yoy = seasonChange(sales, target, rainEff), yoyF = Math.max(0.6, Math.min(1.6, 1 + 0.7 * (yoy - 1)));
     if (yoy !== 1) reasons.push("сезон: год назад в эти дни спрос " + (yoy > 1 ? "вырос" : "снизился") + " на " + Math.round(Math.abs(yoy - 1) * 100) + "%");
 
@@ -970,7 +949,7 @@ footer { padding-block: 32px; font-size: 14px; color: var(--ink-3); }
     return { sales: sales, products: products };
   }
 
-  // прогноз Open-Meteo (бесплатно, без ключа): номер дня → { rain, temp }, как в bot/core/weather.py
+  // прогноз Open-Meteo: день -> { rain, temp }
   function loadWeather(lat, lon, days) {
     if (typeof fetch !== "function") return Promise.resolve({});
     var url = "https://api.open-meteo.com/v1/forecast?latitude=" + lat + "&longitude=" + lon +
@@ -985,7 +964,7 @@ footer { padding-block: 32px; font-size: 14px; color: var(--ink-3); }
     }).catch(function () { return {}; });
   }
   function deg(t) { var r = Math.round(t); return (r > 0 ? "+" : r < 0 ? "−" : "") + Math.abs(r) + "°"; }
-  // средняя температура за две недели до дня — от неё модель считает «холоднее/теплее»
+  // средняя температура за 14 дней до дня
   function recentTemp(sales, day) {
     var seen = {}, xs = [];
     sales.forEach(function (s) { if (s.temp != null && day - s.day >= 1 && day - s.day <= 14 && !(s.day in seen)) { seen[s.day] = 1; xs.push(s.temp); } });
@@ -1033,7 +1012,7 @@ var DEMO_CSV = "дата;товар;испечено;продано;законч
   }
 
   var DEMO = loadDemo();
-  var WX = {}; // прогноз погоды для Челябинска: номер дня → { rain, temp }
+  var WX = {}; // прогноз для Челябинска по дням
   var S = { data: DEMO, source: "demo", fileName: "", dayIdx: 1, rain: false, temp: "fc", event: 1, tab: "plan", sel: null,
             msg: "morning", batches: demoBatches(), err: "" };
 
@@ -1041,7 +1020,6 @@ var DEMO_CSV = "дата;товар;испечено;продано;законч
   function baseDay() { return S.source === "demo" ? TODAY : lastDay(S.data) + 1; }
   function target() { return baseDay() + S.dayIdx; }
   function forecastTemp(day) { return WX[day] && WX[day].temp != null ? WX[day].temp : null; }
-  // температура для расчёта: прогноз или «как в последние дни» ± сдвиг из списка
   function tempMode(day) { return S.temp === "fc" && forecastTemp(day) == null ? 0 : S.temp; }
   function tempFor(day) {
     var base = M.recentTemp(S.data.sales, day), mode = tempMode(day);
@@ -1078,8 +1056,6 @@ var DEMO_CSV = "дата;товар;испечено;продано;законч
         return { b: b, st: st, tip: st.left < 0 ? "спишите" : M.expiryTip(b.item) };
       });
   }
-
-  /* ---------------- чек на первом экране ---------------- */
   function renderTicket() {
     var day = TODAY + 1, temp = forecastTemp(day), c = compute(DEMO, day, false, 1, temp), total = 0, habit = 0, h = [];
     h.push('<div class="t-head"><span>СВЕЖИЙ РАСЧЁТ</span><span>06:00</span></div>');
@@ -1099,8 +1075,6 @@ var DEMO_CSV = "дата;товар;испечено;продано;законч
     }
     $("ticket").innerHTML = h.join("");
   }
-
-  /* ---------------- пульт ---------------- */
   function renderDays() {
     var sel = $("day"), b = baseDay(), opts = [];
     for (var i = 0; i < 7; i++) {
@@ -1265,8 +1239,6 @@ var DEMO_CSV = "дата;товар;испечено;продано;законч
       '<p class="note">За последние ' + b.days + " " + plural(b.days, "день", "дня", "дней") + ": доля списаний от выпечки " + shareNow.toFixed(1).replace(".", ",") + "% → <b>" + shareNew.toFixed(1).replace(".", ",") + "%</b>. " +
       "Для каждого дня модель видела только продажи до него." + (S.source === "demo" ? " Данные смоделированы." : "") + "</p>";
   }
-
-  /* ---------------- сообщение в Telegram ---------------- */
   function renderPhone() {
     var day = target(), out = [], kb = [], time = "06:00";
     var cap = { morning: "Утреннее сообщение в Telegram.", evening: "Вечернее сообщение в Telegram.", closing: "Сообщение перед закрытием." };
@@ -1322,10 +1294,8 @@ var DEMO_CSV = "дата;товар;испечено;продано;законч
     $("src-demo").setAttribute("aria-pressed", String(S.source === "demo")); $("src-file").setAttribute("aria-pressed", String(S.source === "file"));
     ["morning", "evening", "closing"].forEach(function (m) { $("m-" + m).setAttribute("aria-pressed", String(S.msg === m)); });
   }
-
-  /* ---------------- калькулятор ---------------- */
   var DEMO_CUT = null;
-  var SUBSCRIPTION = 5999; // ₽ в месяц за точку
+  var SUBSCRIPTION = 5900;
   function renderCalc() {
     var rev = +$("c-rev").value, w = +$("c-waste").value / 100, cost = +$("c-cost").value / 100, cut = +$("c-cut").value / 100, days = 30;
     $("o-rev").textContent = money(rev); $("o-waste").textContent = Math.round(w * 100) + "%";
@@ -1335,8 +1305,6 @@ var DEMO_CSV = "дата;товар;испечено;продано;законч
     $("r-net").textContent = (net < 0 ? "−" : "") + money(Math.abs(net));
     $("r-roi").textContent = net > 0 ? "Подписка окупается в " + (save / SUBSCRIPTION).toFixed(1).replace(".", ",") + " раза" : "При таких цифрах подписка не окупается.";
   }
-
-  /* ---------------- подключение ---------------- */
   function renderPilot() {
     var box = $("pilot-cta");
     var url = "https://t.me/" + encodeURIComponent(BOT_USERNAME);
@@ -1349,8 +1317,6 @@ var DEMO_CSV = "дата;товар;испечено;продано;законч
       '<a class="btn btn-ghost" href="' + url + '?start=demo" target="_blank" rel="noopener">Посмотреть пример в боте</a>' +
       '<span class="bot-addr">@' + esc(BOT_USERNAME) + "</span>";
   }
-
-  /* ---------------- события ---------------- */
   $("day").addEventListener("change", function () { S.dayIdx = +this.value; renderTemp(); renderPlan(); renderPhone(); });
   $("temp").addEventListener("change", function () { S.temp = this.value === "fc" ? "fc" : +this.value; renderPlan(); renderPhone(); });
   $("event").addEventListener("change", function () { S.event = +this.value; renderPlan(); renderPhone(); });
@@ -1404,8 +1370,6 @@ var DEMO_CSV = "дата;товар;испечено;продано;законч
     var rt = null;
     new ResizeObserver(function () { clearTimeout(rt); rt = setTimeout(function () { if (S.tab === "plan") renderChart(); }, 80); }).observe($("chart"));
   }
-
-  /* ---------------- старт ---------------- */
   renderTicket(); renderAll(); renderCalc(); renderPilot();
   M.loadWeather(55.16, 61.44, 8).then(function (w) { WX = w; if (Object.keys(w).length) { renderTicket(); renderAll(); } });
 })();

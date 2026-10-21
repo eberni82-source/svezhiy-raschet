@@ -2,9 +2,9 @@
 
     python site-src/build.py
 
-index.html          — сайт (GitHub Pages)
-kabinet.html        — кабинет: на GitHub Pages работает как пример в браузере
-bot/web/kabinet.html — тот же кабинет, его раздаёт бот (свои данные, вход по коду)
+index.html          - сайт (GitHub Pages)
+kabinet.html        - кабинет: на GitHub Pages работает как пример в браузере
+bot/web/kabinet.html - тот же кабинет, его раздаёт бот (свои данные, вход по коду)
 """
 import base64
 import json

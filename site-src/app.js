@@ -27,7 +27,7 @@
   }
 
   var DEMO = loadDemo();
-  var WX = {}; // прогноз погоды для Челябинска: номер дня → { rain, temp }
+  var WX = {}; // прогноз для Челябинска по дням
   var S = { data: DEMO, source: "demo", fileName: "", dayIdx: 1, rain: false, temp: "fc", event: 1, tab: "plan", sel: null,
             msg: "morning", batches: demoBatches(), err: "" };
 
@@ -35,7 +35,6 @@
   function baseDay() { return S.source === "demo" ? TODAY : lastDay(S.data) + 1; }
   function target() { return baseDay() + S.dayIdx; }
   function forecastTemp(day) { return WX[day] && WX[day].temp != null ? WX[day].temp : null; }
-  // температура для расчёта: прогноз или «как в последние дни» ± сдвиг из списка
   function tempMode(day) { return S.temp === "fc" && forecastTemp(day) == null ? 0 : S.temp; }
   function tempFor(day) {
     var base = M.recentTemp(S.data.sales, day), mode = tempMode(day);
@@ -72,8 +71,6 @@
         return { b: b, st: st, tip: st.left < 0 ? "спишите" : M.expiryTip(b.item) };
       });
   }
-
-  /* ---------------- чек на первом экране ---------------- */
   function renderTicket() {
     var day = TODAY + 1, temp = forecastTemp(day), c = compute(DEMO, day, false, 1, temp), total = 0, habit = 0, h = [];
     h.push('<div class="t-head"><span>СВЕЖИЙ РАСЧЁТ</span><span>06:00</span></div>');
@@ -93,8 +90,6 @@
     }
     $("ticket").innerHTML = h.join("");
   }
-
-  /* ---------------- пульт ---------------- */
   function renderDays() {
     var sel = $("day"), b = baseDay(), opts = [];
     for (var i = 0; i < 7; i++) {
@@ -259,8 +254,6 @@
       '<p class="note">За последние ' + b.days + " " + plural(b.days, "день", "дня", "дней") + ": доля списаний от выпечки " + shareNow.toFixed(1).replace(".", ",") + "% → <b>" + shareNew.toFixed(1).replace(".", ",") + "%</b>. " +
       "Для каждого дня модель видела только продажи до него." + (S.source === "demo" ? " Данные смоделированы." : "") + "</p>";
   }
-
-  /* ---------------- сообщение в Telegram ---------------- */
   function renderPhone() {
     var day = target(), out = [], kb = [], time = "06:00";
     var cap = { morning: "Утреннее сообщение в Telegram.", evening: "Вечернее сообщение в Telegram.", closing: "Сообщение перед закрытием." };
@@ -316,10 +309,8 @@
     $("src-demo").setAttribute("aria-pressed", String(S.source === "demo")); $("src-file").setAttribute("aria-pressed", String(S.source === "file"));
     ["morning", "evening", "closing"].forEach(function (m) { $("m-" + m).setAttribute("aria-pressed", String(S.msg === m)); });
   }
-
-  /* ---------------- калькулятор ---------------- */
   var DEMO_CUT = null;
-  var SUBSCRIPTION = 5999; // ₽ в месяц за точку
+  var SUBSCRIPTION = 5900;
   function renderCalc() {
     var rev = +$("c-rev").value, w = +$("c-waste").value / 100, cost = +$("c-cost").value / 100, cut = +$("c-cut").value / 100, days = 30;
     $("o-rev").textContent = money(rev); $("o-waste").textContent = Math.round(w * 100) + "%";
@@ -329,8 +320,6 @@
     $("r-net").textContent = (net < 0 ? "−" : "") + money(Math.abs(net));
     $("r-roi").textContent = net > 0 ? "Подписка окупается в " + (save / SUBSCRIPTION).toFixed(1).replace(".", ",") + " раза" : "При таких цифрах подписка не окупается.";
   }
-
-  /* ---------------- подключение ---------------- */
   function renderPilot() {
     var box = $("pilot-cta");
     var url = "https://t.me/" + encodeURIComponent(BOT_USERNAME);
@@ -343,8 +332,6 @@
       '<a class="btn btn-ghost" href="' + url + '?start=demo" target="_blank" rel="noopener">Посмотреть пример в боте</a>' +
       '<span class="bot-addr">@' + esc(BOT_USERNAME) + "</span>";
   }
-
-  /* ---------------- события ---------------- */
   $("day").addEventListener("change", function () { S.dayIdx = +this.value; renderTemp(); renderPlan(); renderPhone(); });
   $("temp").addEventListener("change", function () { S.temp = this.value === "fc" ? "fc" : +this.value; renderPlan(); renderPhone(); });
   $("event").addEventListener("change", function () { S.event = +this.value; renderPlan(); renderPhone(); });
@@ -398,8 +385,6 @@
     var rt = null;
     new ResizeObserver(function () { clearTimeout(rt); rt = setTimeout(function () { if (S.tab === "plan") renderChart(); }, 80); }).observe($("chart"));
   }
-
-  /* ---------------- старт ---------------- */
   renderTicket(); renderAll(); renderCalc(); renderPilot();
   M.loadWeather(55.16, 61.44, 8).then(function (w) { WX = w; if (Object.keys(w).length) { renderTicket(); renderAll(); } });
 })();

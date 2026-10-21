@@ -34,7 +34,7 @@ def _days(data: dict) -> dict[date, Day]:
 
 
 def geocode(city: str) -> dict | None:
-    """Город → координаты и часовой пояс. None, если не нашли или нет сети."""
+    """Город -> координаты и часовой пояс. None, если не нашли или нет сети."""
     q = urllib.parse.urlencode({"name": city, "count": 1, "language": "ru", "format": "json"})
     try:
         data = _get(f"https://geocoding-api.open-meteo.com/v1/search?{q}")
@@ -49,7 +49,7 @@ def geocode(city: str) -> dict | None:
 
 
 def history(lat: float | None, lon: float | None, start: date, end: date) -> dict[date, Day]:
-    """Архив погоды за прошлые даты — чтобы загруженная история продаж сразу была с погодой."""
+    """Архив погоды за прошлые даты - чтобы загруженная история продаж сразу была с погодой."""
     if lat is None or lon is None or start > end:
         return {}
     q = urllib.parse.urlencode({"latitude": lat, "longitude": lon, "daily": DAILY, "timezone": "auto",

@@ -1,21 +1,21 @@
 """
-Модель «Свежий расчёт»: прогноз спроса + оптимальный объём выпечки.
+Модель "Свежий расчёт": прогноз спроса + оптимальный объём выпечки.
 
 Логика (одинаковая в боте и на сайте):
 1. Спрос дня. Если товар закончился раньше закрытия, реальный спрос был больше
    продаж: добавляем поправку sold * (1 + 0.5 * доля_дня_после_распродажи).
 2. Влияние дождя считается по истории всех товаров точки (если есть отметки
    погоды); иначе берётся -10%.
-3. Базовый прогноз = уровень (средний спрос за 14 дней) × профиль недели
+3. Базовый прогноз = уровень (средний спрос за 14 дней) * профиль недели
    (во сколько раз этот день недели выше среднего за 8 недель). Всё очищено
    от влияния дождя.
 4. Сезон. Уровень по двум неделям сам идёт за сезоном. Сверху две поправки:
-   температура — по истории модель узнаёт, как холод и жара меняют спрос на
+   температура - по истории модель узнаёт, как холод и жара меняют спрос на
    каждую позицию (нужно от двух месяцев данных с температурой);
-   прошлый год — как менялся спрос всей точки в эти же дни год назад
+   прошлый год - как менялся спрос всей точки в эти же дни год назад
    (праздники, дачный сезон, каникулы). Обе включаются, только если эффект
    заметно больше случайного разброса.
-5. Объём выпечки по модели «газетчика»: печём столько, чтобы вероятность
+5. Объём выпечки по модели "газетчика": печём столько, чтобы вероятность
    продать всё была равна доле (цена - себестоимость) / цена.
 """
 from __future__ import annotations
@@ -30,7 +30,7 @@ WEEKDAYS_SHORT = ["пн", "вт", "ср", "чт", "пт", "сб", "вс"]
 
 DEFAULT_RAIN_EFFECT = -0.10
 SHARE_AFTER_EVENING = 0.22      # доля дневных продаж после вечерней проверки (17:00)
-DISCOUNT_THRESHOLD = 1.2        # если на витрине больше ожидаемого остатка × 1.2 — скидка
+DISCOUNT_THRESHOLD = 1.2        # если на витрине больше ожидаемого остатка * 1.2 - скидка
 
 
 @dataclass
@@ -39,7 +39,7 @@ class Sale:
     product: str
     sold: float
     baked: float | None = None
-    soldout: str | None = None   # "15:40" — время, когда товар закончился
+    soldout: str | None = None   # "15:40" - время, когда товар закончился
     rain: bool | None = None
     temp: float | None = None    # средняя температура дня, °C
 
@@ -50,7 +50,7 @@ class Product:
     price: float | None = None
     cost: float | None = None
     shelf_life: int | None = None      # срок хранения, дней
-    default_qty: float | None = None   # обычный объём в день — для нового товара без истории
+    default_qty: float | None = None   # обычный объём в день - для нового товара без истории
 
 
 @dataclass
@@ -120,7 +120,7 @@ TEMP_WINDOW, TEMP_NEAR, TEMP_MIN_DAYS, TEMP_MIN_T = 365, 15, 60, 2.5
 
 
 def temperature_slope(hist, target: date, clean_value, wd_factor) -> float:
-    """На сколько (доля) меняется спрос на каждый градус. 0 — если данных мало или связь ненадёжна."""
+    """На сколько (доля) меняется спрос на каждый градус. 0 - если данных мало или связь ненадёжна."""
     n_days = TEMP_WINDOW
     y = [None] * (n_days + 1)       # индекс = сколько дней назад
     tt = [None] * (n_days + 1)
@@ -169,7 +169,7 @@ def temperature_slope(hist, target: date, clean_value, wd_factor) -> float:
 
 def season_change(sales: list[Sale], target: date, open_h=7, close_h=21, rain_eff=DEFAULT_RAIN_EFFECT) -> float:
     """Сезон по прошлому году: во сколько раз спрос всей точки в неделю с этой даты год назад
-    отличался от двух недель до неё. 1.0 — если года истории нет или разница в пределах шума."""
+    отличался от двух недель до неё. 1.0 - если года истории нет или разница в пределах шума."""
     total: dict[int, float] = {}
     for s in sales:
         age = (target - s.day).days
@@ -180,7 +180,7 @@ def season_change(sales: list[Sale], target: date, open_h=7, close_h=21, rain_ef
         return 1.0
     after = [total[a] for a in range(359, 366)]    # неделя с этой даты год назад
     before = [total[a] for a in range(366, 380)]   # две недели до неё
-    # шум: насколько расходятся одни и те же дни недели с разницей в неделю за последние 8 недель
+    # шум: разница одинаковых дней недели через неделю, последние 8 недель
     pairs = [((total[a] - total[a + 7]) / ((total[a] + total[a + 7]) / 2)) ** 2 / 2
              for a in range(1, 50) if a in total and a + 7 in total and total[a] + total[a + 7] > 0]
     if len(pairs) < 7 or _mean(before) <= 0:
@@ -239,7 +239,7 @@ def forecast(sales: list[Sale], product: Product, target: date, rain_tomorrow: b
     elif abs(wf - 1) >= 0.08:
         reasons.append(f"{WEEKDAYS[target.weekday()]}: обычно {(wf - 1) * 100:+.0f}% к среднему дню")
 
-    # разброс: насколько дни отклонялись от модели «уровень × профиль»
+    # разброс: насколько дни отклонялись от модели "уровень * профиль"
     resid = []
     for day, v in clean.items():
         if (target - day).days <= 28:
@@ -249,9 +249,7 @@ def forecast(sales: list[Sale], product: Product, target: date, rain_tomorrow: b
     var = (sum(r * r for r in resid) / len(resid)) * 1.25 * wf * wf if len(resid) >= 4 else 0
     base = level * wf
 
-    # сезон 1: температура. За год истории узнаём, как жара и холод меняют спрос на эту позицию.
-    # Каждый день сравниваем с соседними (±15 дней), чтобы сезон и рост продаж не выдавались
-    # за влияние погоды, и верим связи, только если она статистически надёжна.
+    # температура: связь ищем по истории позиции, день сравниваем с соседними +-15 днями
     temp_f = 1.0
     level_temps = [temps[d] for d in recent_days if d in temps]
     if temp_tomorrow is not None and level_temps:
@@ -262,7 +260,7 @@ def forecast(sales: list[Sale], product: Product, target: date, rain_tomorrow: b
             if abs(temp_f - 1) >= 0.03:
                 reasons.append(f"{'холоднее' if diff < 0 else 'теплее'} на {abs(diff):.0f}°: {(temp_f - 1) * 100:+.0f}% к спросу")
 
-    # сезон 2: прошлый год — праздники, дачный сезон, каникулы
+    # сезон: как менялся спрос в эти дни год назад
     yoy = season_change(sales, target, open_h, close_h, rain_eff)
     yoy_f = max(0.6, min(1.6, 1 + 0.7 * (yoy - 1)))
     if yoy != 1:
@@ -296,7 +294,7 @@ def forecast(sales: list[Sale], product: Product, target: date, rain_tomorrow: b
 
 
 def evening_threshold(rec: Recommendation) -> int:
-    """Если в 17:00 на витрине больше этого числа — ставим скидку."""
+    """Если в 17:00 на витрине больше этого числа - ставим скидку."""
     return max(1, int(math.ceil(rec.mean * SHARE_AFTER_EVENING * DISCOUNT_THRESHOLD)))
 
 

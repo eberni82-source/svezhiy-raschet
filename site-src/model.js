@@ -1,4 +1,4 @@
-/* Модель «Свежий расчёт» — та же логика, что в боте (bot/core/forecast.py). */
+// модель прогноза, та же что в bot/core/forecast.py
 (function (root) {
   "use strict";
   var WD = ["понедельник", "вторник", "среда", "четверг", "пятница", "суббота", "воскресенье"];
@@ -65,7 +65,7 @@
   function signedDeg(x) { return Math.abs(Math.round(x)) + "°"; }
   var TEMP_WINDOW = 365, TEMP_NEAR = 15, TEMP_MIN_DAYS = 60, TEMP_MIN_T = 2.5;
 
-  // на сколько (доля) меняется спрос на каждый градус; 0 — если данных мало или связь ненадёжна
+  // на сколько (доля) меняется спрос на каждый градус; 0 - если данных мало или связь ненадёжна
   function temperatureSlope(hist, target, cleanValue, wf) {
     var N = TEMP_WINDOW, y = new Array(N + 1).fill(null), tt = new Array(N + 1).fill(null);
     hist.forEach(function (s) {
@@ -104,8 +104,7 @@
     return Math.max(-0.02, Math.min(0.02, slope * n / (n + 30)));
   }
 
-  // сезон по прошлому году: во сколько раз спрос всей точки в неделю с этой даты год назад отличался
-  // от двух недель до неё; 1 — если года истории нет или разница в пределах шума
+  // во сколько раз спрос точки год назад в неделю с этой даты отличался от двух недель до неё
   function seasonChange(sales, target, rainEff) {
     var total = {}, a, after = [], before = [], pairs = [];
     sales.forEach(function (s) {
@@ -116,7 +115,7 @@
       }
     });
     for (a = 359; a <= 379; a++) { if (!(a in total)) return 1; (a <= 365 ? after : before).push(total[a]); }
-    // шум: насколько расходятся одни и те же дни недели с разницей в неделю за последние 8 недель
+    // шум: разница одинаковых дней недели через неделю, последние 8 недель
     for (a = 1; a < 50; a++) {
       if (a in total && (a + 7) in total && total[a] + total[a + 7] > 0) {
         var r = (total[a] - total[a + 7]) / ((total[a] + total[a + 7]) / 2);
@@ -170,8 +169,7 @@
     var v = resid.length >= 4 ? resid.reduce(function (a, r) { return a + r * r; }, 0) / resid.length * 1.25 * f * f : 0;
     var base = level * f;
 
-    // сезон 1: температура — за год истории узнаём, как жара и холод меняют спрос на позицию;
-    // каждый день сравниваем с соседними (±15 дней) и верим связи, только если она надёжна
+    // температура: связь ищем по истории позиции, день сравниваем с соседними +-15 днями
     var tempF = 1;
     var levelTemps = recentDays.filter(function (k) { return k in temps; }).map(function (k) { return temps[k]; });
     if (tempTomorrow != null && levelTemps.length) {
@@ -183,7 +181,7 @@
       }
     }
 
-    // сезон 2: прошлый год — праздники, дачный сезон, каникулы
+    // сезон: как менялся спрос в эти дни год назад
     var yoy = seasonChange(sales, target, rainEff), yoyF = Math.max(0.6, Math.min(1.6, 1 + 0.7 * (yoy - 1)));
     if (yoy !== 1) reasons.push("сезон: год назад в эти дни спрос " + (yoy > 1 ? "вырос" : "снизился") + " на " + Math.round(Math.abs(yoy - 1) * 100) + "%");
 
@@ -316,7 +314,7 @@
     return { sales: sales, products: products };
   }
 
-  // прогноз Open-Meteo (бесплатно, без ключа): номер дня → { rain, temp }, как в bot/core/weather.py
+  // прогноз Open-Meteo: день -> { rain, temp }
   function loadWeather(lat, lon, days) {
     if (typeof fetch !== "function") return Promise.resolve({});
     var url = "https://api.open-meteo.com/v1/forecast?latitude=" + lat + "&longitude=" + lon +
@@ -331,7 +329,7 @@
     }).catch(function () { return {}; });
   }
   function deg(t) { var r = Math.round(t); return (r > 0 ? "+" : r < 0 ? "−" : "") + Math.abs(r) + "°"; }
-  // средняя температура за две недели до дня — от неё модель считает «холоднее/теплее»
+  // средняя температура за 14 дней до дня
   function recentTemp(sales, day) {
     var seen = {}, xs = [];
     sales.forEach(function (s) { if (s.temp != null && day - s.day >= 1 && day - s.day <= 14 && !(s.day in seen)) { seen[s.day] = 1; xs.push(s.temp); } });

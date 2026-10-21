@@ -1,4 +1,4 @@
-"""Собирает бота в один файл bot/svezhiy_bot.py — для тех, кто копирует код вручную."""
+"""Собирает бота в один файл bot/svezhiy_bot.py - для тех, кто копирует код вручную."""
 import ast
 import json
 import re
@@ -17,7 +17,7 @@ def module_body(path: Path) -> str:
         src = src[m.end():]
     lines = [l for l in src.splitlines() if not re.match(r"^(from |import )", l)]
     body = "\n".join(lines).strip("\n")
-    title = f"# {'=' * 70}\n# {path.relative_to(ROOT).as_posix()}\n# {'=' * 70}\n"
+    title = f"# {path.relative_to(ROOT).as_posix()}\n"
     return title + head + body + "\n"
 
 
@@ -28,26 +28,24 @@ def demo_body() -> str:
 
 
 HEADER = '''"""
-«Свежий расчёт» — Telegram-бот в ОДНОМ файле.
+"Свежий расчёт" - Telegram-бот одним файлом.
 План производства на утро, вечерние скидки, сроки годности, рассылки.
 
 Как запустить:
-1. Установите Python 3.9+ с python.org (на Windows отметьте «Add Python to PATH»).
+1. Установите Python 3.9+ с python.org (на Windows отметьте "Add Python to PATH").
 2. Сохраните этот файл как svezhiy_bot.py в отдельную папку.
 3. Впишите токен от @BotFather и свой Telegram ID в BOT_TOKEN и ADMIN_IDS ниже
    (или положите рядом файл .env с BOT_TOKEN=... и ADMIN_IDS=...).
 4. В терминале в этой папке:  python svezhiy_bot.py
 Никаких pip install не нужно.
 
-ВНИМАНИЕ: если вписали токен в файл — не выкладывайте этот файл в открытый доступ.
+Если вписали токен в файл, не выкладывайте его в открытый доступ.
 """
 from __future__ import annotations
 
-# ----------------------------------------------------------------------
-# НАСТРОЙКИ
-# ----------------------------------------------------------------------
-BOT_TOKEN = ""   # например "1234567890:AAH..." — токен от @BotFather
-ADMIN_IDS = ""   # ваш Telegram ID от @userinfobot, несколько — через запятую
+# Настройки
+BOT_TOKEN = ""   # токен от @BotFather, например "1234567890:AAH..."
+ADMIN_IDS = ""   # ваш Telegram ID от @userinfobot, несколько - через запятую
 
 import csv
 import html
@@ -90,18 +88,18 @@ def bot_body() -> str:
     assert old_demo in body
     body = body.replace(old_demo, 'demo_file = ROOT / "data" / "demo_sales.csv"\n'
                         '        text = demo_file.read_text(encoding="utf-8") if demo_file.exists() else demo_csv_text()')
-    return f"# {'=' * 70}\n# Бот\n# {'=' * 70}\n" + body
+    return "# bot/bot.py\n" + body
 
 
 parts = [HEADER]
 for name in ("forecast.py", "csv_import.py", "storage.py", "tg.py", "weather.py", "web.py"):
     parts.append(module_body(BOT / "core" / name))
-parts.append("# Страница личного кабинета (встроена, чтобы бот работал одним файлом)\nKABINET_HTML = " +
+parts.append("# страница личного кабинета\nKABINET_HTML = " +
              json.dumps((BOT / "web" / "kabinet.html").read_text(encoding="utf-8"), ensure_ascii=False))
 parts.append(demo_body())
 parts.append(bot_body())
 out = "\n\n".join(p.strip("\n") for p in parts) + "\n"
-# модули склеены в одно пространство имён: функции и классы не должны перекрываться
+# все модули в одном пространстве имён, имена не должны совпадать
 defs = [n.name for n in ast.parse(out).body if isinstance(n, (ast.FunctionDef, ast.ClassDef))]
 dup = sorted({n for n in defs if defs.count(n) > 1})
 assert not dup, f"имена определены дважды: {dup}"
