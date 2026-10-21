@@ -368,7 +368,8 @@ class FreshBot:
                      reply_keyboard=MENU)
         if not chat["city"]:
             self.state[cid] = {"name": "city"}
-            return self.tg.send(cid, "В каком городе ваше заведение? Нужен для погоды и часового пояса.")
+            return self.tg.send(cid, "В каком городе ваше заведение? Нужен для погоды и часового пояса. "
+                                     "Нажмите «Челябинск» или напишите свой город.", reply_keyboard=[["Челябинск"]])
         self.after_setup(chat)
 
     def after_setup(self, chat):
@@ -381,15 +382,17 @@ class FreshBot:
     def st_city(self, chat, text, st):
         cid = chat["chat_id"]
         g = geocode(text)
+        if not g and "челяб" in text.lower():  # без интернета к сервису погоды — знаем Челябинск сами
+            g = {"name": "Челябинск", "lat": 55.1644, "lon": 61.4368, "tz": "Asia/Yekaterinburg"}
         if g:
             _, offset = self.weather.daily(g["lat"], g["lon"], time.time())  # запасной вариант для Windows без tzdata
             self.db.set_chat(cid, city=g["name"], lat=g["lat"], lon=g["lon"], tz=g["tz"],
                              utc_offset=offset if offset is not None else chat["utc_offset"])
-            self.tg.send(cid, f"Город: <b>{esc(g['name'])}</b>, часовой пояс {esc(g['tz'])}.")
+            self.tg.send(cid, f"Город: <b>{esc(g['name'])}</b>, часовой пояс {esc(g['tz'])}.", reply_keyboard=MENU)
         else:
-            self.db.set_chat(cid, city=text[:60])
-            self.tg.send(cid, f"Записал город «{esc(text[:60])}». Не смог узнать часовой пояс, поставил московское время. "
-                              "Поменять: /tz +2 (разница с Москвой в часах).")
+            self.db.set_chat(cid, city=text[:60], tz="Asia/Yekaterinburg", utc_offset=18000)
+            self.tg.send(cid, f"Записал город «{esc(text[:60])}». Не смог узнать часовой пояс, поставил время Челябинска (Москва +2). "
+                              "Поменять: /tz +0 (разница с Москвой в часах).", reply_keyboard=MENU)
         self.state.pop(cid, None)
         self.after_setup(self.db.chat(cid))
 
@@ -411,7 +414,7 @@ class FreshBot:
                 return self.tg.send(cid, f"Часовой пояс: {esc(arg)}")
             except Exception:
                 pass
-        self.tg.send(cid, "Пример: <code>/tz +2</code> (Екатеринбург = Москва +2) или <code>/tz Asia/Yekaterinburg</code>")
+        self.tg.send(cid, "Пример: <code>/tz +2</code> (Челябинск = Москва +2) или <code>/tz Asia/Yekaterinburg</code>")
 
     def cmd_help(self, chat):
         self.tg.send(chat["chat_id"], HELP.format(morning=chat["morning"], evening=chat["evening"],

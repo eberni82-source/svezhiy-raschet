@@ -98,7 +98,7 @@
     var n = $("data-note"), d = S.data, days = d.sales.map(function (s) { return s.day; });
     var first = Math.min.apply(null, days), last = Math.max.apply(null, days), np = Object.keys(allProducts(d)).length;
     var h = S.source === "demo"
-      ? '<span class="tag">Пример</span><span>Пекарня: ' + np + " позиций, продажи за 8 недель (смоделированы).</span>"
+      ? '<span class="tag">Пример</span><span>Пекарня в Челябинске: ' + np + " позиций, продажи за 8 недель (смоделированы).</span>"
       : '<span class="tag own">Ваш файл</span><span>' + esc(S.fileName) + ": " + d.sales.length + " " + plural(d.sales.length, "строка", "строки", "строк") + ", " + np + " " + plural(np, "позиция", "позиции", "позиций") + ", " + M.ddmm(first) + "–" + M.ddmm(last) + ". Данные остаются в вашем браузере.</span>";
     if (S.err) h += '<span class="err">Не получилось прочитать файл: ' + esc(S.err) + "</span>";
     if (S.source === "demo") h += '<span>Свой файл: колонки <span class="mono">дата;товар;продано</span>, по желанию <span class="mono">испечено (или заказано);закончилось;цена;себестоимость;дождь</span></span>';

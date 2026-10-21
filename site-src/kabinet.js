@@ -101,7 +101,7 @@
           share_now: bt.wasteUnitsNow / bt.producedNow * 100, share_new: bt.wasteUnitsNew / bt.producedNew * 100 } : null };
       }
       return {
-        mode: "local", business: { name: D.business, city: "", is_example: D.example },
+        mode: "local", business: { name: D.business, city: D.example ? "Челябинск" : "", is_example: D.example },
         now: M.diso(T) + "T" + pad(now.getHours()) + ":" + pad(now.getMinutes()), phase: phaseOf(D.times, m), times: D.times,
         today: { date: M.diso(T), rain: null, event: D.events[T] || 1, items: items },
         tomorrow: { date: M.diso(T + 1), rain: null, event: D.events[T + 1] || 1, rain_effect: rm.eff, items: tom },

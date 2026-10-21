@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS chats (
     chat_id INTEGER PRIMARY KEY,
     username TEXT, first_name TEXT,
     business TEXT, city TEXT, lat REAL, lon REAL,
-    tz TEXT DEFAULT 'Europe/Moscow', utc_offset INTEGER DEFAULT 10800,
+    tz TEXT DEFAULT 'Asia/Yekaterinburg', utc_offset INTEGER DEFAULT 18000,
     morning TEXT DEFAULT '06:00', evening TEXT DEFAULT '17:00', closing TEXT DEFAULT '21:00',
     open_h REAL DEFAULT 7, close_h REAL DEFAULT 21,
     last_morning TEXT, last_evening TEXT, last_closing TEXT,
