@@ -6,24 +6,19 @@ index.html          - сайт (GitHub Pages)
 kabinet.html        - кабинет: на GitHub Pages работает как пример в браузере
 bot/web/kabinet.html - тот же кабинет, его раздаёт бот (свои данные, вход по коду)
 """
-import base64
 import json
+from urllib.parse import quote
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
-ASSETS = ROOT / "assets"
+ICON = ("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='#2346C8'/>"
+        "<text x='16' y='22.5' text-anchor='middle' font-family='Arial,sans-serif' font-size='19' font-weight='700' fill='#fff'>С</text></svg>")
 
 
-def data_uri(name: str) -> str:
-    return "data:image/png;base64," + base64.b64encode((ASSETS / name).read_bytes()).decode()
-
-
-def head(touch_icon: bool) -> str:
+def head() -> str:
     """Начало страницы: кодировка, масштаб, иконка вкладки."""
-    links = f'<link rel="icon" type="image/png" href="{data_uri("favicon-32.png")}">\n'
-    if touch_icon:
-        links += '<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">\n'
+    links = f'<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,{quote(ICON)}">\n'
     return ('<!doctype html>\n<html lang="ru">\n<head>\n<meta charset="utf-8">\n'
             '<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">\n' + links +
             '<style>:root{padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}'
@@ -41,8 +36,7 @@ def build(src_name: str, app_name: str, marker: str, example: bool = True) -> st
     csv = (ROOT / "bot" / "data" / "demo_sales.csv").read_text(encoding="utf-8") if example else ""
     return (read(src_name).replace("/*MODEL*/", read("model.js"))
             .replace("__DEMO_CSV__", json.dumps(csv, ensure_ascii=False))
-            .replace(marker, read(app_name))
-            .replace("__LOGO__", data_uri("logo-64.png")))
+            .replace(marker, read(app_name)))
 
 
 def main():
@@ -50,10 +44,10 @@ def main():
     kab = build("kabinet.src.html", "kabinet.js", "/*KABINET*/")
     # кабинету в боте пример не нужен: там свои данные с сервера
     kab_bot = build("kabinet.src.html", "kabinet.js", "/*KABINET*/", example=False)
-    (ROOT / "index.html").write_text(head(True) + site + TAIL, encoding="utf-8")
-    (ROOT / "kabinet.html").write_text(head(True) + kab + TAIL, encoding="utf-8")
+    (ROOT / "index.html").write_text(head() + site + TAIL, encoding="utf-8")
+    (ROOT / "kabinet.html").write_text(head() + kab + TAIL, encoding="utf-8")
     (ROOT / "bot" / "web").mkdir(exist_ok=True)
-    (ROOT / "bot" / "web" / "kabinet.html").write_text(head(False) + kab_bot + TAIL, encoding="utf-8")
+    (ROOT / "bot" / "web" / "kabinet.html").write_text(head() + kab_bot + TAIL, encoding="utf-8")
     print("ok: index.html", len(site), "· kabinet.html", len(kab))
 
 

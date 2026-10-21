@@ -83,7 +83,6 @@ a { color: inherit; }
 .top { background: var(--kraft); color: var(--kraft-ink); }
 .top-in { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-block: 16px; flex-wrap: wrap; }
 .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--kraft-ink); }
-.brand-logo { width: 38px; height: 38px; border-radius: 10px; display: block; flex: none; }
 .brand-name { font: 600 18px/1 var(--f-display); }
 .nav { display: flex; gap: 22px; align-items: center; flex-wrap: wrap; }
 .nav a { text-decoration: none; font-weight: 500; font-size: 15px; }
@@ -254,7 +253,7 @@ table.plan { width: 100%; border-collapse: collapse; font-size: 15px; }
 .phone { width: 100%; max-width: 300px; justify-self: center; border-radius: 34px; background: var(--phone); padding: 10px; box-shadow: var(--shadow); }
 .screen { border-radius: 26px; overflow: hidden; background: var(--chat); }
 .tg-bar { display: flex; align-items: center; gap: 10px; background: var(--bubble); color: var(--bubble-ink); padding: 12px 14px; }
-.tg-ava { width: 34px; height: 34px; border-radius: 50%; display: block; flex: none; }
+.tg-ava { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; flex: none; background: #3E6BD6; color: #FFFFFF; font: 600 13px/1 var(--f-body); }
 .tg-bar b { display: block; font-size: 14px; }
 .tg-bar small { font-size: 12px; opacity: .65; }
 .tg-chat { padding: 12px 10px 14px; min-height: 380px; max-height: 560px; overflow-y: auto; display: grid; align-content: start; }
@@ -318,7 +317,7 @@ footer { padding-block: 32px; font-size: 14px; color: var(--ink-3); }
 
 <header class="top">
   <div class="wrap top-in">
-    <a class="brand" href="#top" aria-label="Свежий расчёт — наверх"><img class="brand-logo" src="__LOGO__" alt="" width="38" height="38"><span class="brand-name">Свежий расчёт</span></a>
+    <a class="brand" href="#top" aria-label="Свежий расчёт — наверх"><span class="brand-name">Свежий расчёт</span></a>
     <nav class="nav" aria-label="Разделы">
       <a href="#who">Для кого</a>
       <a href="#how">Как работает</a>
@@ -502,7 +501,7 @@ footer { padding-block: 32px; font-size: 14px; color: var(--ink-3); }
             <a class="btn btn-primary bot-try" data-bot="start=demo" hidden>Попробовать в Telegram</a>
             <div class="phone">
               <div class="screen">
-                <div class="tg-bar"><img class="tg-ava" src="__LOGO__" alt="" width="34" height="34"><span><b>Свежий расчёт</b><small>бот</small></span></div>
+                <div class="tg-bar"><span class="tg-ava" aria-hidden="true">СР</span><span><b>Свежий расчёт</b><small>бот</small></span></div>
                 <div class="tg-chat"><div id="bubble-wrap"></div></div>
               </div>
             </div>
