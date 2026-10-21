@@ -7,7 +7,7 @@
 </head>
 <body>
 <title>Свежий расчёт</title>
-<meta name="description" content="Сервис для пекарен, кафе и магазинов Челябинска: прогноз продаж, план производства и заказа на утро, вечерние скидки и контроль сроков годности в Telegram.">
+<meta name="description" content="Сервис для малого бизнеса Челябинска, который работает со свежими продуктами: прогноз продаж, план производства и заказа на утро, вечерние скидки и контроль сроков годности в Telegram.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400..800&display=swap">
@@ -154,12 +154,13 @@ a { color: inherit; }
 
 /* ---------- для кого ---------- */
 .who-list { border-top: 2px solid var(--ink); }
-.who-row { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1.3fr) 112px minmax(0, 1.6fr); gap: 8px 24px; padding: 18px 0; border-bottom: 1px solid var(--line); align-items: baseline; }
+.who-row { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.2fr) 96px minmax(0, 1.5fr) minmax(0, 1fr); gap: 8px 24px; padding: 18px 0; border-bottom: 1px solid var(--line); align-items: baseline; }
 .who-row.head { font: 600 13px/1.2 var(--f-mono); color: var(--ink-3); padding: 12px 0; }
 .who-row .seg-name { font-weight: 700; font-size: 17px; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
 .who-row .goods { color: var(--ink-2); }
 .who-row .life { font: 700 15px/1.3 var(--f-mono); }
 .who-row .does { color: var(--ink); }
+.who-row .cnt { color: var(--ink-2); font-variant-numeric: tabular-nums; }
 .who-row .tag-demo { font: 600 13px/1 var(--f-mono); background: var(--stamp-soft); color: var(--stamp); padding: 5px 8px; border-radius: 6px; }
 .who-row .mob { display: none; font: 600 13px/1.2 var(--f-mono); color: var(--ink-3); margin-right: 6px; }
 @media (max-width: 760px) {
@@ -389,7 +390,7 @@ footer { padding-block: 32px; font-size: 14px; color: var(--ink-3); }
     <div class="wrap hero-in">
       <div>
         <h1>Готовьте и заказывайте столько, сколько купят</h1>
-        <p class="lead">Для пекарен, кафе и магазинов Челябинска. Каждое утро сервис присылает в Telegram план: сколько испечь, приготовить или заказать. Вечером подсказывает, что уценить, и напоминает о сроках годности.</p>
+        <p class="lead">Для малого бизнеса Челябинска, который работает со свежими продуктами: магазинов у дома, овощных лавок, кафе, столовых, пекарен и кулинарий. Каждое утро сервис присылает в Telegram план: сколько испечь, приготовить или заказать. Вечером подсказывает, что уценить, и напоминает о сроках годности.</p>
         <div class="hero-cta">
           <a class="btn btn-primary" href="#demo">Посмотреть пример</a>
           <a class="btn btn-ghost" href="#pilot" data-bot="start=pilot">Подключить в Telegram</a>
@@ -409,7 +410,7 @@ footer { padding-block: 32px; font-size: 14px; color: var(--ink-3); }
   <section class="section" id="problem">
     <div class="wrap">
       <div class="section-head">
-        <h2>Свежий товар заказывают на глаз, а лишнее выбрасывают</h2>
+        <h2>Еда теряется на последнем шаге: на полке магазина и на кухне кафе</h2>
       </div>
       <div class="facts">
         <div class="fact">
@@ -418,9 +419,9 @@ footer { padding-block: 32px; font-size: 14px; color: var(--ink-3); }
           <p class="src">ЮНЕП, Food Waste Index Report 2024</p>
         </div>
         <div class="fact">
-          <div class="big num">245</div>
-          <p>пекарен работает в Челябинске.</p>
-          <p class="src"><a href="https://2gis.ru/chelyabinsk/search/%D0%9F%D0%B5%D0%BA%D0%B0%D1%80%D0%BD%D0%B8/rubricId/111594" target="_blank" rel="noopener">2ГИС, октябрь 2026</a></p>
+          <div class="big num">2 569</div>
+          <p>продуктовых магазинов в Челябинске и ещё 718 овощных лавок.</p>
+          <p class="src"><a href="https://2gis.ru/chelyabinsk/search/%D0%9F%D1%80%D0%BE%D0%B4%D1%83%D0%BA%D1%82%D0%BE%D0%B2%D1%8B%D0%B5%20%D0%BC%D0%B0%D0%B3%D0%B0%D0%B7%D0%B8%D0%BD%D1%8B" target="_blank" rel="noopener">2ГИС, октябрь 2026</a></p>
         </div>
         <div class="fact">
           <div class="big num">+3%</div>
@@ -434,17 +435,18 @@ footer { padding-block: 32px; font-size: 14px; color: var(--ink-3); }
   <section class="section" id="who" style="padding-top: 0">
     <div class="wrap">
       <div class="section-head">
-        <h2>Кому подходит</h2>
+        <h2>Кому подходит в Челябинске</h2>
       </div>
       <div class="who-list" role="table" aria-label="Кому подходит сервис">
-        <div class="who-row head" role="row"><span role="columnheader">Бизнес</span><span role="columnheader">Что портится</span><span role="columnheader">Срок</span><span role="columnheader">Что считает сервис</span></div>
-        <div class="who-row" role="row"><span class="seg-name" role="cell">Пекарни и кондитерские</span><span class="goods" role="cell"><span class="mob">Портится:</span>хлеб, выпечка, десерты</span><span class="life" role="cell"><span class="mob">Срок:</span>1 день</span><span class="does" role="cell">Сколько испечь и с какого остатка уценять</span></div>
-        <div class="who-row" role="row"><span class="seg-name" role="cell">Кофейни и кулинарии</span><span class="goods" role="cell"><span class="mob">Портится:</span>сэндвичи, салаты, готовые блюда</span><span class="life" role="cell"><span class="mob">Срок:</span>1–3 дня</span><span class="does" role="cell">Сколько приготовить или заказать на день</span></div>
-        <div class="who-row" role="row"><span class="seg-name" role="cell">Магазины у дома</span><span class="goods" role="cell"><span class="mob">Портится:</span>молочка, мясо, готовая еда</span><span class="life" role="cell"><span class="mob">Срок:</span>3–10 дней</span><span class="does" role="cell">Сколько заказать и что уценить до конца срока</span></div>
-        <div class="who-row" role="row"><span class="seg-name" role="cell">Овощные и фермерские лавки</span><span class="goods" role="cell"><span class="mob">Портится:</span>зелень, ягоды, фрукты</span><span class="life" role="cell"><span class="mob">Срок:</span>2–7 дней</span><span class="does" role="cell">Объём закупки с учётом погоды и дня недели</span></div>
-        <div class="who-row" role="row"><span class="seg-name" role="cell">Столовые и кафе</span><span class="goods" role="cell"><span class="mob">Портится:</span>порции, заготовки</span><span class="life" role="cell"><span class="mob">Срок:</span>часы</span><span class="does" role="cell">Сколько порций готовить по дням недели</span></div>
+        <div class="who-row head" role="row"><span role="columnheader">Бизнес</span><span role="columnheader">Что портится</span><span role="columnheader">Срок</span><span role="columnheader">Что считает сервис</span><span role="columnheader">В Челябинске</span></div>
+        <div class="who-row" role="row"><span class="seg-name" role="cell">Пекарни и кондитерские</span><span class="goods" role="cell"><span class="mob">Портится:</span>хлеб, выпечка, десерты</span><span class="life" role="cell"><span class="mob">Срок:</span>1 день</span><span class="does" role="cell">Сколько испечь и с какого остатка уценять</span><span class="cnt" role="cell"><span class="mob">В Челябинске:</span>245 пекарен</span></div>
+        <div class="who-row" role="row"><span class="seg-name" role="cell">Кофейни и кулинарии</span><span class="goods" role="cell"><span class="mob">Портится:</span>сэндвичи, салаты, готовые блюда</span><span class="life" role="cell"><span class="mob">Срок:</span>1–3 дня</span><span class="does" role="cell">Сколько приготовить или заказать на день</span><span class="cnt" role="cell"><span class="mob">В Челябинске:</span>222 кулинарии</span></div>
+        <div class="who-row" role="row"><span class="seg-name" role="cell">Магазины у дома</span><span class="goods" role="cell"><span class="mob">Портится:</span>молочка, мясо, готовая еда</span><span class="life" role="cell"><span class="mob">Срок:</span>3–10 дней</span><span class="does" role="cell">Сколько заказать и что уценить до конца срока</span><span class="cnt" role="cell"><span class="mob">В Челябинске:</span>2 569 магазинов</span></div>
+        <div class="who-row" role="row"><span class="seg-name" role="cell">Овощные и фермерские лавки</span><span class="goods" role="cell"><span class="mob">Портится:</span>зелень, ягоды, фрукты</span><span class="life" role="cell"><span class="mob">Срок:</span>2–7 дней</span><span class="does" role="cell">Объём закупки с учётом погоды и дня недели</span><span class="cnt" role="cell"><span class="mob">В Челябинске:</span>718 лавок</span></div>
+        <div class="who-row" role="row"><span class="seg-name" role="cell">Столовые и кафе</span><span class="goods" role="cell"><span class="mob">Портится:</span>порции, заготовки</span><span class="life" role="cell"><span class="mob">Срок:</span>часы</span><span class="does" role="cell">Сколько порций готовить по дням недели</span><span class="cnt" role="cell"><span class="mob">В Челябинске:</span>428 кафе, 336 столовых</span></div>
       </div>
       <p class="who-note">Для товаров со сроком до 2 дней сервис работает уже сейчас. Заказ товаров со сроком в несколько дней с учётом остатков и поставок в разработке.</p>
+      <p class="src" style="margin-top:8px">Число мест в рубриках 2ГИС на октябрь 2026, сетевые точки тоже входят.</p>
     </div>
   </section>
 
@@ -574,7 +576,7 @@ footer { padding-block: 32px; font-size: 14px; color: var(--ink-3); }
     <div class="wrap">
       <div class="section-head">
         <h2>Сколько вы сэкономите</h2>
-        <p class="lead">По умолчанию стоят цифры небольшой пекарни.</p>
+        <p class="lead">По умолчанию стоят цифры небольшого кафе или пекарни.</p>
       </div>
       <div class="calc">
         <div class="calc-in">
@@ -600,7 +602,7 @@ footer { padding-block: 32px; font-size: 14px; color: var(--ink-3); }
         <div class="calc-out" aria-live="polite">
           <div class="row"><span>Сейчас теряете на просрочке в месяц</span><b id="r-loss" class="num"></b></div>
           <div class="row"><span>Сэкономите в месяц</span><b id="r-save" class="num"></b></div>
-          <div class="row"><span>Подписка</span><b class="num">3 500 ₽</b></div>
+          <div class="row"><span>Подписка</span><b class="num">5 999 ₽</b></div>
           <div>
             <span style="opacity:.75">Чистая выгода в месяц</span>
             <div class="hero-num num" id="r-net"></div>
@@ -629,7 +631,7 @@ footer { padding-block: 32px; font-size: 14px; color: var(--ink-3); }
         </div>
         <div class="plan-card main">
           <h3>Точка</h3>
-          <div class="price">3 500 ₽ <small>в месяц</small></div>
+          <div class="price">5 999 ₽ <small>в месяц</small></div>
           <ul>
             <li>Всё, что в пилоте</li>
             <li>Загрузка продаж из кассы</li>
@@ -646,7 +648,7 @@ footer { padding-block: 32px; font-size: 14px; color: var(--ink-3); }
     <div class="wrap">
       <div class="section-head"><h2>Вопросы</h2></div>
       <div class="faq">
-        <details><summary>Подойдёт, если у меня не пекарня?</summary><p>Да, если товар портится за несколько дней: кофейня, кулинария, столовая, магазин у дома, овощная лавка.</p></details>
+        <details><summary>Подойдёт моему бизнесу?</summary><p>Да, если вы продаёте или готовите еду, которая портится за несколько дней: магазин у дома, овощная лавка, кафе, столовая, пекарня, кулинария.</p></details>
         <details><summary>Нужна специальная касса?</summary><p>Нет. Хватит выгрузки продаж в Excel или CSV: дата, товар, продано.</p></details>
         <details><summary>Сколько нужно данных?</summary><p>Достаточно 4 недель продаж. Дальше прогноз уточняется каждый день.</p></details>
         <details><summary>Почему иногда советует сделать меньше обычного?</summary><p>Если остаток обходится дороже, чем упущенная продажа, выгоднее делать впритык.</p></details>
@@ -658,7 +660,7 @@ footer { padding-block: 32px; font-size: 14px; color: var(--ink-3); }
   <section class="section pilot" id="pilot">
     <div class="wrap pilot-in">
       <div>
-        <h2>Первый месяц бесплатно для заведений Челябинска</h2>
+        <h2>Первый месяц бесплатно для бизнеса в Челябинске</h2>
         <p class="lead">Через месяц сравним, сколько вы списывали до и после.</p>
         <div class="pilot-cta" id="pilot-cta"></div>
         <p class="pilot-kab">То же самое есть в личном кабинете на сайте. <a href="kabinet.html">Открыть пример кабинета</a></p>
@@ -1225,7 +1227,7 @@ var DEMO_CSV = "дата;товар;испечено;продано;законч
 
   /* ---------------- калькулятор ---------------- */
   var DEMO_CUT = null;
-  var SUBSCRIPTION = 3500; // ₽ в месяц за точку
+  var SUBSCRIPTION = 5999; // ₽ в месяц за точку
   function renderCalc() {
     var rev = +$("c-rev").value, w = +$("c-waste").value / 100, cost = +$("c-cost").value / 100, cut = +$("c-cut").value / 100, days = 30;
     $("o-rev").textContent = money(rev); $("o-waste").textContent = Math.round(w * 100) + "%";

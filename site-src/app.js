@@ -301,7 +301,7 @@
 
   /* ---------------- калькулятор ---------------- */
   var DEMO_CUT = null;
-  var SUBSCRIPTION = 3500; // ₽ в месяц за точку
+  var SUBSCRIPTION = 5999; // ₽ в месяц за точку
   function renderCalc() {
     var rev = +$("c-rev").value, w = +$("c-waste").value / 100, cost = +$("c-cost").value / 100, cut = +$("c-cut").value / 100, days = 30;
     $("o-rev").textContent = money(rev); $("o-waste").textContent = Math.round(w * 100) + "%";
