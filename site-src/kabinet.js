@@ -69,6 +69,39 @@
       return { product: r.product, qty: q, mean: m, sd: r.sd, reasons: r.reasons, "new": r.n === 0, threshold: M.eveningThreshold({ mean: m }) };
     }
     function sale(day, product) { for (var i = 0; i < D.sales.length; i++) if (D.sales[i].day === day && D.sales[i].product === product) return D.sales[i]; return null; }
+    function productList() {
+      var hist = {}, pm = prodMap(true);
+      D.sales.forEach(function (s) { (hist[s.product] = hist[s.product] || {})[s.day] = 1; });
+      return Object.keys(pm).map(function (k) {
+        var p = pm[k];
+        return { name: k, price: p.price, cost: p.cost, shelf_life: p.shelf_life == null ? null : p.shelf_life, default_qty: p.default_qty == null ? null : p.default_qty, history_days: hist[k] ? Object.keys(hist[k]).length : 0 };
+      }).sort(function (a, b) { return a.name.toLowerCase() < b.name.toLowerCase() ? -1 : 1; });
+    }
+    function batchList(T) {
+      return D.batches.filter(function (b) { return b.status === "active"; }).sort(function (a, b) { return a.exp - b.exp || a.id - b.id; }).map(function (b) {
+        var st = M.expiryStatus(b.exp, T);
+        return { id: b.id, item: b.item, qty: b.qty, expires: M.diso(b.exp), label: st.label, left: st.left, level: st.left <= 0 ? "bad" : st.left <= 2 ? "warn" : "ok",
+                 tip: st.left <= 1 ? (st.left < 0 ? "спишите" : M.expiryTip(b.item)) : null };
+      });
+    }
+    function sheet() {
+      var T = today(), days = [], week = {}, sum = function (q) { return q.reduce(function (x, y) { return x + y; }, 0); };
+      for (var i = 0; i < 7; i++) {
+        days.push(M.diso(T + i));
+        recs(T + i).recs.forEach(function (r) {
+          var fixed = i === 0 && D.plans[T] && D.plans[T][r.product];
+          (week[r.product] = week[r.product] || [0, 0, 0, 0, 0, 0, 0])[i] = fixed ? fixed.qty : r.qty;
+        });
+      }
+      return {
+        today: M.diso(T), products: productList(), batches: batchList(T),
+        sales: D.sales.map(function (s) {
+          return { day: M.diso(s.day), product: s.product, baked: s.baked == null ? null : s.baked, sold: s.sold, soldout: s.soldout || null,
+                   rain: s.rain == null ? null : s.rain, temp: s.temp == null ? null : s.temp };
+        }),
+        week: { days: days, rows: Object.keys(week).map(function (k) { return { product: k, qty: week[k] }; }).sort(function (a, b) { return sum(b.qty) - sum(a.qty); }) }
+      };
+    }
     function state() {
       var now = new Date(), T = today(), m = now.getHours() * 60 + now.getMinutes();
       Object.keys(D.plans).forEach(function (k) { if (+k < T - 14) delete D.plans[k]; });
@@ -82,19 +115,8 @@
       }).sort(function (a, b) { return b.qty - a.qty; });
       var rm = recs(T + 1);
       var tom = rm.recs.map(function (r) { var it = item(r); it.habit = rm.habit[r.product] != null ? Math.round(rm.habit[r.product]) : null; return it; });
-      var hist = {};
-      D.sales.forEach(function (s) { (hist[s.product] = hist[s.product] || {})[s.day] = 1; });
-      var pm = prodMap(true);
-      var products = Object.keys(pm).map(function (k) {
-        var p = pm[k];
-        return { name: k, price: p.price, cost: p.cost, shelf_life: p.shelf_life == null ? null : p.shelf_life, default_qty: p.default_qty == null ? null : p.default_qty, history_days: hist[k] ? Object.keys(hist[k]).length : 0 };
-      }).sort(function (a, b) { return a.name.toLowerCase() < b.name.toLowerCase() ? -1 : 1; });
+      var products = productList(), batches = batchList(T);
       var removed = Object.keys(D.products).filter(function (k) { return !D.products[k].active; }).sort();
-      var batches = D.batches.filter(function (b) { return b.status === "active"; }).sort(function (a, b) { return a.exp - b.exp || a.id - b.id; }).map(function (b) {
-        var st = M.expiryStatus(b.exp, T);
-        return { id: b.id, item: b.item, qty: b.qty, expires: M.diso(b.exp), label: st.label, left: st.left, level: st.left <= 0 ? "bad" : st.left <= 2 ? "warn" : "ok",
-                 tip: st.left <= 1 ? (st.left < 0 ? "спишите" : M.expiryTip(b.item)) : null };
-      });
       var days = D.sales.map(function (s) { return s.day; });
       if (!btCache || btCache.n !== D.sales.length) {
         var bt = D.sales.length ? M.backtest(D.sales, prodMap(false)) : null;
@@ -154,6 +176,25 @@
           var s = sale(T, pr), sold = so ? baked : Math.max(0, baked - left);
           if (s) { s.sold = sold; s.baked = baked; s.soldout = so; } else D.sales.push({ day: T, product: pr, sold: sold, baked: baked, soldout: so, rain: weather(T).rain, temp: weather(T).temp });
           btCache = null;
+        } else if (path === "/api/sales") {
+          var TIME = /^([01]?\d|2[0-3]):[0-5]\d$/, ups = (b.upsert || []).map(function (x) {
+            var pr = name(x.product, "товар"), sold = num(x.sold, 0, 1e5), bk = num(x.baked, 0, 1e5);
+            if (sold == null) throw new Error(pr + ": не указано, сколько продано");
+            if (bk != null && sold > bk) throw new Error(pr + ": продано больше, чем испечено");
+            if (x.soldout && !TIME.test(x.soldout)) throw new Error("время в формате 15:30");
+            return { day: M.dnum(x.day), product: pr, sold: sold, baked: bk, soldout: x.soldout || null, rain: x.rain == null ? null : !!x.rain, temp: num(x.temp, -60, 50) };
+          });
+          var gone = {};
+          (b["delete"] || []).forEach(function (x) { gone[M.dnum(x.day) + "|" + x.product] = 1; });
+          D.sales = D.sales.filter(function (x) { return !gone[x.day + "|" + x.product]; });
+          var at = {};
+          D.sales.forEach(function (x, i) { at[x.day + "|" + x.product] = i; });
+          ups.forEach(function (x) { var k = x.day + "|" + x.product; if (k in at) D.sales[at[k]] = x; else { at[k] = D.sales.length; D.sales.push(x); } });
+          btCache = null;
+        } else if (path === "/api/batch/edit") {
+          var bi = name(b.item, "продукт"), be = b.expires ? M.dnum(b.expires) : null;
+          if (be == null || isNaN(be)) throw new Error("годен до: нужна дата");
+          D.batches.forEach(function (x) { if (x.id === +b.id) { x.item = bi; x.qty = String(b.qty || "").trim().slice(0, 20); x.exp = be; } });
         } else if (path === "/api/event") {
           var f = num(b.factor, 0.3, 3);
           if (!f || Math.abs(f - 1) < 1e-9) delete D.events[T + 1]; else D.events[T + 1] = f;
@@ -183,7 +224,7 @@
       save();
       return Promise.resolve({ ok: true });
     }
-    return { load: load, state: function () { return Promise.resolve(state()); }, act: act, reset: example };
+    return { load: load, state: function () { return Promise.resolve(state()); }, sheet: sheet, act: act, reset: example };
   })();
   function LoginNeeded() { this.login = true; }
   var API = {
@@ -198,6 +239,14 @@
     state: function () {
       if (this.mode === "local") return Local.state();
       return fetch("api/state", { cache: "no-store", credentials: "same-origin" }).then(function (r) {
+        if (r.status === 401) throw new LoginNeeded();
+        if (!r.ok) throw new Error("Сервер ответил " + r.status);
+        return r.json();
+      });
+    },
+    sheet: function () {
+      if (this.mode === "local") { try { return Promise.resolve(Local.sheet()); } catch (e) { return Promise.reject(e); } }
+      return fetch("api/sheet", { cache: "no-store", credentials: "same-origin" }).then(function (r) {
         if (r.status === 401) throw new LoginNeeded();
         if (!r.ok) throw new Error("Сервер ответил " + r.status);
         return r.json();
@@ -445,9 +494,33 @@
     return h;
   }
 
+  function viewTables() {
+    var host = $("sheets");
+    if (S.sheets && host && host === S.sheets.el) return;
+    $("view").innerHTML = '<div class="card"><h2>Таблицы</h2><p class="sub">Все данные в одном месте, как в Excel: продажи по дням, товары, сроки годности и план на неделю. Правки сразу учитываются в прогнозе. Можно вставлять прямо из Excel и скачивать обратно.</p><div id="sheets" style="margin-top:14px"></div></div>';
+    S.sheets = new Sheets($("sheets"), sheetAdapter);
+    S.sheets.load();
+  }
+  function touched(r) { S.dirty = true; return r; }
+  function unlogged(e) { if (e && e.login) showLogin(); throw e; }
+  var sheetAdapter = {
+    today: null,
+    load: function () { return API.sheet().then(function (d) { sheetAdapter.today = d.today; return d; }).catch(unlogged); },
+    saveSales: function (up, del) { return API.post("/api/sales", { upsert: up, "delete": del }).then(touched).catch(unlogged); },
+    saveProduct: function (p, oldName) { var body = Object.assign({}, p); if (oldName) body.old_name = oldName; return API.post("/api/product", body).then(touched).catch(unlogged); },
+    removeProduct: function (n) { return API.post("/api/product/remove", { name: n }).then(touched).catch(unlogged); },
+    addBatch: function (b) { var body = { item: b.item, qty: b.qty, made: b.made }; if (b.expires) body.expires = b.expires; return API.post("/api/batch", body).then(touched).catch(unlogged); },
+    editBatch: function (b) { return API.post("/api/batch/edit", b).then(touched).catch(unlogged); },
+    deleteBatch: function (id) { return API.post("/api/batch/close", { id: id, status: "deleted" }).then(touched).catch(unlogged); },
+    upload: function (text) { return API.post("/api/upload", { csv: text }).then(touched).catch(unlogged); },
+    toast: function (m) { toast(m); }
+  };
+
   function render() {
     if (!S.st) return;
     renderTop(); renderDay(); renderTabs();
+    if (S.tab === "tables") { viewTables(); return; }
+    S.sheets = null;
     var v = "";
     if (S.tab === "today") v = S.part === "vitrina" ? viewVitrina() : S.part === "itogi" ? viewItogi() : viewPlan();
     else if (S.tab === "tomorrow") v = viewTomorrow();
@@ -495,8 +568,16 @@
   document.addEventListener("click", function (e) {
     var t = e.target.closest("[data-act],[data-part],[data-tab]");
     if (!t) return;
-    if (t.hasAttribute("data-tab")) { S.tab = t.getAttribute("data-tab"); S.edit = null; S.confirm = null; render(); return; }
-    if (t.hasAttribute("data-part")) { S.part = t.getAttribute("data-part"); S.partManual = true; S.tab = "today"; render(); return; }
+    if (t.hasAttribute("data-tab")) {
+      S.tab = t.getAttribute("data-tab"); S.edit = null; S.confirm = null;
+      if (S.dirty) { S.dirty = false; refresh(true); } else render();
+      return;
+    }
+    if (t.hasAttribute("data-part")) {
+      S.part = t.getAttribute("data-part"); S.partManual = true; S.tab = "today";
+      if (S.dirty) { S.dirty = false; refresh(true); } else render();
+      return;
+    }
     var a = t.getAttribute("data-act"), p = t.getAttribute("data-p");
     if (a === "logout") { API.post("/api/logout").catch(function () {}).then(function () { S.st = null; showLogin(); }); }
     else if (a === "reset") { Local.reset(); S.vitrina = {}; refresh(true).then(function () { toast("Пример восстановлен"); }); }

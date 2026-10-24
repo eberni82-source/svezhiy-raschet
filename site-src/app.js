@@ -18,7 +18,13 @@
     var last = Math.max.apply(null, r.sales.map(function (s) { return s.day; }));
     var shift = (TODAY - 1) - last;
     r.sales.forEach(function (s) { s.day += shift; });
+    Object.keys(r.products).forEach(function (k) { r.products[k].shelf_life = k === "Эклер" || k === "Сэндвич с курицей" ? 2 : 1; });
     return r;
+  }
+  var toastT = null;
+  function toast(msg) {
+    var t = $("toast"); t.textContent = msg; t.hidden = false;
+    clearTimeout(toastT); toastT = setTimeout(function () { t.hidden = true; }, 2800);
   }
   var uid = 0;
   function demoBatches() {
@@ -29,7 +35,7 @@
   var DEMO = loadDemo();
   var WX = {}; // прогноз для Челябинска по дням
   var S = { data: DEMO, source: "demo", fileName: "", dayIdx: 1, rain: false, temp: "fc", event: 1, tab: "plan", sel: null,
-            msg: "morning", batches: demoBatches(), err: "" };
+            msg: "morning", batches: demoBatches(), err: "", hidden: {} };
 
   function lastDay(data) { return Math.max.apply(null, data.sales.map(function (s) { return s.day; })); }
   function baseDay() { return S.source === "demo" ? TODAY : lastDay(S.data) + 1; }
@@ -46,6 +52,7 @@
     var p = {};
     Object.keys(data.products).forEach(function (k) { p[k] = data.products[k]; });
     data.sales.forEach(function (s) { if (!p[s.product]) p[s.product] = { name: s.product, price: null, cost: null }; });
+    Object.keys(S.hidden).forEach(function (k) { delete p[k]; });
     return p;
   }
   function compute(data, day, rain, event, temp) {
@@ -235,6 +242,7 @@
     return '<div class="bt-bar"><span>' + label + '</span><div class="track"><div class="fill ' + cls + '" style="width:' + (max ? Math.max(1, v / max * 100) : 0).toFixed(1) + '%"></div></div><span class="v">' + money(v) + "</span></div>";
   }
   function renderBacktest() {
+    S.btStale = false;
     var b = M.backtest(S.data.sales, S.data.products);
     if (!b) {
       $("bt").innerHTML = '<div class="empty">Чтобы сравнить «как было» и «как посоветовала бы модель», нужна колонка <span class="mono">испечено</span> или <span class="mono">заказано</span> в файле.</div>';
@@ -297,12 +305,99 @@
   }
 
   function renderTabs() {
-    ["plan", "exp", "bt"].forEach(function (t) {
+    ["plan", "exp", "bt", "sheets"].forEach(function (t) {
       $("tab-" + t).setAttribute("aria-selected", String(S.tab === t));
       $("pane-" + t).hidden = S.tab !== t;
     });
+    document.querySelector(".console-body").classList.toggle("wide", S.tab === "sheets");
     if (S.tab === "plan") renderChart();
+    if (S.tab === "bt" && S.btStale) renderBacktest();
+    if (S.tab === "sheets") {
+      if (!S.sheets) S.sheets = new Sheets($("sheets"), sheetAdapter);
+      S.sheets.load();
+    }
   }
+
+  /* ---------------- таблицы ---------------- */
+  var redrawT = null;
+  function dataChanged() {
+    clearTimeout(redrawT);
+    S.btStale = true;
+    redrawT = setTimeout(function () { renderNote(); renderTemp(); renderPlan(); renderBatches(); renderPhone(); if (S.source === "demo") renderTicket(); }, 30);
+    return Promise.resolve();
+  }
+  function salesIndex() { var at = {}; S.data.sales.forEach(function (s, i) { at[s.day + "|" + s.product] = i; }); return at; }
+  var sheetAdapter = {
+    today: null,
+    toast: toast,
+    load: function () {
+      var base = baseDay(), prods = allProducts(S.data), hist = {}, week = {}, days = [];
+      sheetAdapter.today = M.diso(S.source === "demo" ? TODAY : base - 1);
+      S.data.sales.forEach(function (s) { (hist[s.product] = hist[s.product] || {})[s.day] = 1; });
+      for (var i = 0; i < 7; i++) {
+        var d = base + i;
+        days.push(M.diso(d));
+        compute(S.data, d, false, 1, tempFor(d)).recs.forEach(function (r) { (week[r.product] = week[r.product] || [0, 0, 0, 0, 0, 0, 0])[i] = r.qty; });
+      }
+      var total = function (q) { return q.reduce(function (x, y) { return x + y; }, 0); };
+      return Promise.resolve({
+        today: sheetAdapter.today,
+        sales: S.data.sales.map(function (s) {
+          return { day: M.diso(s.day), product: s.product, baked: s.baked == null ? null : s.baked, sold: s.sold, soldout: s.soldout || null,
+                   rain: s.rain == null ? null : s.rain, temp: s.temp == null ? null : s.temp };
+        }),
+        products: Object.keys(prods).map(function (k) {
+          var p = prods[k];
+          return { name: k, price: p.price == null ? null : p.price, cost: p.cost == null ? null : p.cost, shelf_life: p.shelf_life == null ? null : p.shelf_life,
+                   default_qty: p.default_qty == null ? null : p.default_qty, history_days: hist[k] ? Object.keys(hist[k]).length : 0 };
+        }),
+        batches: S.batches.slice().sort(function (a, b) { return a.exp - b.exp || a.id - b.id; }).map(function (b) {
+          var st = M.expiryStatus(b.exp, TODAY);
+          return { id: b.id, item: b.item, qty: b.qty, expires: M.diso(b.exp), label: st.label, level: st.level, tip: st.left <= 1 ? (st.left < 0 ? "спишите" : M.expiryTip(b.item)) : null };
+        }),
+        week: { days: days, rows: Object.keys(week).map(function (k) { return { product: k, qty: week[k] }; }).sort(function (a, b) { return total(b.qty) - total(a.qty); }) }
+      });
+    },
+    saveSales: function (up, del) {
+      var gone = {};
+      del.forEach(function (x) { gone[M.dnum(x.day) + "|" + x.product] = 1; });
+      S.data.sales = S.data.sales.filter(function (s) { return !gone[s.day + "|" + s.product]; });
+      var at = salesIndex();
+      up.forEach(function (x) {
+        var s = { day: M.dnum(x.day), product: x.product, sold: x.sold, baked: x.baked, soldout: x.soldout, rain: x.rain, temp: x.temp }, k = s.day + "|" + s.product;
+        if (k in at) S.data.sales[at[k]] = s; else { at[k] = S.data.sales.length; S.data.sales.push(s); }
+      });
+      return dataChanged();
+    },
+    saveProduct: function (p, oldName) {
+      if (oldName && oldName !== p.name) {
+        S.data.sales.forEach(function (s) { if (s.product === oldName) s.product = p.name; });
+        delete S.data.products[oldName];
+      }
+      delete S.hidden[p.name];
+      S.data.products[p.name] = { name: p.name, price: p.price, cost: p.cost, shelf_life: p.shelf_life, default_qty: p.default_qty };
+      return dataChanged();
+    },
+    removeProduct: function (n) { S.hidden[n] = true; return dataChanged(); },
+    addBatch: function (b) {
+      var exp = b.expires ? M.dnum(b.expires) : null, p = allProducts(S.data)[b.item];
+      if (exp == null) {
+        if (!p || !p.shelf_life) return Promise.reject(new Error("Укажите «годен до»"));
+        exp = TODAY + p.shelf_life;
+      }
+      S.batches.push({ id: ++uid, item: b.item, qty: b.qty || "", exp: exp });
+      return dataChanged();
+    },
+    editBatch: function (b) {
+      S.batches.forEach(function (x) { if (x.id === b.id) { x.item = b.item; x.qty = b.qty; x.exp = M.dnum(b.expires); } });
+      return dataChanged();
+    },
+    deleteBatch: function (id) { S.batches = S.batches.filter(function (x) { return x.id !== id; }); return dataChanged(); },
+    upload: function (text) {
+      try { useFile(text, "Файл из таблицы"); } catch (e) { return Promise.reject(e); }
+      return Promise.resolve({ rows: S.data.sales.length });
+    }
+  };
   function renderAll() {
     renderNote(); renderDays(); renderTemp(); renderPlan(); renderBatches(); renderBacktest(); renderPhone(); renderTabs();
     $("w-dry").setAttribute("aria-pressed", String(!S.rain)); $("w-rain").setAttribute("aria-pressed", String(S.rain));
@@ -337,7 +432,12 @@
   $("event").addEventListener("change", function () { S.event = +this.value; renderPlan(); renderPhone(); });
   $("w-dry").addEventListener("click", function () { S.rain = false; renderAll(); });
   $("w-rain").addEventListener("click", function () { S.rain = true; renderAll(); });
-  $("src-demo").addEventListener("click", function () { S.data = DEMO; S.source = "demo"; S.err = ""; S.dayIdx = 1; S.sel = null; renderAll(); });
+  $("src-demo").addEventListener("click", function () { S.data = DEMO; S.source = "demo"; S.err = ""; S.dayIdx = 1; S.sel = null; S.hidden = {}; renderAll(); });
+  function useFile(text, fileName) {
+    var d = M.parseCSV(text);
+    S.data = d; S.source = "file"; S.fileName = fileName; S.err = ""; S.dayIdx = 0; S.sel = null; S.hidden = {};
+    renderAll();
+  }
   $("file").addEventListener("change", function () {
     var f = this.files && this.files[0];
     if (!f) return;
@@ -345,16 +445,13 @@
     rd.onload = function () {
       var buf = rd.result, text;
       try { text = new TextDecoder("utf-8", { fatal: true }).decode(buf); } catch (e) { text = new TextDecoder("windows-1251").decode(buf); }
-      try {
-        var d = M.parseCSV(text);
-        S.data = d; S.source = "file"; S.fileName = f.name; S.err = ""; S.dayIdx = 0; S.sel = null;
-      } catch (e) { S.err = e.message; }
+      try { useFile(text, f.name); } catch (e) { S.err = e.message; }
       renderAll();
     };
     rd.readAsArrayBuffer(f);
     this.value = "";
   });
-  ["plan", "exp", "bt"].forEach(function (t) { $("tab-" + t).addEventListener("click", function () { S.tab = t; renderTabs(); }); });
+  ["plan", "exp", "bt", "sheets"].forEach(function (t) { $("tab-" + t).addEventListener("click", function () { S.tab = t; renderTabs(); }); });
   ["morning", "evening", "closing"].forEach(function (m) { $("m-" + m).addEventListener("click", function () { S.msg = m; renderAll(); }); });
   $("plan-table").addEventListener("click", function (e) {
     var tr = e.target.closest("tr[data-p]"); if (!tr) return;

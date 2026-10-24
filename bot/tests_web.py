@@ -119,6 +119,26 @@ s = req("GET", "/api/state")
 check(r["rows"] == 19 and [p["name"] for p in s["products"]] == ["Кефир 1%"] and not s["business"]["is_example"],
       "свой CSV заменил пример")
 
+# таблицы: продажи, партии, план на неделю
+sh = req("GET", "/api/sheet")
+check(len(sh["sales"]) == 19 and len(sh["week"]["days"]) == 7 and sh["week"]["rows"][0]["product"] == "Кефир 1%", "лист с продажами и планом на неделю")
+req("POST", "/api/sales", {"upsert": [{"day": "2026-10-20", "product": "Кефир 1%", "sold": 15, "baked": 18, "soldout": None, "rain": True, "temp": -3.5}],
+                           "delete": [{"day": "2026-10-01", "product": "Кефир 1%"}]})
+sh = req("GET", "/api/sheet")
+row = [x for x in sh["sales"] if x["day"] == "2026-10-20"]
+check(len(sh["sales"]) == 19 and row and row[0]["rain"] is True and row[0]["temp"] == -3.5 and not any(x["day"] == "2026-10-01" for x in sh["sales"]),
+      "строка добавлена, другая удалена")
+req("POST", "/api/sales", {"upsert": [{"day": "2026-10-20", "product": "Кефир 1%", "sold": 15, "baked": 18, "rain": None, "temp": None}]})
+row = [x for x in req("GET", "/api/sheet")["sales"] if x["day"] == "2026-10-20"][0]
+check(row["rain"] is None and row["temp"] is None, "очищенные ячейки сохраняются пустыми")
+req("POST", "/api/sales", {"upsert": [{"day": "2026-10-21", "product": "Кефир 1%", "sold": 30, "baked": 18}]}, expect=400)
+req("POST", "/api/sales", {"upsert": [{"day": "21.10.2026", "product": "Кефир 1%", "sold": 3}]}, expect=400)
+req("POST", "/api/batch", {"item": "Сливки 33%", "qty": "2 л", "expires": "2026-12-01"})
+bid = [x for x in req("GET", "/api/sheet")["batches"] if x["item"] == "Сливки 33%"][0]["id"]
+req("POST", "/api/batch/edit", {"id": bid, "item": "Сливки 20%", "qty": "3 л", "expires": "2026-12-05"})
+bt = [x for x in req("GET", "/api/sheet")["batches"] if x["id"] == bid][0]
+check(bt["item"] == "Сливки 20%" and bt["qty"] == "3 л" and bt["expires"] == "2026-12-05", "партия изменена из таблицы")
+
 # бот видит то же, что кабинет
 bot.db.set_chat(CID, is_demo=0)
 recs, _ = bot.recommendations(bot.db.chat(CID), bot.today(bot.db.chat(CID)))

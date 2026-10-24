@@ -17,7 +17,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from .csv_import import ImportErrorRu, parse_csv
-from .forecast import Product, Recommendation, backtest, evening_threshold, expiry_status, expiry_tip
+from .forecast import Product, Recommendation, Sale, backtest, evening_threshold, expiry_status, expiry_tip
 
 log = logging.getLogger("web")
 KABINET_HTML: str | None = None   # однофайловая версия бота подставляет сюда страницу кабинета
@@ -52,6 +52,13 @@ def _wnum(v, lo=None, hi=None, integer=False):
     if math.isnan(x) or (lo is not None and x < lo) or (hi is not None and x > hi):
         raise ValueError(f"значение вне диапазона: {v}")
     return int(round(x)) if integer else x
+
+
+def _wdate(v, field="дата") -> date:
+    try:
+        return date.fromisoformat(str(v or ""))
+    except ValueError:
+        raise ValueError(f"{field}: нужна дата")
 
 
 def _wname(v, field="название") -> str:
@@ -91,6 +98,31 @@ class Cabinet:
         self._bt_cache[cid] = (key, res)
         return res
 
+    def _products(self, cid: int) -> list[dict]:
+        db = self.bot.db
+        hist = db.history_days(cid)
+        products = [{"name": p.name, "price": p.price, "cost": p.cost, "shelf_life": p.shelf_life,
+                     "default_qty": p.default_qty, "history_days": hist.get(p.name, 0)}
+                    for p in db.products(cid).values()]
+        known = {p["name"] for p in products}
+        for name in sorted(hist):  # позиции из продаж без карточки товара
+            if name not in known and name not in db.inactive_products(cid):
+                products.append({"name": name, "price": None, "cost": None, "shelf_life": None,
+                                 "default_qty": None, "history_days": hist[name]})
+        products.sort(key=lambda p: p["name"].lower())
+        return products
+
+    def _batches(self, cid: int, today: date) -> list[dict]:
+        batches = []
+        for x in self.bot.db.batches(cid):
+            exp = date.fromisoformat(x["expires"])
+            st, left = expiry_status(exp, today)
+            level = "bad" if left <= 0 else "warn" if left <= 2 else "ok"
+            batches.append({"id": x["id"], "item": x["item"], "qty": x["qty"], "expires": x["expires"],
+                            "label": st, "left": left, "level": level,
+                            "tip": ("спишите" if left < 0 else expiry_tip(x["item"])) if left <= 1 else None})
+        return batches
+
     def state(self, chat) -> dict:
         b, db = self.bot, self.bot.db
         cid = chat["chat_id"]
@@ -120,25 +152,8 @@ class Cabinet:
         tom = [dict(self._item(r), habit=round(info_m["habit"][r.product]) if r.product in info_m["habit"] else None)
                for r in recs_m]
 
-        hist = db.history_days(cid)
-        products = [{"name": p.name, "price": p.price, "cost": p.cost, "shelf_life": p.shelf_life,
-                     "default_qty": p.default_qty, "history_days": hist.get(p.name, 0)}
-                    for p in db.products(cid).values()]
-        known = {p["name"] for p in products}
-        for name in sorted(hist):  # позиции из продаж без карточки товара
-            if name not in known and name not in db.inactive_products(cid):
-                products.append({"name": name, "price": None, "cost": None, "shelf_life": None,
-                                 "default_qty": None, "history_days": hist[name]})
-        products.sort(key=lambda p: p["name"].lower())
-
-        batches = []
-        for x in db.batches(cid):
-            exp = date.fromisoformat(x["expires"])
-            st, left = expiry_status(exp, today)
-            level = "bad" if left <= 0 else "warn" if left <= 2 else "ok"
-            batches.append({"id": x["id"], "item": x["item"], "qty": x["qty"], "expires": x["expires"],
-                            "label": st, "left": left, "level": level,
-                            "tip": ("спишите" if left < 0 else expiry_tip(x["item"])) if left <= 1 else None})
+        products = self._products(cid)
+        batches = self._batches(cid, today)
 
         sales = db.sales(cid)
         days = sorted({s.day for s in sales})
@@ -160,6 +175,24 @@ class Cabinet:
                      "last": days[-1].isoformat() if days else None},
             "summary": self._summary(cid),
         }
+
+    def sheet(self, chat) -> dict:
+        """Данные для таблиц кабинета: продажи, товары, партии и план на 7 дней."""
+        b, db = self.bot, self.bot.db
+        cid = chat["chat_id"]
+        today = b.today(chat)
+        sales = [{"day": s.day.isoformat(), "product": s.product, "baked": s.baked, "sold": s.sold,
+                  "soldout": s.soldout, "rain": s.rain, "temp": s.temp} for s in db.sales(cid)]
+        days = [today + timedelta(days=i) for i in range(7)]
+        fixed = {r["product"]: r["qty"] for r in db.plan(cid, today)}
+        week: dict[str, list[int]] = {}
+        for i, d in enumerate(days):
+            recs, _ = b.recommendations(chat, d)
+            for r in recs:
+                week.setdefault(r.product, [0] * 7)[i] = fixed.get(r.product, r.qty) if i == 0 else r.qty
+        rows = [{"product": p, "qty": q} for p, q in sorted(week.items(), key=lambda kv: -sum(kv[1]))]
+        return {"today": today.isoformat(), "sales": sales, "products": self._products(cid),
+                "batches": self._batches(cid, today), "week": {"days": [d.isoformat() for d in days], "rows": rows}}
 
     def act(self, chat, path: str, body: dict) -> dict:
         b, db = self.bot, self.bot.db
@@ -196,6 +229,36 @@ class Cabinet:
             if status not in ("used", "written_off", "deleted"):
                 raise ValueError("неизвестное действие")
             db.close_batch(cid, int(body.get("id")), status)
+            return {"ok": True}
+        if path == "/api/sales":
+            ups, dels = body.get("upsert") or [], body.get("delete") or []
+            if len(ups) + len(dels) > 20000:
+                raise ValueError("слишком много строк за раз, загрузите файлом")
+            rows = []
+            for x in ups:
+                product = _wname(x.get("product"), "товар")
+                sold = _wnum(x.get("sold"), 0, 1e5)
+                if sold is None:
+                    raise ValueError(f"{product}: не указано, сколько продано")
+                baked = _wnum(x.get("baked"), 0, 1e5)
+                if baked is not None and sold > baked:
+                    raise ValueError(f"{product}: продано больше, чем испечено")
+                soldout = x.get("soldout") or None
+                if soldout and not TIME_RE.match(soldout):
+                    raise ValueError("время в формате 15:30")
+                rain = x.get("rain")
+                rows.append(Sale(_wdate(x.get("day")), product, sold, baked, soldout,
+                                 None if rain is None else bool(rain), _wnum(x.get("temp"), -60, 50)))
+            for x in dels:
+                db.delete_sale(cid, _wdate(x.get("day")), _wname(x.get("product"), "товар"))
+            for s in rows:
+                db.put_sale(cid, s)
+            db.db.commit()
+            self._bt_cache.pop(cid, None)
+            return {"ok": True, "rows": len(rows)}
+        if path == "/api/batch/edit":
+            db.update_batch(cid, int(body.get("id")), _wname(body.get("item"), "продукт"),
+                            str(body.get("qty") or "").strip()[:20], _wdate(body.get("expires"), "годен до"))
             return {"ok": True}
         if path == "/api/record":
             product = _wname(body.get("product"))
@@ -290,6 +353,12 @@ def make_handler(cab: Cabinet, page: str):
                     if not chat:
                         return self._send(401, {"error": "login"})
                     return self._send(200, cab.state(chat))
+            if path == "/api/sheet":
+                with bot.lock:
+                    chat = self._chat()
+                    if not chat:
+                        return self._send(401, {"error": "login"})
+                    return self._send(200, cab.sheet(chat))
             return self._send(404, {"error": "not found"})
 
         def do_POST(self):

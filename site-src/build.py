@@ -34,7 +34,7 @@ def read(name: str) -> str:
 
 def build(src_name: str, app_name: str, marker: str, example: bool = True) -> str:
     csv = (ROOT / "bot" / "data" / "demo_sales.csv").read_text(encoding="utf-8") if example else ""
-    return (read(src_name).replace("/*MODEL*/", read("model.js"))
+    return (read(src_name).replace("/*MODEL*/", read("model.js")).replace("/*GRID*/", read("grid.js"))
             .replace("__DEMO_CSV__", json.dumps(csv, ensure_ascii=False))
             .replace(marker, read(app_name)))
 

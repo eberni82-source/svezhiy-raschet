@@ -134,6 +134,18 @@ class Storage:
             (chat_id, s.day.isoformat(), s.product, s.baked, s.sold, s.soldout,
              None if s.rain is None else int(s.rain), s.temp))
 
+    def put_sale(self, chat_id: int, s: Sale):
+        """Строка из таблицы кабинета: значения заменяются целиком, пустые тоже."""
+        self.db.execute(
+            "INSERT INTO sales (chat_id, day, product, baked, sold, soldout, rain, temp) VALUES (?,?,?,?,?,?,?,?) "
+            "ON CONFLICT(chat_id, day, product) DO UPDATE SET baked=excluded.baked, sold=excluded.sold, "
+            "soldout=excluded.soldout, rain=excluded.rain, temp=excluded.temp",
+            (chat_id, s.day.isoformat(), s.product, s.baked, s.sold, s.soldout,
+             None if s.rain is None else int(s.rain), s.temp))
+
+    def delete_sale(self, chat_id: int, day: date, product: str):
+        self.db.execute("DELETE FROM sales WHERE chat_id=? AND day=? AND product=?", (chat_id, day.isoformat(), product))
+
     def import_sales(self, chat_id: int, sales: list[Sale], products: dict[str, Product]):
         for p in products.values():
             self.upsert_product(chat_id, p)
@@ -196,6 +208,11 @@ class Storage:
 
     def batch_count(self, chat_id: int) -> int:
         return self.db.execute("SELECT COUNT(*) FROM batches WHERE chat_id=? AND status='active'", (chat_id,)).fetchone()[0]
+
+    def update_batch(self, chat_id: int, batch_id: int, item: str, qty: str, expires: date):
+        self.db.execute("UPDATE batches SET item=?, qty=?, expires=? WHERE chat_id=? AND id=? AND status='active'",
+                        (item, qty, expires.isoformat(), chat_id, batch_id))
+        self.db.commit()
 
     def close_batch(self, chat_id: int, batch_id: int, status: str):
         self.db.execute("UPDATE batches SET status=? WHERE chat_id=? AND id=?", (status, chat_id, batch_id))

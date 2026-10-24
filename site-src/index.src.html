@@ -163,6 +163,10 @@ select, input[type="text"], input[type="number"], input[type="date"] { font: 500
 .err { color: var(--bad); font-weight: 500; }
 
 .console-body { display: grid; grid-template-columns: minmax(0, 1fr) 340px; }
+.console-body.wide { grid-template-columns: minmax(0, 1fr); }
+.console-body.wide .side { display: none; }
+.console-body.wide .panel { border-right: 0; }
+.toast { position: fixed; left: 50%; bottom: max(20px, env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 10px; font-weight: 600; font-size: 15px; z-index: 30; box-shadow: var(--shadow); max-width: calc(100% - 32px); }
 @media (max-width: 980px) { .console-body { grid-template-columns: minmax(0, 1fr); } }
 .panel { padding: 20px; min-width: 0; border-right: 1px solid var(--line); }
 @media (max-width: 980px) { .panel { border-right: 0; border-bottom: 1px solid var(--line); } }
@@ -453,6 +457,7 @@ footer { padding-block: 32px; font-size: 14px; color: var(--ink-3); }
               <button role="tab" id="tab-plan" aria-selected="true" aria-controls="pane-plan">План на день</button>
               <button role="tab" id="tab-exp" aria-selected="false" aria-controls="pane-exp">Сроки годности</button>
               <button role="tab" id="tab-bt" aria-selected="false" aria-controls="pane-bt">Проверка на истории</button>
+              <button role="tab" id="tab-sheets" aria-selected="false" aria-controls="pane-sheets">Таблицы</button>
             </div>
             <div role="tabpanel" id="pane-plan" aria-labelledby="tab-plan">
               <div class="table-wrap">
@@ -487,6 +492,10 @@ footer { padding-block: 32px; font-size: 14px; color: var(--ink-3); }
             </div>
             <div role="tabpanel" id="pane-bt" aria-labelledby="tab-bt" hidden>
               <div id="bt"></div>
+            </div>
+            <div role="tabpanel" id="pane-sheets" aria-labelledby="tab-sheets" hidden>
+              <p class="note" style="margin:0 0 12px">Все данные примера как в Excel: продажи по дням, товары, сроки годности и план на неделю. Меняйте цифры — план пересчитается. Правки живут до перезагрузки страницы.</p>
+              <div id="sheets"></div>
             </div>
           </div>
           <aside class="side" aria-label="Как сообщение выглядит в Telegram">
@@ -622,10 +631,12 @@ footer { padding-block: 32px; font-size: 14px; color: var(--ink-3); }
   </div>
 </footer>
 
+<div class="toast" id="toast" role="status" hidden></div>
 <script>/*MODEL*/</script>
 <script>
 "use strict";
 var BOT_USERNAME = "svezhiy_raschet_bot";
 var DEMO_CSV = __DEMO_CSV__;
 </script>
+<script>/*GRID*/</script>
 <script>/*APP*/</script>
