@@ -1551,7 +1551,7 @@ var DEMO_CSV = "дата;товар;испечено;продано;законч
     if (d === "csv") {
       var names = { sales: "prodazhi", products: "tovary", batches: "sroki", week: "plan-na-nedelyu" };
       var rows = t === "sales" ? this.salesRows().filter(function (r) { return !r.__draft; }) : this.grid.rows.filter(function (r) { return !r.__draft; });
-      download(names[t] + "-" + this.a.today + ".csv", csv(this.cols, rows));
+      Sheets.saveFile(names[t] + "-" + this.a.today + ".csv", csv(this.cols, rows), this.a.toast);
     } else if (d === "add") {
       var row = t === "sales" ? { day: this.a.today, product: this.product || null } : {};
       row.__draft = true;
@@ -1649,6 +1649,7 @@ var DEMO_CSV = "дата;товар;испечено;продано;законч
     return chain(jobs).then(function () { return self.load(); }).catch(function (x) { self.err(x); return self.load(); });
   };
 
+  Sheets.saveFile = download;
   root.Sheets = Sheets;
   root.SheetGrid = Grid;
 })(this);
