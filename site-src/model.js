@@ -63,6 +63,7 @@
 
   function avg(xs) { return xs.reduce(function (a, x) { return a + x; }, 0) / xs.length; }
   function signedDeg(x) { return Math.abs(Math.round(x)) + "°"; }
+  var LEVEL_DAYS = 14, LEVEL_DECAY = 0.9;
   var TEMP_WINDOW = 365, TEMP_NEAR = 15, TEMP_MIN_DAYS = 60, TEMP_MIN_T = 2.5;
 
   // на сколько (доля) меняется спрос на каждый градус; 0 - если данных мало или связь ненадёжна
@@ -150,16 +151,25 @@
       clean[s.day] += cleanValue(s);
       if (s.temp != null) temps[s.day] = s.temp;
     });
-    // уровень: среднее за последние 14 дней (сам следует за сезоном)
-    var recentDays = days.filter(function (k) { return target - k <= 14; });
-    if (recentDays.length < 5) recentDays = days.slice();
-    var level = avg(recentDays.map(function (k) { return clean[k]; }));
+    // профиль недели: во сколько раз этот день недели выше среднего
     var overall = avg(days.map(function (k) { return clean[k]; }));
     function wf(w) {
       var v = days.filter(function (k) { return wday(k) === w; }).map(function (k) { return clean[k]; });
       if (v.length < 2 || overall <= 0) return 1;
       return avg(v) / overall;
     }
+    // уровень: последние 14 дней, каждый приведён к среднему дню недели;
+    // чем ближе день, тем больше вес: вчера - 1, позавчера - 0.9, и так далее
+    var recentDays = days.filter(function (k) { return target - k <= LEVEL_DAYS; });
+    if (recentDays.length < 5) recentDays = days.slice();
+    var weights = {}, wsum = 0, level = 0;
+    recentDays.forEach(function (k) {
+      var g = wf(wday(k));
+      if (g <= 0) return;
+      weights[k] = Math.pow(LEVEL_DECAY, target - k - 1);
+      wsum += weights[k]; level += weights[k] * clean[k] / g;
+    });
+    level = wsum ? level / wsum : 0;
     var f = wf(wday(target));
     if (days.length < 14) reasons.push("истории меньше 2 недель — прогноз грубый");
     else if (Math.abs(f - 1) >= 0.08) reasons.push(WD[wday(target)] + ": обычно " + signed((f - 1) * 100) + " к среднему дню");
@@ -170,12 +180,14 @@
     var base = level * f;
 
     // температура: связь ищем по истории позиции, день сравниваем с соседними +-15 днями
-    var tempF = 1;
-    var levelTemps = recentDays.filter(function (k) { return k in temps; }).map(function (k) { return temps[k]; });
-    if (tempTomorrow != null && levelTemps.length) {
+    var tempF = 1, diff = null;
+    var tempDays = recentDays.filter(function (k) { return k in weights && k in temps; });
+    if (tempTomorrow != null && tempDays.length) {
       var slope = temperatureSlope(hist, target, cleanValue, wf);
       if (slope) {
-        var diff = Math.max(-12, Math.min(12, tempTomorrow - avg(levelTemps)));
+        var tw = 0, tsum = 0;
+        tempDays.forEach(function (k) { tw += weights[k]; tsum += weights[k] * temps[k]; });
+        diff = Math.max(-12, Math.min(12, tempTomorrow - tsum / tw));
         tempF = Math.max(0.75, Math.min(1.3, 1 + slope * diff));
         if (Math.abs(tempF - 1) >= 0.03) reasons.push((diff < 0 ? "холоднее" : "теплее") + " на " + signedDeg(diff) + ": " + signed((tempF - 1) * 100) + " к спросу");
       }
@@ -195,12 +207,15 @@
     var scale = base ? mean / base : 1;
     var sd = Math.max(Math.sqrt(v) * scale, Math.sqrt(Math.max(mean, 0)));
     if (days.length < 14) sd *= 1.3;
-    var qty = Math.max(0, Math.floor(mean + invNorm(cr) * sd + 0.5));
+    var z = invNorm(cr), qty = Math.max(0, Math.floor(mean + z * sd + 0.5));
     if (product.price && product.cost != null) {
       if (cr >= 0.6) reasons.push("маржа " + Math.round(cr * 100) + "% — берём с запасом");
       else if (cr <= 0.45) reasons.push("маржа " + Math.round(cr * 100) + "% — впритык, остаток дорого обходится");
     }
-    return { product: product.name, mean: mean, sd: sd, qty: qty, ratio: cr, reasons: reasons, n: days.length };
+    // из чего сложился прогноз: уровень × день недели × температура × сезон × дождь × событие
+    var parts = { level: level, days: Object.keys(weights).length, recent: (target - 1) in weights ? weights[target - 1] / wsum : 0,
+                  week: f, temp: tempF, delta: diff, season: yoyF, rain: rainTomorrow ? 1 + rainEff : 1, event: eventFactor, z: z };
+    return { product: product.name, mean: mean, sd: sd, qty: qty, ratio: cr, reasons: reasons, n: days.length, parts: parts };
   }
 
   function eveningThreshold(rec) { return Math.max(1, Math.ceil(rec.mean * SHARE_EVENING * DISCOUNT_K)); }

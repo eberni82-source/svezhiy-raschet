@@ -6,9 +6,10 @@
    продаж: добавляем поправку sold * (1 + 0.5 * доля_дня_после_распродажи).
 2. Влияние дождя считается по истории всех товаров точки (если есть отметки
    погоды); иначе берётся -10%.
-3. Базовый прогноз = уровень (средний спрос за 14 дней) * профиль недели
-   (во сколько раз этот день недели выше среднего за 8 недель). Всё очищено
-   от влияния дождя.
+3. Базовый прогноз = уровень * профиль недели (во сколько раз этот день
+   недели выше среднего за 8 недель). Уровень - взвешенное среднее за 14 дней,
+   каждый день приведён к среднему дню недели; вчера весит 1, позавчера 0.9
+   и так далее, поэтому свежие продажи влияют сильнее. Всё очищено от дождя.
 4. Сезон. Уровень по двум неделям сам идёт за сезоном. Сверху две поправки:
    температура - по истории модель узнаёт, как холод и жара меняют спрос на
    каждую позицию (нужно от двух месяцев данных с температурой);
@@ -62,6 +63,7 @@ class Recommendation:
     ratio: float
     reasons: list[str] = field(default_factory=list)
     history_days: int = 0
+    parts: dict = field(default_factory=dict)   # множители прогноза, см. forecast()
 
 
 def parse_time(s: str | None) -> float | None:
@@ -116,6 +118,7 @@ def _mean(xs):
     return sum(xs) / len(xs)
 
 
+LEVEL_DAYS, LEVEL_DECAY = 14, 0.9
 TEMP_WINDOW, TEMP_NEAR, TEMP_MIN_DAYS, TEMP_MIN_T = 365, 15, 60, 2.5
 
 
@@ -219,12 +222,6 @@ def forecast(sales: list[Sale], product: Product, target: date, rain_tomorrow: b
             if s.temp is not None:
                 temps[s.day] = s.temp
 
-    # уровень: среднее за последние 14 дней (сам следует за сезоном)
-    recent_days = [day for day in clean if (target - day).days <= 14]
-    if len(recent_days) < 5:
-        recent_days = list(clean)
-    level = _mean([clean[d] for d in recent_days])
-
     # профиль недели: во сколько раз этот день недели выше среднего
     overall = _mean(list(clean.values()))
 
@@ -233,6 +230,15 @@ def forecast(sales: list[Sale], product: Product, target: date, rain_tomorrow: b
         if len(vals) < 2 or overall <= 0:
             return 1.0
         return _mean(vals) / overall
+
+    # уровень: последние 14 дней, каждый приведён к среднему дню недели;
+    # чем ближе день, тем больше вес: вчера - 1, позавчера - 0.9, и так далее
+    recent_days = [day for day in clean if (target - day).days <= LEVEL_DAYS]
+    if len(recent_days) < 5:
+        recent_days = list(clean)
+    weights = {d: LEVEL_DECAY ** ((target - d).days - 1) for d in recent_days if wd_factor(d.weekday()) > 0}
+    wsum = sum(weights.values())
+    level = sum(w * clean[d] / wd_factor(d.weekday()) for d, w in weights.items()) / wsum if wsum else 0.0
     wf = wd_factor(target.weekday())
     if len(clean) < 14:
         reasons.append("истории меньше 2 недель — прогноз грубый")
@@ -250,12 +256,13 @@ def forecast(sales: list[Sale], product: Product, target: date, rain_tomorrow: b
     base = level * wf
 
     # температура: связь ищем по истории позиции, день сравниваем с соседними +-15 днями
-    temp_f = 1.0
-    level_temps = [temps[d] for d in recent_days if d in temps]
-    if temp_tomorrow is not None and level_temps:
+    temp_f, diff = 1.0, None
+    temp_days = [d for d in weights if d in temps]
+    if temp_tomorrow is not None and temp_days:
         slope = temperature_slope(hist, target, clean_value, wd_factor)
         if slope:
-            diff = max(-12.0, min(12.0, temp_tomorrow - _mean(level_temps)))
+            level_temp = sum(weights[d] * temps[d] for d in temp_days) / sum(weights[d] for d in temp_days)
+            diff = max(-12.0, min(12.0, temp_tomorrow - level_temp))
             temp_f = max(0.75, min(1.3, 1 + slope * diff))
             if abs(temp_f - 1) >= 0.03:
                 reasons.append(f"{'холоднее' if diff < 0 else 'теплее'} на {abs(diff):.0f}°: {(temp_f - 1) * 100:+.0f}% к спросу")
@@ -290,7 +297,12 @@ def forecast(sales: list[Sale], product: Product, target: date, rain_tomorrow: b
             reasons.append(f"маржа {ratio * 100:.0f}% — берём с запасом")
         elif ratio <= 0.45:
             reasons.append(f"маржа {ratio * 100:.0f}% — впритык, остаток дорого обходится")
-    return Recommendation(product.name, mean, sd, qty, ratio, reasons, len(clean))
+    # из чего сложился прогноз: уровень × день недели × температура × сезон × дождь × событие
+    yesterday = target - timedelta(days=1)
+    parts = {"level": level, "days": len(weights), "recent": weights[yesterday] / wsum if yesterday in weights else 0.0,
+             "week": wf, "temp": temp_f, "delta": diff, "season": yoy_f, "rain": 1 + rain_eff if rain_tomorrow else 1.0,
+             "event": event_factor, "z": z}
+    return Recommendation(product.name, mean, sd, qty, ratio, reasons, len(clean), parts)
 
 
 def evening_threshold(rec: Recommendation) -> int:

@@ -77,7 +77,7 @@ HELP = """<b>Что умеет бот</b>
 /time утро 06:00 — поменять время рассылки (утро, вечер, итоги)
 /city — сменить город (для погоды и часового пояса)
 /web — войти в личный кабинет на сайте
-/demo — загрузить пример: условная пекарня
+/demo — загрузить пример «Пекарня»
 /stop — выключить рассылку, /start — включить
 
 <b>Свои продажи</b> — пришлите CSV-файл (выгрузку из кассы или Excel → «Сохранить как CSV») с колонками:
@@ -365,7 +365,7 @@ class FreshBot:
             return self.tg.send(cid, "Заявка на бесплатный месяц пилота.\n\n<b>1/4.</b> Как называется ваше заведение?",
                                 remove_keyboard=True)
         if arg == "demo":  # кнопка "Попробовать в Telegram" на сайте
-            self.tg.send(cid, "Привет! Я <b>Свежий расчёт</b>. Покажу, как работаю, на демо-данных условной пекарни.",
+            self.tg.send(cid, "Привет! Я <b>Свежий расчёт</b>. Покажу, как работаю, на примере «Пекарня».",
                          reply_keyboard=MENU)
             return self.cmd_demo(self.db.chat(cid))
         self.tg.send(cid, "Привет! Я <b>Свежий расчёт</b>. Каждое утро присылаю план: сколько испечь и закупить, "
@@ -383,7 +383,7 @@ class FreshBot:
             return self.tg.send(chat["chat_id"], "Данные на месте. План на завтра: /plan")
         self.tg.send(chat["chat_id"],
                      "Чтобы я начал считать, пришлите CSV-файл с продажами (колонки: <code>дата;товар;продано</code>) "
-                     "или посмотрите, как всё работает, на демо-данных: /demo")
+                     "или посмотрите, как всё работает, на примере: /demo")
 
     def st_city(self, chat, text, st):
         cid = chat["chat_id"]
@@ -449,7 +449,7 @@ class FreshBot:
         self.tg.send(chat["chat_id"], "Рассылка выключена. Включить снова: /start")
 
     def load_example(self, chat):
-        """Пример: условная пекарня - год продаж и несколько партий со сроками годности."""
+        """Пример «Пекарня»: год продаж и несколько партий со сроками годности."""
         cid = chat["chat_id"]
         text = (ROOT / "data" / "demo_sales.csv").read_text(encoding="utf-8")
         sales, products = parse_csv(text)
@@ -476,7 +476,7 @@ class FreshBot:
                                            {"text": "Отмена", "callback_data": "x"}]])
         sales, products = self.load_example(chat)
         bt = backtest(sales, products)
-        lines = [f"Загрузил <b>пример</b> условной пекарни в Челябинске: {len(products)} позиций, продажи за год с погодой. "
+        lines = [f"Загрузил пример <b>«Пекарня»</b> (Челябинск): {len(products)} позиций, продажи за год с погодой. "
                  "Продажи смоделированы — это пример, чтобы посмотреть, как работает бот."]
         if bt:
             lines += ["", "<b>Если бы последние 4 недели пекли по плану бота</b>",
@@ -727,7 +727,7 @@ class FreshBot:
         lead_id = self.db.add_lead(cid, chat["username"], st["data"])
         self.state.pop(cid, None)
         self.tg.send(cid, "Спасибо! Заявка принята, свяжемся в течение дня. "
-                          "Пока можно посмотреть, как работает бот, на демо-данных: /demo", reply_keyboard=MENU)
+                          "Пока можно посмотреть, как работает бот, на примере: /demo", reply_keyboard=MENU)
         d = st["data"]
         who = f"@{chat['username']}" if chat["username"] else f"id {cid}"
         for admin in self.admins:

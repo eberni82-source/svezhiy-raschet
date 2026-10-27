@@ -35,7 +35,7 @@
         var p = r.products[k];
         products[k] = { name: k, price: p.price, cost: p.cost, shelf_life: (k === "Эклер" || k === "Сэндвич с курицей") ? 2 : 1, default_qty: null, active: true };
       });
-      D = { v: 2, business: "Условная пекарня", example: true, times: { morning: "06:00", evening: "17:00", closing: "21:00" },
+      D = { v: 2, business: "Пекарня", example: true, times: { morning: "06:00", evening: "17:00", closing: "21:00" },
             products: products, sales: r.sales, plans: {}, events: {}, nextId: 5,
             batches: [[1, "Сливки 33%", "2 л", 1], [2, "Творог 5%", "3 кг", 2], [3, "Филе куриное", "1,5 кг", 0], [4, "Вишня замороженная", "2 кг", 20]]
               .map(function (b) { return { id: b[0], item: b[1], qty: b[2], exp: T + b[3], status: "active" }; }) };
@@ -473,7 +473,7 @@
       '<form class="form" data-form="settings"><label class="wide">Название<input type="text" name="business" maxlength="80" value="' + esc(st.business.name) + '" placeholder="Булочная на Ленина"></label>' +
       '<label>План утром<input type="time" name="morning" value="' + esc(st.times.morning) + '"></label><label>Витрина вечером<input type="time" name="evening" value="' + esc(st.times.evening) + '"></label>' +
       '<label>Итоги дня<input type="time" name="closing" value="' + esc(st.times.closing) + '"></label><button class="btn btn-primary" type="submit">Сохранить</button></form></div>';
-    h += '<div class="card"><h2>Данные продаж</h2><p class="sub">' + (d.rows ? d.rows + " " + plural(d.rows, "строка", "строки", "строк") + " с " + dayLabel(d.first) + " по " + dayLabel(d.last) + (st.business.is_example ? ". Сейчас загружен пример — условная пекарня." : ".") : "Продаж пока нет.") + "</p>" +
+    h += '<div class="card"><h2>Данные продаж</h2><p class="sub">' + (d.rows ? d.rows + " " + plural(d.rows, "строка", "строки", "строк") + " с " + dayLabel(d.first) + " по " + dayLabel(d.last) + (st.business.is_example ? ". Сейчас загружен пример «Пекарня»." : ".") : "Продаж пока нет.") + "</p>" +
       '<div class="form"><label class="wide">Выгрузка из кассы или Excel (CSV)<input type="file" accept=".csv,.txt,text/csv" data-act="upload"></label></div>' +
       '<p class="hint" style="margin-top:8px">Колонки: <span class="mono">дата;товар;продано</span>, по желанию <span class="mono">испечено (или заказано);закончилось;цена;себестоимость;дождь;температура</span>. Свои данные заменят пример.</p>' +
       '<div class="acts" style="justify-content:flex-start;margin-top:12px">' + (S.confirm === "__example"
@@ -487,7 +487,7 @@
           '<div class="cmp"><span>По плану</span><div class="bar"><i style="width:' + (b / max * 100).toFixed(1) + '%;background:var(--stamp)"></i></div><span class="v">' + money(b) + "</span></div></div>";
       };
       h += '<div class="card"><h2>Проверка на истории</h2><p class="sub">Что было бы за последние ' + sm.days + " " + plural(sm.days, "день", "дня", "дней") + ", если бы работали по плану сервиса. Для каждого дня модель видит только продажи до него." +
-        (st.business.is_example ? " Данные условной пекарни смоделированы." : "") + "</p>" +
+        (st.business.is_example ? " Данные примера «Пекарня» смоделированы." : "") + "</p>" +
         row("Списания по себестоимости", sm.waste_now, sm.waste_new) + row("Упущенная прибыль, когда товар закончился", sm.lost_now, sm.lost_new) +
         row("Итого потери", sm.waste_now + sm.lost_now, sm.waste_new + sm.lost_new) + "</div>";
     }
