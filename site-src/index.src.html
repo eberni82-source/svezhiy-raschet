@@ -1,37 +1,37 @@
 <title>Свежий расчёт</title>
 <meta name="description" content="Сервис для малого бизнеса Челябинска, который работает со свежими продуктами: прогноз продаж, план производства и заказа на утро, вечерние скидки и контроль сроков годности в Telegram.">
-<meta name="color-scheme" content="dark">
-<meta name="theme-color" content="#2E261D">
+<meta name="color-scheme" content="only light">
+<meta name="theme-color" content="#E6D5B5">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400..800&display=swap">
 <style>
 :root {
-  color-scheme: dark;
-  --bg: #15120F;
-  --surface: #1D1915;
-  --ink: #F1EBE3;
-  --ink-2: #B9AFA4;
-  --ink-3: #8E847A;
-  --line: #352E28;
-  --kraft: #2E261D;
-  --kraft-2: #3A3025;
-  --kraft-ink: #EBDCC0;
-  --paper: #F4EFE4;
-  --stamp: #93A8FF;
-  --stamp-ink: #0E1533;
-  --stamp-soft: #222A4C;
-  --ok: #6CC08F;  --ok-soft: #1C3326;
-  --warn: #E3AB4E; --warn-soft: #3A2C14;
-  --bad: #F2907A;  --bad-soft: #3E211A;
-  --bar: #A2978C;
-  --bar-soft: #4E463E;
-  --phone: #050404;
-  --chat: #0F1922;
-  --bubble: #1E2B37;
-  --bubble-ink: #E8EEF3;
-  --tg-link: #6FB3E8;
-  --shadow: 0 1px 0 rgba(0,0,0,.3), 0 14px 30px -12px rgba(0,0,0,.7);
+  color-scheme: only light;
+  --bg: #FAF9F6;
+  --surface: #FFFFFF;
+  --ink: #211B16;
+  --ink-2: #5E554C;
+  --ink-3: #8A8077;
+  --line: #E4DFD7;
+  --kraft: #E6D5B5;
+  --kraft-2: #D9C49D;
+  --kraft-ink: #3F311F;
+  --paper: #FFFEFA;
+  --stamp: #2346C8;
+  --stamp-ink: #FFFFFF;
+  --stamp-soft: #E7ECFB;
+  --ok: #2B7A4B;  --ok-soft: #E2F1E7;
+  --warn: #9A6210; --warn-soft: #F6ECD8;
+  --bad: #B3371F;  --bad-soft: #F8E3DE;
+  --bar: #8D8278;
+  --bar-soft: #D3CBC1;
+  --phone: #1C1815;
+  --chat: #D9E2EA;
+  --bubble: #FFFFFF;
+  --bubble-ink: #1B1F24;
+  --tg-link: #2A7AB8;
+  --shadow: 0 1px 0 rgba(33,27,22,.06), 0 12px 28px -12px rgba(33,27,22,.28);
   --f-display: "Golos Text", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
   --f-body: "Golos Text", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
   --f-mono: "Golos Text", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
@@ -298,11 +298,11 @@ table.plan { width: 100%; border-collapse: collapse; font-size: 15px; }
 .field output { font: 700 18px var(--f-mono); }
 .field small { color: var(--ink-3); font-size: 13px; }
 input[type="range"] { width: 100%; accent-color: var(--stamp); }
-.calc-out { padding: 26px; background: var(--ink); color: var(--bg); display: grid; gap: 18px; align-content: start; }
-.calc-out .row { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; border-bottom: 1px solid color-mix(in srgb, var(--bg) 18%, transparent); padding-bottom: 12px; }
+.calc-out { padding: 26px; background: var(--kraft); color: var(--kraft-ink); display: grid; gap: 18px; align-content: start; }
+.calc-out .row { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; border-bottom: 1px solid color-mix(in srgb, var(--kraft-ink) 18%, transparent); padding-bottom: 12px; }
 .calc-out .row span { opacity: .75; }
 .calc-out .row b { font: 700 20px var(--f-mono); white-space: nowrap; }
-.calc-out .hero-num { font: 700 clamp(40px, 5vw, 56px)/1 var(--f-display); color: var(--bg); }
+.calc-out .hero-num { font: 700 clamp(40px, 5vw, 56px)/1 var(--f-display); color: var(--stamp); }
 .plans { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
 @media (max-width: 760px) { .plans { grid-template-columns: minmax(0, 1fr); } }
 .plan-card { border: 1px solid var(--line); border-radius: 18px; padding: 26px; display: grid; gap: 14px; align-content: start; background: var(--surface); }
