@@ -141,6 +141,17 @@ input.small { width: 84px; }
 
 .toast { position: fixed; left: 50%; bottom: max(20px, env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 10px; font-weight: 600; z-index: 20; box-shadow: var(--shadow); max-width: calc(100% - 32px); }
 .loading { padding: 60px 0; text-align: center; color: var(--ink-3); }
+/* нижняя панель на телефоне: главная и личный кабинет */
+.mnav { display: none; }
+@media (max-width: 760px) {
+  .mnav { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; position: fixed; left: 0; right: 0; bottom: 0; z-index: 25; background: var(--surface); border-top: 1px solid var(--line); box-shadow: 0 -6px 18px rgba(33,27,22,.08); padding: 6px max(10px, env(safe-area-inset-right, 0px)) max(8px, env(safe-area-inset-bottom, 0px)) max(10px, env(safe-area-inset-left, 0px)); }
+  .mnav a { display: grid; justify-items: center; gap: 3px; min-height: 52px; align-content: center; border-radius: 12px; text-decoration: none; color: var(--ink-2); font: 600 13px/1.1 var(--f-body); }
+  .mnav a[aria-current="page"] { color: var(--stamp); background: var(--stamp-soft); }
+  body { padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px)); }
+  .toast { bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
+  .server .mnav { display: none; }
+  body.server { padding-bottom: 0; }
+}
 </style>
 
 <header class="top">
@@ -178,6 +189,10 @@ input.small { width: 84px; }
     <div class="view" id="view"></div>
   </section>
 </main>
+<nav class="mnav" aria-label="Разделы сайта">
+  <a href="index.html"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3.5 10.5 12 3.5l8.5 7V20a1 1 0 0 1-1 1H15v-6H9v6H4.5a1 1 0 0 1-1-1z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg><span>Главная</span></a>
+  <a href="kabinet.html" aria-current="page"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><circle cx="12" cy="8" r="4" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M4.5 21c.6-3.9 3.7-6.5 7.5-6.5s6.9 2.6 7.5 6.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span>Личный кабинет</span></a>
+</nav>
 <div class="toast" id="toast" role="status" hidden></div>
 
 <script>/*MODEL*/</script>

@@ -660,6 +660,7 @@
   }, 15000);
   setInterval(function () { if (S.st) refresh(); }, 60000);
   API.init().then(function () {
+    document.body.classList.toggle("server", API.mode === "server");   // в кабинете из бота нижняя панель не нужна
     var m = location.search.match(/[?&]code=(\d{6})/);
     if (API.mode === "server" && m) {
       history.replaceState(null, "", location.pathname);
