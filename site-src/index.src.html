@@ -105,13 +105,12 @@ a { color: inherit; }
 .src a { color: var(--ink-3); }
 @media (max-width: 760px) { .facts { grid-template-columns: minmax(0, 1fr); } .fact + .fact { padding-left: 0; border-left: 0; border-top: 1px solid var(--line); } }
 .who-list { border-top: 2px solid var(--ink); }
-.who-row { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.2fr) 96px minmax(0, 1.5fr) minmax(0, 1fr); gap: 8px 24px; padding: 18px 0; border-bottom: 1px solid var(--line); align-items: baseline; }
+.who-row { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.3fr) 96px minmax(0, 1.6fr); gap: 8px 24px; padding: 18px 0; border-bottom: 1px solid var(--line); align-items: baseline; }
 .who-row.head { font: 600 13px/1.2 var(--f-mono); color: var(--ink-3); padding: 12px 0; }
 .who-row .seg-name { font-weight: 700; font-size: 17px; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
 .who-row .goods { color: var(--ink-2); }
 .who-row .life { font: 700 15px/1.3 var(--f-mono); }
 .who-row .does { color: var(--ink); }
-.who-row .cnt { color: var(--ink-2); font-variant-numeric: tabular-nums; }
 .who-row .mob { display: none; font: 600 13px/1.2 var(--f-mono); color: var(--ink-3); margin-right: 6px; }
 @media (max-width: 760px) {
   .who-row { grid-template-columns: minmax(0, 1fr); gap: 6px; }
@@ -398,8 +397,8 @@ footer { padding-block: 32px; font-size: 14px; color: var(--ink-3); }
       </div>
       <div class="facts">
         <div class="fact">
-          <div class="big num">71,9%</div>
-          <p>покупателей важна свежесть продуктов.</p>
+          <div class="big num">72%</div>
+          <p>покупателей ценят свежесть продуктов.</p>
         </div>
         <div class="fact">
           <div class="big num">до +35%</div>
@@ -415,12 +414,12 @@ footer { padding-block: 32px; font-size: 14px; color: var(--ink-3); }
         <h2>Кому подходит в Челябинске</h2>
       </div>
       <div class="who-list" role="table" aria-label="Кому подходит сервис">
-        <div class="who-row head" role="row"><span role="columnheader">Бизнес</span><span role="columnheader">Что портится</span><span role="columnheader">Срок</span><span role="columnheader">Что считает сервис</span><span role="columnheader">В Челябинске</span></div>
-        <div class="who-row" role="row"><span class="seg-name" role="cell">Пекарни и кондитерские</span><span class="goods" role="cell"><span class="mob">Портится:</span>хлеб, выпечка, десерты</span><span class="life" role="cell"><span class="mob">Срок:</span>1 день</span><span class="does" role="cell">Сколько испечь и с какого остатка уценять</span><span class="cnt" role="cell"><span class="mob">В Челябинске:</span>245 пекарен</span></div>
-        <div class="who-row" role="row"><span class="seg-name" role="cell">Кофейни и кулинарии</span><span class="goods" role="cell"><span class="mob">Портится:</span>сэндвичи, салаты, готовые блюда</span><span class="life" role="cell"><span class="mob">Срок:</span>1–3 дня</span><span class="does" role="cell">Сколько приготовить или заказать на день</span><span class="cnt" role="cell"><span class="mob">В Челябинске:</span>222 кулинарии</span></div>
-        <div class="who-row" role="row"><span class="seg-name" role="cell">Магазины у дома</span><span class="goods" role="cell"><span class="mob">Портится:</span>молочка, мясо, готовая еда</span><span class="life" role="cell"><span class="mob">Срок:</span>3–10 дней</span><span class="does" role="cell">Сколько заказать и что уценить до конца срока</span><span class="cnt" role="cell"><span class="mob">В Челябинске:</span>2 569 магазинов</span></div>
-        <div class="who-row" role="row"><span class="seg-name" role="cell">Овощные и фермерские лавки</span><span class="goods" role="cell"><span class="mob">Портится:</span>зелень, ягоды, фрукты</span><span class="life" role="cell"><span class="mob">Срок:</span>2–7 дней</span><span class="does" role="cell">Объём закупки с учётом погоды и дня недели</span><span class="cnt" role="cell"><span class="mob">В Челябинске:</span>718 лавок</span></div>
-        <div class="who-row" role="row"><span class="seg-name" role="cell">Столовые и кафе</span><span class="goods" role="cell"><span class="mob">Портится:</span>порции, заготовки</span><span class="life" role="cell"><span class="mob">Срок:</span>часы</span><span class="does" role="cell">Сколько порций готовить по дням недели</span><span class="cnt" role="cell"><span class="mob">В Челябинске:</span>428 кафе, 336 столовых</span></div>
+        <div class="who-row head" role="row"><span role="columnheader">Бизнес</span><span role="columnheader">Что портится</span><span role="columnheader">Срок</span><span role="columnheader">Что считает сервис</span></div>
+        <div class="who-row" role="row"><span class="seg-name" role="cell">Пекарни и кондитерские</span><span class="goods" role="cell"><span class="mob">Портится:</span>хлеб, выпечка, десерты</span><span class="life" role="cell"><span class="mob">Срок:</span>1 день</span><span class="does" role="cell">Сколько испечь и с какого остатка уценять</span></div>
+        <div class="who-row" role="row"><span class="seg-name" role="cell">Кофейни и кулинарии</span><span class="goods" role="cell"><span class="mob">Портится:</span>сэндвичи, салаты, готовые блюда</span><span class="life" role="cell"><span class="mob">Срок:</span>1–3 дня</span><span class="does" role="cell">Сколько приготовить или заказать на день</span></div>
+        <div class="who-row" role="row"><span class="seg-name" role="cell">Магазины у дома</span><span class="goods" role="cell"><span class="mob">Портится:</span>молочка, мясо, готовая еда</span><span class="life" role="cell"><span class="mob">Срок:</span>3–10 дней</span><span class="does" role="cell">Сколько заказать и что уценить до конца срока</span></div>
+        <div class="who-row" role="row"><span class="seg-name" role="cell">Овощные и фермерские лавки</span><span class="goods" role="cell"><span class="mob">Портится:</span>зелень, ягоды, фрукты</span><span class="life" role="cell"><span class="mob">Срок:</span>2–7 дней</span><span class="does" role="cell">Объём закупки с учётом погоды и дня недели</span></div>
+        <div class="who-row" role="row"><span class="seg-name" role="cell">Столовые и кафе</span><span class="goods" role="cell"><span class="mob">Портится:</span>порции, заготовки</span><span class="life" role="cell"><span class="mob">Срок:</span>часы</span><span class="does" role="cell">Сколько порций готовить по дням недели</span></div>
       </div>
     </div>
   </section>
