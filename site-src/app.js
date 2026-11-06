@@ -16,7 +16,7 @@
   var TODAY = M.dnum(now.getFullYear() + "-" + pad(now.getMonth() + 1) + "-" + pad(now.getDate()));
   var KEY = "svezhiy-demo-v3";
 
-  // ---------------------------------------------------------------- данные примера и состояние
+  // данные примера и состояние
   // S сохраняется в браузере: продажи, товары, партии, выбранный день, погода и события по дням, планы
   function demoState() {
     var r = M.parseCSV(DEMO_CSV);
@@ -84,7 +84,7 @@
   }
   function names() { return Object.keys(allProducts(S)).sort(byName); }
 
-  // погода и событие дня: что указал человек → прогноз Open-Meteo → как было в истории → средняя за 2 недели
+  // погода и событие дня: что указал человек -> прогноз Open-Meteo -> как было в истории -> средняя за 2 недели
   function dayWeather(data, day) {
     for (var i = 0; i < data.sales.length; i++) {
       var s = data.sales[i];
@@ -166,7 +166,7 @@
     clearTimeout(toastT); toastT = setTimeout(function () { t.hidden = true; }, 2800);
   }
 
-  // ---------------------------------------------------------------- первый экран
+  // первый экран
   function renderTicket() {
     var day = TODAY + 1, c = condFor(TICKET, day), r = compute(TICKET, day, c), total = 0, habit = 0, h = [];
     h.push('<div class="t-head"><span>СВЕЖИЙ РАСЧЁТ</span><span>06:00</span></div>');
@@ -187,7 +187,7 @@
     $("ticket").innerHTML = h.join("");
   }
 
-  // ---------------------------------------------------------------- пример: данные, день, погода
+  // пример: данные, день, погода
   function renderNote() {
     var n = $("data-note"), np = Object.keys(allProducts(S)).length, h;
     var period = S.sales.length ? M.ddmm(firstDay()) + "." + M.diso(firstDay()).slice(0, 4) + " – " + M.ddmm(lastDay()) + "." + M.diso(lastDay()).slice(0, 4) : "продаж пока нет";
@@ -214,7 +214,7 @@
     $("event").value = String(c.event);
   }
 
-  // ---------------------------------------------------------------- вчерашние продажи
+  // вчерашние продажи
   function yWeather(y) {
     var c = S.cond[y] || {}, h = dayWeather(S, y) || {}, w = WX[y] || {};
     return { rain: c.rain != null ? c.rain : h.rain != null ? h.rain : w.rain != null ? w.rain : null,
@@ -304,7 +304,7 @@
     changed();
   }
 
-  // ---------------------------------------------------------------- план на день
+  // план на день
   var SRC = { user: "указано вами", fc: "по прогнозу Open-Meteo", hist: "как было в этот день", avg: "средняя за 2 недели" };
   function renderPlan() {
     var day = S.today, y = day - 1, c = condFor(S, day), C = compute(S, day, c);
@@ -340,7 +340,7 @@
     renderChart();
   }
 
-  // план идёт в работу только после подтверждения: тогда он становится «Сделали» за этот день
+  // план идёт в работу только после подтверждения: тогда он становится "Сделали" за этот день
   function qtyMap(recs) {
     var out = {};
     recs.forEach(function (r) { out[r.product] = r.qty; });
@@ -469,7 +469,7 @@
     box.querySelector("svg").addEventListener("pointerleave", function () { tip.hidden = true; });
   }
 
-  // ---------------------------------------------------------------- сроки годности, проверка, телефон
+  // сроки годности, проверка, телефон
   function stockAlerts(v) { return M.stockAlerts(v, M.diso(S.today), function (iso) { return dayLabel(M.dnum(iso)); }); }
   function renderStock() {
     var v = stock(), box = $("stock"), note = $("stock-note");
@@ -616,7 +616,7 @@
     }
   }
 
-  // ---------------------------------------------------------------- таблицы
+  // таблицы
   var sheetAdapter = {
     today: null,
     toast: toast,
@@ -725,7 +725,7 @@
     }
   };
 
-  // ---------------------------------------------------------------- обновление
+  // обновление
   var planT = null;
   function changed(fromSheets) {
     U.btStale = true;
@@ -757,7 +757,7 @@
     save(); renderAll();
   }
 
-  // ---------------------------------------------------------------- калькулятор и бот
+  // калькулятор и бот
   var SUBSCRIPTION = 5900;
   function renderCalc() {
     var rev = +$("c-rev").value, w = +$("c-waste").value / 100, cost = +$("c-cost").value / 100, cut = +$("c-cut").value / 100, days = 30;
@@ -780,7 +780,7 @@
       '<span class="bot-addr">@' + esc(BOT_USERNAME) + "</span>";
   }
 
-  // ---------------------------------------------------------------- события
+  // события
   $("today").addEventListener("change", function () { if (this.value) goTo(M.dnum(this.value)); });
   $("day-prev").addEventListener("click", function () { goTo(S.today - 1); });
   $("day-next").addEventListener("click", function () { goTo(S.today + 1); });

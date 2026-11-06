@@ -212,7 +212,7 @@
       if (cr >= 0.6) reasons.push("маржа " + Math.round(cr * 100) + "% — берём с запасом");
       else if (cr <= 0.45) reasons.push("маржа " + Math.round(cr * 100) + "% — впритык, остаток дорого обходится");
     }
-    // из чего сложился прогноз: уровень × день недели × температура × сезон × дождь × событие
+    // из чего сложился прогноз: уровень * день недели * температура * сезон * дождь * событие
     var parts = { level: level, days: Object.keys(weights).length, recent: (target - 1) in weights ? weights[target - 1] / wsum : 0,
                   week: f, temp: tempF, delta: diff, season: yoyF, rain: rainTomorrow ? 1 + rainEff : 1, event: eventFactor, z: z };
     return { product: product.name, mean: mean, sd: sd, qty: qty, ratio: cr, reasons: reasons, n: days.length, parts: parts };
@@ -351,7 +351,7 @@
     return xs.length ? avg(xs) : null;
   }
 
-  // ---------------------------------------------------------------- сырьё: техкарты, остатки, заказ
+  // сырьё: техкарты, остатки, заказ
   // та же логика, что в bot/core/materials.py
   var UNITS = { "кг": ["г", 1000], "л": ["мл", 1000], "шт": ["шт", 1] };
   var UNIT_WORDS = { "кг": "кг", "kg": "кг", "килограмм": "кг", "г": "г", "гр": "г", "грамм": "г", "g": "г",
@@ -424,7 +424,7 @@
     return amount > EPS ? amount : 0;
   }
   // materials: { имя: { name, unit, delivery, shelf_life, cost } }, recipes: [{ product, material, norm }]
-  // batches: [{ id, item, amount, expires, arrived }] — дни числами, made и plan: { день: { товар: штук } }
+  // batches: [{ id, item, amount, expires, arrived }] - дни числами, made и plan: { день: { товар: штук } }
   function stockReport(materials, recipes, batches, made, plan, today) {
     var mats = {}, per = perPiece(materials, recipes), pool = {};
     Object.keys(materials).forEach(function (k) { mats[mkey(materials[k].name)] = materials[k]; });
@@ -482,7 +482,7 @@
     return "можно сделать больше: " + extra.slice(0, 2).map(function (x) { return x[1] + " +" + x[0]; }).join(" или ");
   }
 
-  // отчёт по сырью в виде для экрана — тот же, что отдаёт сервер бота (web.py, Cabinet._stock)
+  // отчёт по сырью в виде для экрана - тот же, что отдаёт сервер бота (web.py, Cabinet._stock)
   function stockView(rep, planToday) {
     var iso = function (d) { return d == null ? null : diso(d); };
     return { rows: rep.rows.map(function (r) {
@@ -496,7 +496,7 @@
                 short_before: f(roundUp(r.short_before, r.unit)), short_rest: f(rest), order: f(r.order), waste_total: f(r.waste_total) } };
     }), left: rep.left };
   }
-  // что важно по сырью сегодня: нехватка и будущее списание. label(iso) — подпись дня, «пн, 09.11»
+  // что важно по сырью сегодня: нехватка и будущее списание. label(iso) - подпись дня, "пн, 09.11"
   function stockAlerts(view, todayIso, label) {
     var out = [], T = dnum(todayIso);
     view.rows.forEach(function (r) {

@@ -302,14 +302,14 @@ class FreshBot:
         out = []
         for b in self.db.batches(chat["chat_id"]):
             if skip and b["amount"] is not None and mat_key(b["item"]) in skip:
-                continue  # сырьё с остатком в числах - про него раздел «Сырьё»
+                continue  # сырьё с остатком в числах - про него раздел "Сырьё"
             status, left = expiry_status(date.fromisoformat(b["expires"]), day)
             if left <= horizon:
                 tip = "спишите" if left < 0 else expiry_tip(b["item"])
                 out.append(f"• {esc(b['item'])} ({esc(b['qty'])}) — {status} → {tip}")
         return out
 
-    # ---------------------------------------------------------------- сырьё
+    # сырьё
     def plan_days(self, chat, days: list[date]) -> dict[date, dict[str, int]]:
         """План по дням для расчёта сырья: подтверждённый, иначе утренний расчёт, иначе прогноз."""
         cid = chat["chat_id"]
@@ -333,7 +333,7 @@ class FreshBot:
         return out
 
     def made(self, cid: int, start: date, today: date) -> dict[date, dict[str, float]]:
-        """Что произвели в прошлые дни: «испечено» из продаж, иначе подтверждённый план."""
+        """Что произвели в прошлые дни: "испечено" из продаж, иначе подтверждённый план."""
         out: dict[date, dict[str, float]] = {}
         d = start
         while d < today:
@@ -358,7 +358,7 @@ class FreshBot:
         return stock_report(mats, self.db.recipes(cid), batches, self.made(cid, start, today), plan, today), plan
 
     def stock_lines(self, chat, rep: dict, plan: dict, brief: bool = False) -> list[str]:
-        """Раздел «Сырьё»: нехватка, будущее списание и заказ поставщикам."""
+        """Раздел "Сырьё": нехватка, будущее списание и заказ поставщикам."""
         today = self.today(chat)
         alerts, orders = [], []
         for r in rep["rows"]:
@@ -637,7 +637,7 @@ class FreshBot:
         self.tg.send(chat["chat_id"], "Рассылка выключена. Включить снова: /start")
 
     def load_example(self, chat):
-        """Пример «Пекарня»: год продаж, сырьё с техкартами и графиком поставок, партии со сроками."""
+        """Пример "Пекарня": год продаж, сырьё с техкартами и графиком поставок, партии со сроками."""
         cid = chat["chat_id"]
         text = (ROOT / "data" / "demo_sales.csv").read_text(encoding="utf-8")
         sales, products = parse_csv(text)

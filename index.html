@@ -970,7 +970,7 @@ footer { padding-block: 32px; font-size: 14px; color: var(--ink-3); }
       if (cr >= 0.6) reasons.push("маржа " + Math.round(cr * 100) + "% — берём с запасом");
       else if (cr <= 0.45) reasons.push("маржа " + Math.round(cr * 100) + "% — впритык, остаток дорого обходится");
     }
-    // из чего сложился прогноз: уровень × день недели × температура × сезон × дождь × событие
+    // из чего сложился прогноз: уровень * день недели * температура * сезон * дождь * событие
     var parts = { level: level, days: Object.keys(weights).length, recent: (target - 1) in weights ? weights[target - 1] / wsum : 0,
                   week: f, temp: tempF, delta: diff, season: yoyF, rain: rainTomorrow ? 1 + rainEff : 1, event: eventFactor, z: z };
     return { product: product.name, mean: mean, sd: sd, qty: qty, ratio: cr, reasons: reasons, n: days.length, parts: parts };
@@ -1109,7 +1109,7 @@ footer { padding-block: 32px; font-size: 14px; color: var(--ink-3); }
     return xs.length ? avg(xs) : null;
   }
 
-  // ---------------------------------------------------------------- сырьё: техкарты, остатки, заказ
+  // сырьё: техкарты, остатки, заказ
   // та же логика, что в bot/core/materials.py
   var UNITS = { "кг": ["г", 1000], "л": ["мл", 1000], "шт": ["шт", 1] };
   var UNIT_WORDS = { "кг": "кг", "kg": "кг", "килограмм": "кг", "г": "г", "гр": "г", "грамм": "г", "g": "г",
@@ -1182,7 +1182,7 @@ footer { padding-block: 32px; font-size: 14px; color: var(--ink-3); }
     return amount > EPS ? amount : 0;
   }
   // materials: { имя: { name, unit, delivery, shelf_life, cost } }, recipes: [{ product, material, norm }]
-  // batches: [{ id, item, amount, expires, arrived }] — дни числами, made и plan: { день: { товар: штук } }
+  // batches: [{ id, item, amount, expires, arrived }] - дни числами, made и plan: { день: { товар: штук } }
   function stockReport(materials, recipes, batches, made, plan, today) {
     var mats = {}, per = perPiece(materials, recipes), pool = {};
     Object.keys(materials).forEach(function (k) { mats[mkey(materials[k].name)] = materials[k]; });
@@ -1240,7 +1240,7 @@ footer { padding-block: 32px; font-size: 14px; color: var(--ink-3); }
     return "можно сделать больше: " + extra.slice(0, 2).map(function (x) { return x[1] + " +" + x[0]; }).join(" или ");
   }
 
-  // отчёт по сырью в виде для экрана — тот же, что отдаёт сервер бота (web.py, Cabinet._stock)
+  // отчёт по сырью в виде для экрана - тот же, что отдаёт сервер бота (web.py, Cabinet._stock)
   function stockView(rep, planToday) {
     var iso = function (d) { return d == null ? null : diso(d); };
     return { rows: rep.rows.map(function (r) {
@@ -1254,7 +1254,7 @@ footer { padding-block: 32px; font-size: 14px; color: var(--ink-3); }
                 short_before: f(roundUp(r.short_before, r.unit)), short_rest: f(rest), order: f(r.order), waste_total: f(r.waste_total) } };
     }), left: rep.left };
   }
-  // что важно по сырью сегодня: нехватка и будущее списание. label(iso) — подпись дня, «пн, 09.11»
+  // что важно по сырью сегодня: нехватка и будущее списание. label(iso) - подпись дня, "пн, 09.11"
   function stockAlerts(view, todayIso, label) {
     var out = [], T = dnum(todayIso);
     view.rows.forEach(function (r) {
@@ -1351,7 +1351,7 @@ var DEMO_STOCK = {"materials": [["Мука пшеничная", "кг", "пн, �
     return String(v).replace(".", ",").replace("-", "−");
   }
 
-  // значение из текста по типу колонки; ошибка — исключение с понятным текстом
+  // значение из текста по типу колонки; ошибка - исключение с понятным текстом
   function parse(col, raw) {
     var s = String(raw == null ? "" : raw).replace(/ /g, " ").trim();
     if (s === "") {
@@ -1407,7 +1407,7 @@ var DEMO_STOCK = {"materials": [["Мука пшеничная", "кг", "пн, �
     document.addEventListener("paste", function (e) { var g = activeGrid(); if (g) g.onPaste(e); });
   }
 
-  // ---------------------------------------------------------------- сетка
+  // сетка
   function Grid(el, o) {
     injectCss();
     this.el = el; this.o = o; this.rows = o.rows || [];
@@ -1640,7 +1640,7 @@ var DEMO_STOCK = {"materials": [["Мука пшеничная", "кг", "пн, �
     if (lines.length > 1 && lines[lines.length - 1] === "") lines.pop();
     var cols = this.cols(), g = this.range(), ch = [], errors = [], skipped = 0;
     var start = g.r0, first = lines[0].split("\t");
-    // строка заголовков из Excel — пропускаем
+    // строка заголовков из Excel - пропускаем
     var isTitle = function (x, i) { var c = cols[g.c0 + i], s = x.trim().toLowerCase(); return c && (s === c.title.toLowerCase() || s === String(c.csvTitle || "").toLowerCase()); };
     if (first.some(isTitle)) { lines.shift(); if (!lines.length) return; first = lines[0].split("\t"); }
     var limit = this.o.allowAdd ? Infinity : this.rows.length;
@@ -1669,7 +1669,7 @@ var DEMO_STOCK = {"materials": [["Мука пшеничная", "кг", "пн, �
     this.paintSel(true); this.el.focus({ preventScroll: true });
   };
 
-  // ---------------------------------------------------------------- CSV для Excel
+  // CSV для Excel
   function csv(columns, rows) {
     var cols = columns.filter(function (c) { return c.csv !== false; });
     var q = function (s) { s = String(s == null ? "" : s); return /[;"\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
@@ -1686,7 +1686,7 @@ var DEMO_STOCK = {"materials": [["Мука пшеничная", "кг", "пн, �
     setTimeout(function () { URL.revokeObjectURL(a.href); }, 2000);
   }
 
-  // ---------------------------------------------------------------- четыре листа
+  // четыре листа
   // adapter: today (ISO), load(), saveSales(upsert, remove), saveProduct(p, oldName), removeProduct(name),
   //          addBatch(b), editBatch(b), deleteBatch(id), saveMaterial(m, oldName), removeMaterial(name),
   //          saveRecipe(r, old), removeRecipe(r), upload(text)?, toast(msg)
@@ -2034,7 +2034,7 @@ var DEMO_STOCK = {"materials": [["Мука пшеничная", "кг", "пн, �
   var TODAY = M.dnum(now.getFullYear() + "-" + pad(now.getMonth() + 1) + "-" + pad(now.getDate()));
   var KEY = "svezhiy-demo-v3";
 
-  // ---------------------------------------------------------------- данные примера и состояние
+  // данные примера и состояние
   // S сохраняется в браузере: продажи, товары, партии, выбранный день, погода и события по дням, планы
   function demoState() {
     var r = M.parseCSV(DEMO_CSV);
@@ -2102,7 +2102,7 @@ var DEMO_STOCK = {"materials": [["Мука пшеничная", "кг", "пн, �
   }
   function names() { return Object.keys(allProducts(S)).sort(byName); }
 
-  // погода и событие дня: что указал человек → прогноз Open-Meteo → как было в истории → средняя за 2 недели
+  // погода и событие дня: что указал человек -> прогноз Open-Meteo -> как было в истории -> средняя за 2 недели
   function dayWeather(data, day) {
     for (var i = 0; i < data.sales.length; i++) {
       var s = data.sales[i];
@@ -2184,7 +2184,7 @@ var DEMO_STOCK = {"materials": [["Мука пшеничная", "кг", "пн, �
     clearTimeout(toastT); toastT = setTimeout(function () { t.hidden = true; }, 2800);
   }
 
-  // ---------------------------------------------------------------- первый экран
+  // первый экран
   function renderTicket() {
     var day = TODAY + 1, c = condFor(TICKET, day), r = compute(TICKET, day, c), total = 0, habit = 0, h = [];
     h.push('<div class="t-head"><span>СВЕЖИЙ РАСЧЁТ</span><span>06:00</span></div>');
@@ -2205,7 +2205,7 @@ var DEMO_STOCK = {"materials": [["Мука пшеничная", "кг", "пн, �
     $("ticket").innerHTML = h.join("");
   }
 
-  // ---------------------------------------------------------------- пример: данные, день, погода
+  // пример: данные, день, погода
   function renderNote() {
     var n = $("data-note"), np = Object.keys(allProducts(S)).length, h;
     var period = S.sales.length ? M.ddmm(firstDay()) + "." + M.diso(firstDay()).slice(0, 4) + " – " + M.ddmm(lastDay()) + "." + M.diso(lastDay()).slice(0, 4) : "продаж пока нет";
@@ -2232,7 +2232,7 @@ var DEMO_STOCK = {"materials": [["Мука пшеничная", "кг", "пн, �
     $("event").value = String(c.event);
   }
 
-  // ---------------------------------------------------------------- вчерашние продажи
+  // вчерашние продажи
   function yWeather(y) {
     var c = S.cond[y] || {}, h = dayWeather(S, y) || {}, w = WX[y] || {};
     return { rain: c.rain != null ? c.rain : h.rain != null ? h.rain : w.rain != null ? w.rain : null,
@@ -2322,7 +2322,7 @@ var DEMO_STOCK = {"materials": [["Мука пшеничная", "кг", "пн, �
     changed();
   }
 
-  // ---------------------------------------------------------------- план на день
+  // план на день
   var SRC = { user: "указано вами", fc: "по прогнозу Open-Meteo", hist: "как было в этот день", avg: "средняя за 2 недели" };
   function renderPlan() {
     var day = S.today, y = day - 1, c = condFor(S, day), C = compute(S, day, c);
@@ -2358,7 +2358,7 @@ var DEMO_STOCK = {"materials": [["Мука пшеничная", "кг", "пн, �
     renderChart();
   }
 
-  // план идёт в работу только после подтверждения: тогда он становится «Сделали» за этот день
+  // план идёт в работу только после подтверждения: тогда он становится "Сделали" за этот день
   function qtyMap(recs) {
     var out = {};
     recs.forEach(function (r) { out[r.product] = r.qty; });
@@ -2487,7 +2487,7 @@ var DEMO_STOCK = {"materials": [["Мука пшеничная", "кг", "пн, �
     box.querySelector("svg").addEventListener("pointerleave", function () { tip.hidden = true; });
   }
 
-  // ---------------------------------------------------------------- сроки годности, проверка, телефон
+  // сроки годности, проверка, телефон
   function stockAlerts(v) { return M.stockAlerts(v, M.diso(S.today), function (iso) { return dayLabel(M.dnum(iso)); }); }
   function renderStock() {
     var v = stock(), box = $("stock"), note = $("stock-note");
@@ -2634,7 +2634,7 @@ var DEMO_STOCK = {"materials": [["Мука пшеничная", "кг", "пн, �
     }
   }
 
-  // ---------------------------------------------------------------- таблицы
+  // таблицы
   var sheetAdapter = {
     today: null,
     toast: toast,
@@ -2743,7 +2743,7 @@ var DEMO_STOCK = {"materials": [["Мука пшеничная", "кг", "пн, �
     }
   };
 
-  // ---------------------------------------------------------------- обновление
+  // обновление
   var planT = null;
   function changed(fromSheets) {
     U.btStale = true;
@@ -2775,7 +2775,7 @@ var DEMO_STOCK = {"materials": [["Мука пшеничная", "кг", "пн, �
     save(); renderAll();
   }
 
-  // ---------------------------------------------------------------- калькулятор и бот
+  // калькулятор и бот
   var SUBSCRIPTION = 5900;
   function renderCalc() {
     var rev = +$("c-rev").value, w = +$("c-waste").value / 100, cost = +$("c-cost").value / 100, cut = +$("c-cut").value / 100, days = 30;
@@ -2798,7 +2798,7 @@ var DEMO_STOCK = {"materials": [["Мука пшеничная", "кг", "пн, �
       '<span class="bot-addr">@' + esc(BOT_USERNAME) + "</span>";
   }
 
-  // ---------------------------------------------------------------- события
+  // события
   $("today").addEventListener("change", function () { if (this.value) goTo(M.dnum(this.value)); });
   $("day-prev").addEventListener("click", function () { goTo(S.today - 1); });
   $("day-next").addEventListener("click", function () { goTo(S.today + 1); });

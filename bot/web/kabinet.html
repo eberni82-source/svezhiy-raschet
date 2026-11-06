@@ -436,7 +436,7 @@ input.small { width: 84px; }
       if (cr >= 0.6) reasons.push("маржа " + Math.round(cr * 100) + "% — берём с запасом");
       else if (cr <= 0.45) reasons.push("маржа " + Math.round(cr * 100) + "% — впритык, остаток дорого обходится");
     }
-    // из чего сложился прогноз: уровень × день недели × температура × сезон × дождь × событие
+    // из чего сложился прогноз: уровень * день недели * температура * сезон * дождь * событие
     var parts = { level: level, days: Object.keys(weights).length, recent: (target - 1) in weights ? weights[target - 1] / wsum : 0,
                   week: f, temp: tempF, delta: diff, season: yoyF, rain: rainTomorrow ? 1 + rainEff : 1, event: eventFactor, z: z };
     return { product: product.name, mean: mean, sd: sd, qty: qty, ratio: cr, reasons: reasons, n: days.length, parts: parts };
@@ -575,7 +575,7 @@ input.small { width: 84px; }
     return xs.length ? avg(xs) : null;
   }
 
-  // ---------------------------------------------------------------- сырьё: техкарты, остатки, заказ
+  // сырьё: техкарты, остатки, заказ
   // та же логика, что в bot/core/materials.py
   var UNITS = { "кг": ["г", 1000], "л": ["мл", 1000], "шт": ["шт", 1] };
   var UNIT_WORDS = { "кг": "кг", "kg": "кг", "килограмм": "кг", "г": "г", "гр": "г", "грамм": "г", "g": "г",
@@ -648,7 +648,7 @@ input.small { width: 84px; }
     return amount > EPS ? amount : 0;
   }
   // materials: { имя: { name, unit, delivery, shelf_life, cost } }, recipes: [{ product, material, norm }]
-  // batches: [{ id, item, amount, expires, arrived }] — дни числами, made и plan: { день: { товар: штук } }
+  // batches: [{ id, item, amount, expires, arrived }] - дни числами, made и plan: { день: { товар: штук } }
   function stockReport(materials, recipes, batches, made, plan, today) {
     var mats = {}, per = perPiece(materials, recipes), pool = {};
     Object.keys(materials).forEach(function (k) { mats[mkey(materials[k].name)] = materials[k]; });
@@ -706,7 +706,7 @@ input.small { width: 84px; }
     return "можно сделать больше: " + extra.slice(0, 2).map(function (x) { return x[1] + " +" + x[0]; }).join(" или ");
   }
 
-  // отчёт по сырью в виде для экрана — тот же, что отдаёт сервер бота (web.py, Cabinet._stock)
+  // отчёт по сырью в виде для экрана - тот же, что отдаёт сервер бота (web.py, Cabinet._stock)
   function stockView(rep, planToday) {
     var iso = function (d) { return d == null ? null : diso(d); };
     return { rows: rep.rows.map(function (r) {
@@ -720,7 +720,7 @@ input.small { width: 84px; }
                 short_before: f(roundUp(r.short_before, r.unit)), short_rest: f(rest), order: f(r.order), waste_total: f(r.waste_total) } };
     }), left: rep.left };
   }
-  // что важно по сырью сегодня: нехватка и будущее списание. label(iso) — подпись дня, «пн, 09.11»
+  // что важно по сырью сегодня: нехватка и будущее списание. label(iso) - подпись дня, "пн, 09.11"
   function stockAlerts(view, todayIso, label) {
     var out = [], T = dnum(todayIso);
     view.rows.forEach(function (r) {
@@ -817,7 +817,7 @@ var DEMO_STOCK = null;
     return String(v).replace(".", ",").replace("-", "−");
   }
 
-  // значение из текста по типу колонки; ошибка — исключение с понятным текстом
+  // значение из текста по типу колонки; ошибка - исключение с понятным текстом
   function parse(col, raw) {
     var s = String(raw == null ? "" : raw).replace(/ /g, " ").trim();
     if (s === "") {
@@ -873,7 +873,7 @@ var DEMO_STOCK = null;
     document.addEventListener("paste", function (e) { var g = activeGrid(); if (g) g.onPaste(e); });
   }
 
-  // ---------------------------------------------------------------- сетка
+  // сетка
   function Grid(el, o) {
     injectCss();
     this.el = el; this.o = o; this.rows = o.rows || [];
@@ -1106,7 +1106,7 @@ var DEMO_STOCK = null;
     if (lines.length > 1 && lines[lines.length - 1] === "") lines.pop();
     var cols = this.cols(), g = this.range(), ch = [], errors = [], skipped = 0;
     var start = g.r0, first = lines[0].split("\t");
-    // строка заголовков из Excel — пропускаем
+    // строка заголовков из Excel - пропускаем
     var isTitle = function (x, i) { var c = cols[g.c0 + i], s = x.trim().toLowerCase(); return c && (s === c.title.toLowerCase() || s === String(c.csvTitle || "").toLowerCase()); };
     if (first.some(isTitle)) { lines.shift(); if (!lines.length) return; first = lines[0].split("\t"); }
     var limit = this.o.allowAdd ? Infinity : this.rows.length;
@@ -1135,7 +1135,7 @@ var DEMO_STOCK = null;
     this.paintSel(true); this.el.focus({ preventScroll: true });
   };
 
-  // ---------------------------------------------------------------- CSV для Excel
+  // CSV для Excel
   function csv(columns, rows) {
     var cols = columns.filter(function (c) { return c.csv !== false; });
     var q = function (s) { s = String(s == null ? "" : s); return /[;"\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
@@ -1152,7 +1152,7 @@ var DEMO_STOCK = null;
     setTimeout(function () { URL.revokeObjectURL(a.href); }, 2000);
   }
 
-  // ---------------------------------------------------------------- четыре листа
+  // четыре листа
   // adapter: today (ISO), load(), saveSales(upsert, remove), saveProduct(p, oldName), removeProduct(name),
   //          addBatch(b), editBatch(b), deleteBatch(id), saveMaterial(m, oldName), removeMaterial(name),
   //          saveRecipe(r, old), removeRecipe(r), upload(text)?, toast(msg)
@@ -1954,7 +1954,7 @@ var DEMO_STOCK = null;
     return S.st.today.items.filter(function (i) { return i.ok_qty != null; }).sort(function (a, b) { return a.product < b.product ? -1 : 1; });
   }
 
-  // ---------------------------------------------------------------- сырьё
+  // сырьё
   function alertList(list) {
     return '<ul class="alerts">' + list.map(function (a) {
       return '<li class="' + a.level + '"><span class="ic" aria-hidden="true">' + (a.waste ? "🗑" : "⚠️") + "</span><span><b>" + esc(a.name) + ":</b> " + esc(a.text) + "</span></li>";

@@ -470,7 +470,7 @@
     return S.st.today.items.filter(function (i) { return i.ok_qty != null; }).sort(function (a, b) { return a.product < b.product ? -1 : 1; });
   }
 
-  // ---------------------------------------------------------------- сырьё
+  // сырьё
   function alertList(list) {
     return '<ul class="alerts">' + list.map(function (a) {
       return '<li class="' + a.level + '"><span class="ic" aria-hidden="true">' + (a.waste ? "🗑" : "⚠️") + "</span><span><b>" + esc(a.name) + ":</b> " + esc(a.text) + "</span></li>";

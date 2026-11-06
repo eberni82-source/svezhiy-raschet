@@ -160,7 +160,7 @@ class Cabinet:
         return {"rows": rows, "left": {str(k): v for k, v in rep["left"].items()}}
 
     def _amount(self, cid: int, item: str, body: dict) -> tuple[str, float | None, str | None]:
-        """Количество партии: числом (amount и unit) или текстом «2 л». Для сырья - в его единицах."""
+        """Количество партии: числом (amount и unit) или текстом "2 л". Для сырья - в его единицах."""
         m = {mat_key(n): x for n, x in self.bot.db.materials(cid).items()}.get(mat_key(item))
         if body.get("amount") not in (None, ""):
             x = _wnum(body.get("amount"), 0, 1e6)

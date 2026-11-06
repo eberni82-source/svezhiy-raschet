@@ -80,7 +80,7 @@ class Storage:
                                 ("batches", "amount", "REAL"), ("batches", "unit", "TEXT"), ("batches", "arrived", "TEXT")):
             if col not in {r["name"] for r in self.db.execute(f"PRAGMA table_info({table})")}:
                 self.db.execute(f"ALTER TABLE {table} ADD COLUMN {col} {typ}")
-        # старые партии: количество было текстом «2 л» - достаём число
+        # старые партии: количество было текстом "2 л" - достаём число
         for r in self.db.execute("SELECT id, qty, created_at FROM batches WHERE amount IS NULL AND arrived IS NULL").fetchall():
             amount, unit = parse_amount(r["qty"])
             self.db.execute("UPDATE batches SET amount=?, unit=?, arrived=? WHERE id=?",

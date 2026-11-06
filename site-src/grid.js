@@ -61,7 +61,7 @@
     return String(v).replace(".", ",").replace("-", "−");
   }
 
-  // значение из текста по типу колонки; ошибка — исключение с понятным текстом
+  // значение из текста по типу колонки; ошибка - исключение с понятным текстом
   function parse(col, raw) {
     var s = String(raw == null ? "" : raw).replace(/ /g, " ").trim();
     if (s === "") {
@@ -117,7 +117,7 @@
     document.addEventListener("paste", function (e) { var g = activeGrid(); if (g) g.onPaste(e); });
   }
 
-  // ---------------------------------------------------------------- сетка
+  // сетка
   function Grid(el, o) {
     injectCss();
     this.el = el; this.o = o; this.rows = o.rows || [];
@@ -350,7 +350,7 @@
     if (lines.length > 1 && lines[lines.length - 1] === "") lines.pop();
     var cols = this.cols(), g = this.range(), ch = [], errors = [], skipped = 0;
     var start = g.r0, first = lines[0].split("\t");
-    // строка заголовков из Excel — пропускаем
+    // строка заголовков из Excel - пропускаем
     var isTitle = function (x, i) { var c = cols[g.c0 + i], s = x.trim().toLowerCase(); return c && (s === c.title.toLowerCase() || s === String(c.csvTitle || "").toLowerCase()); };
     if (first.some(isTitle)) { lines.shift(); if (!lines.length) return; first = lines[0].split("\t"); }
     var limit = this.o.allowAdd ? Infinity : this.rows.length;
@@ -379,7 +379,7 @@
     this.paintSel(true); this.el.focus({ preventScroll: true });
   };
 
-  // ---------------------------------------------------------------- CSV для Excel
+  // CSV для Excel
   function csv(columns, rows) {
     var cols = columns.filter(function (c) { return c.csv !== false; });
     var q = function (s) { s = String(s == null ? "" : s); return /[;"\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
@@ -396,7 +396,7 @@
     setTimeout(function () { URL.revokeObjectURL(a.href); }, 2000);
   }
 
-  // ---------------------------------------------------------------- четыре листа
+  // четыре листа
   // adapter: today (ISO), load(), saveSales(upsert, remove), saveProduct(p, oldName), removeProduct(name),
   //          addBatch(b), editBatch(b), deleteBatch(id), saveMaterial(m, oldName), removeMaterial(name),
   //          saveRecipe(r, old), removeRecipe(r), upload(text)?, toast(msg)
