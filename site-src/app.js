@@ -25,16 +25,19 @@
     Object.keys(r.products).forEach(function (k) { r.products[k].shelf_life = k === "Эклер" || k === "Сэндвич с курицей" ? 2 : 1; });
     var batches = [["Сливки 33%", "2 л", 1], ["Творог 5%", "3 кг", 2], ["Филе куриное", "1,5 кг", 0], ["Вишня замороженная", "2 кг", 20]]
       .map(function (b, i) { return { id: i + 1, item: b[0], qty: b[1], exp: TODAY + b[2] }; });
-    return { v: 2, source: "demo", fileName: "", sales: r.sales, products: r.products, hidden: {}, batches: batches, today: TODAY, cond: {}, plans: {}, edited: false };
+    return { v: 2, source: "demo", fileName: "", sales: r.sales, products: r.products, hidden: {}, batches: batches, today: TODAY, cond: {}, plans: {}, planAt: {}, edited: false };
   }
   function fileState(text, name) {
     var r = M.parseCSV(text), last = Math.max.apply(null, r.sales.map(function (s) { return s.day; }));
-    return { v: 2, source: "file", fileName: name, sales: r.sales, products: r.products, hidden: {}, batches: [], today: last + 1, cond: {}, plans: {}, edited: false };
+    return { v: 2, source: "file", fileName: name, sales: r.sales, products: r.products, hidden: {}, batches: [], today: last + 1, cond: {}, plans: {}, planAt: {}, edited: false };
   }
   function restore() {
     try {
       var d = JSON.parse(localStorage.getItem(KEY) || "null");
-      if (d && d.v === 2 && Array.isArray(d.sales) && d.sales.length && typeof d.today === "number") return d;
+      if (d && d.v === 2 && Array.isArray(d.sales) && d.sales.length && typeof d.today === "number") {
+        d.plans = d.plans || {}; d.planAt = d.planAt || {};
+        return d;
+      }
     } catch (e) { /* хранилище недоступно — начинаем с примера */ }
     return demoState();
   }
@@ -184,12 +187,6 @@
     return { rain: c.rain != null ? c.rain : h.rain != null ? h.rain : w.rain != null ? w.rain : null,
              temp: c.temp != null ? c.temp : h.temp != null ? h.temp : w.temp != null ? w.temp : null };
   }
-  function plannedFor(day) {
-    if (S.plans[day]) return S.plans[day];
-    var out = {};
-    compute(S, day, condFor(S, day)).recs.forEach(function (r) { out[r.product] = r.qty; });
-    return out;
-  }
   function val(x) { return x == null ? "" : String(x).replace(".", ","); }
   function renderYWeather() {
     var w = yWeather(S.today - 1);
@@ -197,12 +194,11 @@
     if (document.activeElement !== $("y-temp")) $("y-temp").value = w.temp == null ? "" : String(Math.round(w.temp)).replace("-", "−");
   }
   function renderYesterday() {
-    var y = S.today - 1, rows = [], plan = null;
+    var y = S.today - 1, rows = [], plan = S.plans[y] || {};
     $("y-title").textContent = "Вчера, " + dayLabel(y) + ": сколько сделали и продали";
     renderYWeather();
     names().forEach(function (p) {
-      var s = saleAt(y, p), baked = s ? s.baked : null;
-      if (!s) { plan = plan || plannedFor(y); baked = plan[p] != null ? plan[p] : null; }
+      var s = saleAt(y, p), baked = s ? s.baked : plan[p] != null ? plan[p] : null;
       var sold = s ? s.sold : null, left = s && s.soldout ? 0 : baked != null && sold != null ? Math.max(0, baked - sold) : null, lab = esc(p);
       rows.push('<tr data-p="' + esc(p) + '"><td class="name">' + esc(p) + "</td>" +
         '<td class="r"><input type="text" class="cell" data-k="baked" inputmode="decimal" autocomplete="off" value="' + esc(val(baked)) + '" aria-label="Сделали: ' + lab + '"></td>' +
@@ -226,7 +222,8 @@
     hint.textContent = !list.length ? "" : done === list.length
       ? "Продажи за вчера внесены — план ниже их учитывает."
       : done === 0
-        ? "За вчера продаж нет. Впишите, сколько продали, и время, если позиция закончилась раньше закрытия, — план пересчитается."
+        ? (S.plans[y] ? "«Сделали» — из подтверждённого плана. " : "План на вчера не подтверждали, поэтому он не пошёл в работу. Впишите, сколько сделали на самом деле. ") +
+          "Добавьте, сколько продали, и время, если позиция закончилась раньше закрытия, — план пересчитается."
         : "Внесено " + done + " из " + list.length + ". Строки без «Продали» в расчёт не попадают.";
   }
   function parseNum(v) {
@@ -281,15 +278,15 @@
     U.C = C;
     if (!U.sel || !C.recs.some(function (r) { return r.product === U.sel; })) U.sel = C.recs.length ? C.recs[0].product : null;
     $("plan-title").textContent = "План на " + dayLabel(day);
-    var rows = [], tm = 0, tq = 0, th = 0, ty = 0, hasHabit = Object.keys(C.habit).length > 0;
+    var rows = [], tm = 0, tq = 0, th = 0, ty = 0, hasHabit = Object.keys(C.habit).length > 0, ok = S.plans[day];
     C.recs.forEach(function (r) {
-      var hb = C.habit[r.product], ys = saleAt(y, r.product), why = whyText(r);
+      var hb = C.habit[r.product], ys = saleAt(y, r.product), why = whyText(r), was = ok && ok[r.product] !== r.qty ? ok[r.product] : null;
       tm += r.mean; tq += r.qty; th += hb != null ? hb : r.qty; if (ys) ty += ys.sold;
       rows.push('<tr tabindex="0" data-p="' + esc(r.product) + '" aria-selected="' + (r.product === U.sel) + '">' +
         '<td><div class="name">' + esc(r.product) + "</div>" + (why ? '<div class="why">' + esc(why) + "</div>" : "") + "</td>" +
         '<td class="r num">' + (ys ? fmt(ys.sold) + (ys.soldout ? '<div class="why">до ' + esc(ys.soldout) + "</div>" : "") : '<span class="muted">—</span>') + "</td>" +
         '<td class="r num">≈' + Math.round(r.mean) + ' <span class="muted sdv">±' + Math.round(r.sd) + "</span></td>" +
-        '<td class="r"><span class="qty">' + r.qty + "</span></td>" +
+        '<td class="r"><span class="qty">' + r.qty + "</span>" + (was != null ? '<div class="why">в работе ' + was + "</div>" : "") + "</td>" +
         '<td class="r num muted c-habit">' + (hb != null ? Math.round(hb) : "—") + "</td></tr>");
     });
     $("plan-table").tBodies[0].innerHTML = rows.join("") || '<tr><td colspan="5" class="muted">Нет истории продаж для расчёта.</td></tr>';
@@ -305,7 +302,42 @@
     if (c.temp != null) wx.push("температура " + M.deg(c.temp) + " — " + SRC[c.tempSrc]);
     $("rain-note").textContent = (wx.length ? "Погода на " + dayLabel(day) + ": " + wx.join(", ") + ". " : "") +
       "Дождь: " + M.signed(e.eff * 100) + " к спросу" + (e.learned ? " (по истории продаж)." : " (по умолчанию).") + " «Обычно» — сколько делали в этот день недели за 4 недели.";
+    renderConfirm(C.recs);
     renderChart();
+  }
+
+  // план идёт в работу только после подтверждения: тогда он становится «Сделали» за этот день
+  function qtyMap(recs) {
+    var out = {};
+    recs.forEach(function (r) { out[r.product] = r.qty; });
+    return out;
+  }
+  function planState(day, recs) {
+    var ok = S.plans[day];
+    if (!ok) return "draft";
+    var same = recs.length === Object.keys(ok).length && recs.every(function (r) { return ok[r.product] === r.qty; });
+    return same ? "ok" : "changed";
+  }
+  function sum(map) { return Object.keys(map).reduce(function (a, k) { return a + map[k]; }, 0); }
+  function renderConfirm(recs) {
+    var day = S.today, st = planState(day, recs), chip = $("plan-status"), btn = $("confirm-btn"), next = $("go-next"), total = sum(qtyMap(recs)), text;
+    if (st === "draft") {
+      text = "<b>План не подтверждён.</b> Проверьте цифры и подтвердите: без подтверждения план не уходит в работу и не попадёт во «вчера».";
+    } else if (st === "ok") {
+      text = "<b>План подтверждён" + (S.planAt[day] ? " в " + S.planAt[day] : "") + ":</b> " + fmt(total) + " шт по " + recs.length + " " +
+        plural(recs.length, "позиции", "позициям", "позициям") + ". Вечером внесите продажи — следующий план их учтёт.";
+    } else {
+      text = "<b>Данные изменились после подтверждения.</b> В работе " + fmt(sum(S.plans[day])) + " шт, новый расчёт — " + fmt(total) + " шт. Подтвердите новый план.";
+    }
+    chip.className = "chip " + (st === "ok" ? "ok" : "warn");
+    chip.textContent = st === "draft" ? "Черновик" : st === "ok" ? "✓ Подтверждён" : "Изменился";
+    $("confirm-text").innerHTML = text;
+    $("confirm").classList.toggle("ok", st === "ok");
+    $("plan-table").classList.toggle("confirmed", st === "ok");
+    btn.textContent = st === "draft" ? "Подтвердить план" : st === "ok" ? "Отменить подтверждение" : "Подтвердить новый план";
+    btn.className = "btn " + (st === "ok" ? "btn-ghost" : "btn-primary");
+    next.className = "btn " + (st === "ok" ? "btn-primary" : "btn-ghost");
+    btn.disabled = !recs.length;
   }
   function line(name, value, note, cls) {
     return '<div class="ln' + (cls ? " " + cls : "") + '"><span>' + name + "</span><b>" + value + "</b><span>" + note + "</span></div>";
@@ -662,12 +694,23 @@
     if (t === undefined) { toast("Температура от −50 до 45 °C"); renderYWeather(); return; }
     setYesterdayWeather("temp", t);
   });
+  $("confirm-btn").addEventListener("click", function () {
+    var day = S.today, recs = U.C ? U.C.recs : [];
+    if (planState(day, recs) === "ok") {
+      delete S.plans[day]; delete S.planAt[day];
+      toast("Подтверждение снято — план снова черновик");
+    } else {
+      var d = new Date();
+      S.plans[day] = qtyMap(recs); S.planAt[day] = pad(d.getHours()) + ":" + pad(d.getMinutes());
+      toast("План на " + dayLabel(day) + " подтверждён и пошёл в работу");
+    }
+    S.edited = true;
+    save(); renderPlan(); renderNote();
+  });
   $("go-next").addEventListener("click", function () {
-    var plan = {};
-    (U.C ? U.C.recs : []).forEach(function (r) { plan[r.product] = r.qty; });
-    S.plans[S.today] = plan;
-    goTo(S.today + 1);
-    toast("Теперь " + dayLabel(S.today) + ". Внесите продажи за вчера");
+    var day = S.today, inWork = !!S.plans[day];
+    goTo(day + 1);
+    toast(inWork ? "Теперь " + dayLabel(S.today) + ". Внесите продажи за вчера" : "План на " + dayLabel(day) + " не подтвердили — в работу он не пошёл");
     $("y-title").scrollIntoView({ behavior: "smooth", block: "center" });
   });
   ["plan", "exp", "bt", "sheets"].forEach(function (t) { $("tab-" + t).addEventListener("click", function () { U.tab = t; renderTabs(); }); });

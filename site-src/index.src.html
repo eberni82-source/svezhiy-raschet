@@ -202,8 +202,17 @@ table.plan { width: 100%; border-collapse: collapse; font-size: 15px; }
   .ytable th.r { width: 1%; }
   .ytable .c-left, .plan .c-habit { display: none; }
 }
-.next { display: flex; justify-content: space-between; align-items: center; gap: 10px 16px; flex-wrap: wrap; margin-top: 14px; padding: 14px 0 0; border-top: 1px solid var(--line); font-size: 14px; color: var(--ink-2); }
+.plan-head { display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap; margin-bottom: 10px; }
+.plan-head .plan-h { margin-bottom: 0; }
+.plan.confirmed .qty { color: var(--ok); }
+.next { display: flex; justify-content: space-between; align-items: center; gap: 12px 16px; flex-wrap: wrap; margin-top: 14px; padding: 14px 16px; border-radius: 12px; background: var(--warn-soft); font-size: 14px; color: var(--ink-2); }
+.next.ok { background: var(--ok-soft); }
+.next p { flex: 1 1 280px; max-width: 60ch; }
+.next b { color: var(--ink); }
+.next-btns { display: flex; gap: 8px; flex-wrap: wrap; }
 .next .btn { min-height: 44px; font-size: 15px; }
+.next .btn:disabled { opacity: .55; cursor: not-allowed; transform: none; }
+@media (max-width: 560px) { .next-btns, .next-btns .btn { width: 100%; } }
 .bk { display: grid; max-width: 640px; font-size: 14px; margin: 8px 0 16px; }
 .bk:empty { display: none; }
 .bk .ln { display: grid; grid-template-columns: minmax(0, 150px) 78px minmax(0, 1fr); gap: 10px; padding: 6px 0; border-bottom: 1px dashed var(--line); align-items: baseline; }
@@ -433,7 +442,7 @@ footer { padding-block: 32px; font-size: 14px; color: var(--ink-3); }
         <div class="beat">
           <span class="time">06:00</span>
           <h3>План на день</h3>
-          <p>Сколько сделать или заказать каждой позиции с учётом погоды и сезона в Челябинске.</p>
+          <p>Сколько сделать или заказать каждой позиции с учётом погоды и сезона в Челябинске. Вы подтверждаете план — без подтверждения он не идёт в работу.</p>
         </div>
         <div class="beat">
           <span class="time">17:00</span>
@@ -453,7 +462,7 @@ footer { padding-block: 32px; font-size: 14px; color: var(--ink-3); }
     <div class="wrap">
       <div class="section-head">
         <h2>Попробуйте на примере пекарни</h2>
-        <p class="lead">Выберите день, погоду и событие, внесите вчерашние продажи — план пересчитается. Нажмите на позицию, чтобы увидеть расчёт.</p>
+        <p class="lead">Выберите день, погоду и событие, внесите вчерашние продажи — план пересчитается. Подтвердите его: только подтверждённый план идёт в работу. Нажмите на позицию, чтобы увидеть расчёт.</p>
       </div>
 
       <div class="console">
@@ -514,7 +523,7 @@ footer { padding-block: 32px; font-size: 14px; color: var(--ink-3); }
                 </div>
                 <p class="rain-note" id="y-hint"></p>
               </div>
-              <h3 class="plan-h" id="plan-title">План</h3>
+              <div class="plan-head"><h3 class="plan-h" id="plan-title">План</h3><span class="chip warn" id="plan-status">Черновик</span></div>
               <div class="table-wrap">
                 <table class="plan" id="plan-table">
                   <thead><tr><th>Позиция</th><th class="r">Вчера</th><th class="r">Спрос</th><th class="r">Сделать</th><th class="r c-habit">Обычно</th></tr></thead>
@@ -523,9 +532,12 @@ footer { padding-block: 32px; font-size: 14px; color: var(--ink-3); }
                 </table>
               </div>
               <p class="rain-note" id="rain-note"></p>
-              <div class="next">
-                <span>День закончился? Этот план станет «вчера», останется внести продажи.</span>
-                <button type="button" class="btn btn-primary" id="go-next">Следующий день →</button>
+              <div class="next" id="confirm">
+                <p id="confirm-text"></p>
+                <div class="next-btns">
+                  <button type="button" class="btn btn-primary" id="confirm-btn">Подтвердить план</button>
+                  <button type="button" class="btn btn-ghost" id="go-next">Следующий день →</button>
+                </div>
               </div>
               <div class="chart-card">
                 <h3 id="chart-title">История позиции</h3>
