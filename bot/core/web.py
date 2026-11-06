@@ -61,6 +61,13 @@ def _wdate(v, field="дата") -> date:
         raise ValueError(f"{field}: нужна дата")
 
 
+def plan_info(work: list, current: dict[str, int]) -> dict:
+    """Статус плана для кабинета: черновик, подтверждён или изменился после подтверждения."""
+    ok = {r["product"]: r["qty"] for r in work}
+    status = "draft" if not ok else "ok" if ok == current else "changed"
+    return {"status": status, "at": work[0]["at"] if work else None, "total_ok": sum(ok.values()) if ok else None}
+
+
 def _wname(v, field="название") -> str:
     s = re.sub(r"\s+", " ", str(v or "")).strip()
     if not s:
@@ -137,20 +144,31 @@ class Cabinet:
         if missing:
             db.save_plan(cid, today, missing)
             saved = {r["product"]: r for r in db.plan(cid, today)}
+        work_t = db.work_plan(cid, today)
+        ok_t = {r["product"]: r for r in work_t}
         items = []
         for r in recs_t:
             row = saved.get(r.product)
             it = self._item(r, row["qty"] if row else None, row["mean"] if row else None)
+            w = ok_t.get(r.product)
+            it["ok_qty"] = w["qty"] if w else None
+            if w:  # витрина и итоги - по подтверждённому плану
+                it["threshold"] = evening_threshold(Recommendation(r.product, w["mean"], 0, w["qty"], 0))
             s = db.sale(cid, today, r.product)
             it["record"] = None if not s else {
                 "soldout": s["soldout"], "baked": s["baked"],
                 "left": None if s["soldout"] else max(0, round((s["baked"] or 0) - (s["sold"] or 0)))}
             items.append(it)
         items.sort(key=lambda x: -x["qty"])
+        plan_t = plan_info(work_t, {r["product"]: r["qty"] for r in db.plan(cid, today)})
 
         recs_m, info_m = b.recommendations(chat, tomorrow)
-        tom = [dict(self._item(r), habit=round(info_m["habit"][r.product]) if r.product in info_m["habit"] else None)
+        work_m = db.work_plan(cid, tomorrow)
+        ok_m = {r["product"]: r["qty"] for r in work_m}
+        tom = [dict(self._item(r), ok_qty=ok_m.get(r.product),
+                    habit=round(info_m["habit"][r.product]) if r.product in info_m["habit"] else None)
                for r in recs_m]
+        plan_m = plan_info(work_m, {r.product: r.qty for r in recs_m})
 
         products = self._products(cid)
         batches = self._batches(cid, today)
@@ -164,10 +182,10 @@ class Cabinet:
             "now": now.strftime("%Y-%m-%dT%H:%M"), "phase": phase_of(chat, now),
             "times": {"morning": chat["morning"], "evening": chat["evening"], "closing": chat["closing"]},
             "today": {"date": today.isoformat(), "rain": info_t["rain"], "temp": info_t["temp"],
-                      "event": info_t["event"], "items": items},
+                      "event": info_t["event"], "items": items, "plan": plan_t},
             "tomorrow": {"date": tomorrow.isoformat(), "rain": info_m["rain"], "temp": info_m["temp"],
                          "event": info_m["event"],
-                         "rain_effect": round(info_m["rain_eff"], 3), "items": tom},
+                         "rain_effect": round(info_m["rain_eff"], 3), "items": tom, "plan": plan_m},
             "products": products,
             "removed": sorted(db.inactive_products(cid)),
             "batches": batches,
@@ -184,12 +202,14 @@ class Cabinet:
         sales = [{"day": s.day.isoformat(), "product": s.product, "baked": s.baked, "sold": s.sold,
                   "soldout": s.soldout, "rain": s.rain, "temp": s.temp} for s in db.sales(cid)]
         days = [today + timedelta(days=i) for i in range(7)]
-        fixed = {r["product"]: r["qty"] for r in db.plan(cid, today)}
+        # сегодня и завтра - подтверждённый план, если он есть; сегодня без подтверждения - утренний расчёт
+        fixed = [{r["product"]: r["qty"] for r in db.work_plan(cid, today) or db.plan(cid, today)},
+                 {r["product"]: r["qty"] for r in db.work_plan(cid, today + timedelta(days=1))}]
         week: dict[str, list[int]] = {}
         for i, d in enumerate(days):
             recs, _ = b.recommendations(chat, d)
             for r in recs:
-                week.setdefault(r.product, [0] * 7)[i] = fixed.get(r.product, r.qty) if i == 0 else r.qty
+                week.setdefault(r.product, [0] * 7)[i] = fixed[i].get(r.product, r.qty) if i < 2 else r.qty
         rows = [{"product": p, "qty": q} for p, q in sorted(week.items(), key=lambda kv: -sum(kv[1]))]
         return {"today": today.isoformat(), "sales": sales, "products": self._products(cid),
                 "batches": self._batches(cid, today), "week": {"days": [d.isoformat() for d in days], "rows": rows}}
@@ -271,6 +291,20 @@ class Cabinet:
             b.record(chat, today, product, left, soldout)
             self._bt_cache.pop(cid, None)
             return {"ok": True}
+        if path in ("/api/plan/confirm", "/api/plan/unconfirm"):
+            day = _wdate(body.get("day"), "день")
+            if day not in (today, today + timedelta(days=1)):
+                raise ValueError("подтвердить можно план на сегодня или на завтра")
+            if path == "/api/plan/unconfirm":
+                db.unconfirm_plan(cid, day)
+                return {"ok": True}
+            if day > today:  # завтра: фиксируем тот расчёт, что видит владелец
+                recs, _ = b.recommendations(chat, day)
+                db.save_plan(cid, day, recs, replace=True)
+            res = b.confirm(chat, day)
+            if not res:
+                raise ValueError("плана на этот день нет")
+            return dict(res, ok=True)
         if path == "/api/event":
             f = _wnum(body.get("factor"), 0.3, 3)
             db.set_event(cid, today + timedelta(days=1), None if not f or abs(f - 1) < 1e-9 else f)

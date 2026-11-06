@@ -104,9 +104,37 @@ out = msg(999, "/start") + msg(999, "Челябинск"); show("город Че
 check(bot.db.chat(999)["tz"] == "Asia/Yekaterinburg" and bot.db.chat(999)["city"] == "Челябинск", "Челябинск: часовой пояс +5 без интернета")
 out = msg(USER, "/demo"); show("/demo", out)
 check(any("Списания" in p["text"] for _, p in out) and any("План на завтра" in p["text"] for _, p in out), "демо + бэктест + план")
+def buttons(out):
+    return [b for _, p in out for row in (p.get("reply_markup") or {}).get("inline_keyboard", []) for b in row]
+
+
+from datetime import date as _d, timedelta as _td  # noqa: E402
+today = bot.today(bot.db.chat(USER)).isoformat()
+tomorrow = (bot.today(bot.db.chat(USER)) + _td(days=1)).isoformat()
 out = msg(USER, "План на завтра"); show("кнопка План на завтра", out)
+check(any(b["callback_data"] == f"ok:{tomorrow}" for b in buttons(out)), "под планом есть кнопка «Подтвердить план»")
+check(any("без подтверждения он не идёт в работу" in p["text"] for _, p in out), "в плане сказано, что без подтверждения он не в работе")
+out = cb(USER, f"ok:{tomorrow}"); show("подтвердили план на завтра", out)
+check(any("подтверждён и пошёл в работу" in p["text"] for _, p in out), "бот подтвердил план")
+check(bot.db.work_plan(USER, _d.fromisoformat(tomorrow)), "план на завтра в работе")
+out = msg(USER, "План на завтра"); show("план после подтверждения", out)
+check(any("✅ План подтверждён" in p["text"] for _, p in out) and not any(b["callback_data"].startswith("ok:") for b in buttons(out)),
+      "подтверждённый план: кнопки подтверждения нет")
 out = cb(USER, "e:1.2"); show("событие +20%", out)
 check(any("+20%" in p["text"] for _, p in out), "событие учтено в плане")
+check(any("расчёт изменился" in p["text"] for _, p in out) and any(b["text"] == "✅ Подтвердить новый план" for b in buttons(out)),
+      "после события план «изменился» — предлагает подтвердить новый")
+out = cb(USER, "ok:2020-01-01"); check(any("уже прошёл" in p["text"] for _, p in out), "прошедший день подтвердить нельзя")
+
+out = msg(USER, "/itogi"); show("/itogi без подтверждения", out)
+check(any("не подтверждён" in p["text"] for _, p in out) and any(b["callback_data"] == f"ok:{today}" for b in buttons(out)),
+      "итоги без подтверждённого плана не отмечаются — бот предлагает подтвердить")
+out = msg(USER, "/skidka"); check(any("не подтверждён" in p["text"] for _, p in out), "скидки без подтверждённого плана не считаются")
+bot.job_evening(bot.db.chat(USER)); show("вечер без подтверждения", SENT[-1:])
+check("советов по витрине не будет" in SENT[-1][1]["text"], "вечером бот напоминает, что план не подтверждён")
+out = msg(USER, "/today"); show("/today", out)
+check(any("План на сегодня" in p["text"] for _, p in out) and any(b["callback_data"] == f"ok:{today}" for b in buttons(out)), "/today показывает план и кнопку")
+out = cb(USER, f"ok:{today}"); show("подтвердили план на сегодня", out)
 out = msg(USER, "/itogi"); show("/itogi", out)
 out = cb(USER, "d:0"); show("итоги: позиция 0", out)
 out = cb(USER, "o:0:13:30"); show("кончились 12–15", out)
@@ -145,6 +173,8 @@ now = bot.now(chat)
 bot.db.set_chat(USER, morning=f"{now.hour:02d}:{now.minute:02d}", last_morning=None, muted=0)
 SENT.clear(); bot.last_tick = 0; bot.tick(); show("утренняя рассылка", SENT)
 check(any(p["chat_id"] == USER and "План на сегодня" in p["text"] for _, p in SENT), "утренний план отправлен по расписанию")
+check(any(p["chat_id"] == USER and "План на сегодня" in p["text"] and "Подтвердить план" in str(p.get("reply_markup")) for _, p in SENT),
+      "утром под планом кнопка «Подтвердить план»")
 SENT.clear(); bot.last_tick = 0; bot.tick()
 check(not any(p["chat_id"] == USER and "План на сегодня" in p["text"] for _, p in SENT), "второй раз за день не шлёт")
 # погода (Open-Meteo подменён)

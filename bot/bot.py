@@ -65,8 +65,11 @@ HELP = """<b>Что умеет бот</b>
 • в {evening} — при каком остатке на витрине ставить скидку;
 • в {closing} — просьбу отметить итоги дня (1 минута, бот на этом учится).
 
+План нужно подтвердить кнопкой «✅ Подтвердить план». Без подтверждения он не идёт в работу: не будет советов по витрине и итогов дня.
+
 <b>Команды</b>
 /plan — план на завтра
+/today — план на сегодня, если утром не подтвердили
 /itogi — отметить итоги дня
 /skidka — нужна ли скидка прямо сейчас
 /batch — добавить партию продуктов со сроком годности
@@ -186,11 +189,63 @@ class FreshBot:
         return recs, {"rain": w.rain, "temp": w.temp, "event": event, "rain_eff": eff, "learned": learned,
                       "habit": habit, "products": products}
 
+    def plan_status(self, cid: int, day: date) -> tuple[str, list]:
+        """draft - не подтверждён, ok - подтверждён, changed - расчёт изменился после подтверждения."""
+        work = self.db.work_plan(cid, day)
+        if not work:
+            return "draft", work
+        draft = {r["product"]: r["qty"] for r in self.db.plan(cid, day)}
+        return ("ok" if draft == {r["product"]: r["qty"] for r in work} else "changed"), work
+
+    def when(self, chat, at: str) -> str:
+        t = datetime.fromisoformat(at)
+        return f"в {t:%H:%M}" if t.date() == self.today(chat) else f"{t:%d.%m} в {t:%H:%M}"
+
+    def confirm_kb(self, cid: int, day: date) -> list:
+        status, _ = self.plan_status(cid, day)
+        if status == "ok":
+            return []
+        label = "✅ Подтвердить план" if status == "draft" else "✅ Подтвердить новый план"
+        return [[{"text": label, "callback_data": f"ok:{day.isoformat()}"}]]
+
+    def confirm(self, chat, day: date, mid: int | None = None) -> dict | None:
+        """Подтвердить план на день. Из бота и из кабинета."""
+        cid = chat["chat_id"]
+        today = self.today(chat)
+        if day < today or day > today + timedelta(days=1):
+            return None
+        if not self.db.plan(cid, day):
+            recs, _ = self.recommendations(chat, day)
+            self.db.save_plan(cid, day, recs, replace=True)
+        n = self.db.confirm_plan(cid, day, self.now(chat).strftime("%Y-%m-%dT%H:%M"))
+        if not n:
+            return None
+        total = sum(r["qty"] for r in self.db.work_plan(cid, day))
+        if mid is not None:
+            rest = [[{"text": "Завтра событие / праздник", "callback_data": "ev"}]] if day > today else []
+            try:
+                self.tg.edit_kb(cid, mid, rest)
+            except TelegramError:
+                pass
+            self.tg.send(cid, f"✅ План на {fmt_day(day)} подтверждён и пошёл в работу: <b>{total}</b> шт, "
+                              f"{n} {plural(n, 'позиция', 'позиции', 'позиций')}.\n"
+                              f"По нему в {chat['evening']} — советы по витрине, в {chat['closing']} — итоги дня.")
+        return {"positions": n, "total": total}
+
+    def not_confirmed(self, chat, what: str):
+        """План на сегодня есть, но его не подтвердили - в работу он не пошёл."""
+        cid = chat["chat_id"]
+        day = self.today(chat)
+        if not self.db.plan(cid, day):
+            return self.tg.send(cid, "На сегодня нет плана. Он появляется утром или по команде /plan.")
+        self.tg.send(cid, f"План на сегодня не подтверждён, поэтому в работу не пошёл — {what}. Подтвердить можно и сейчас:",
+                     keyboard=self.confirm_kb(cid, day))
+
     def plan_text(self, chat, day: date, title: str) -> str | None:
         recs, info = self.recommendations(chat, day)
         if not recs:
             return None
-        self.db.save_plan(chat["chat_id"], day, recs)
+        self.db.save_plan(chat["chat_id"], day, recs, replace=True)
         head = [f"<b>{title} · {fmt_day(day)}</b>"]
         weather = []
         if info["rain"]:
@@ -221,6 +276,15 @@ class FreshBot:
         exp = self.expiry_lines(chat, today, horizon=max(1, (day - today).days + 1))
         if exp:
             lines += ["", "<b>Сроки годности</b>"] + exp
+        status, work = self.plan_status(chat["chat_id"], day)
+        if status == "draft":
+            lines.append("\n<b>Подтвердите план</b> кнопкой ниже — без подтверждения он не идёт в работу: "
+                         "не будет советов по витрине и итогов дня.")
+        elif status == "ok":
+            lines.append(f"\n✅ План подтверждён {self.when(chat, work[0]['at'])}.")
+        else:
+            lines.append(f"\n⚠️ После подтверждения расчёт изменился: в работе {sum(r['qty'] for r in work)} шт, "
+                         f"новый — {sum(r.qty for r in recs)} шт. Подтвердите новый план или оставьте прежний.")
         return "\n".join(lines)
 
     def expiry_lines(self, chat, day: date, horizon: int = 1) -> list[str]:
@@ -256,14 +320,17 @@ class FreshBot:
                         self.db.set_chat(chat["chat_id"], muted=1)
 
     def job_morning(self, chat):
-        text = self.plan_text(chat, self.today(chat), "План на сегодня")
+        day = self.today(chat)
+        text = self.plan_text(chat, day, "План на сегодня")
         if text:
-            self.tg.send(chat["chat_id"], text)
+            self.tg.send(chat["chat_id"], text, keyboard=self.confirm_kb(chat["chat_id"], day) or None)
 
     def job_evening(self, chat):
         day = self.today(chat)
-        rows = self.db.plan(chat["chat_id"], day)
+        rows = self.db.work_plan(chat["chat_id"], day)
         if not rows:
+            if self.db.plan(chat["chat_id"], day):
+                self.not_confirmed(chat, "советов по витрине не будет")
             return
         lines = [f"<b>{chat['evening']} · проверьте витрину</b>", "Если сейчас на витрине больше, чем указано, — ставьте скидку 30%:"]
         for r in rows:
@@ -294,6 +361,7 @@ class FreshBot:
         try:
             self.tg.call("setMyCommands", commands=[
                 {"command": "plan", "description": "План выпечки на завтра"},
+                {"command": "today", "description": "План на сегодня"},
                 {"command": "itogi", "description": "Отметить итоги дня"},
                 {"command": "skidka", "description": "Нужна ли скидка сейчас"},
                 {"command": "batch", "description": "Добавить партию со сроком"},
@@ -370,6 +438,7 @@ class FreshBot:
             return self.cmd_demo(self.db.chat(cid))
         self.tg.send(cid, "Привет! Я <b>Свежий расчёт</b>. Каждое утро присылаю план: сколько испечь и закупить, "
                           "чтобы меньше выбрасывать и реже оставаться с пустой витриной. "
+                          "Вы подтверждаете план одной кнопкой — без подтверждения он не идёт в работу. "
                           "Вечером подскажу, когда ставить скидку, и напомню о продуктах с истекающим сроком.",
                      reply_keyboard=MENU)
         if not chat["city"]:
@@ -494,7 +563,35 @@ class FreshBot:
         text = self.plan_text(chat, day, "План на завтра")
         if not text:
             return self.tg.send(chat["chat_id"], "Пока нет продаж. Пришлите CSV-файл или попробуйте /demo")
-        self.tg.send(chat["chat_id"], text, keyboard=[[{"text": "Завтра событие / праздник", "callback_data": "ev"}]])
+        kb = self.confirm_kb(chat["chat_id"], day) + [[{"text": "Завтра событие / праздник", "callback_data": "ev"}]]
+        self.tg.send(chat["chat_id"], text, keyboard=kb)
+
+    def cmd_today(self, chat):
+        """План на сегодня ещё раз - например, чтобы подтвердить его днём."""
+        cid, day = chat["chat_id"], self.today(chat)
+        if not self.db.plan(cid, day):
+            text = self.plan_text(chat, day, "План на сегодня")
+        else:
+            text = self.saved_plan_text(chat, day)
+        if not text:
+            return self.tg.send(cid, "Пока нет продаж. Пришлите CSV-файл или попробуйте /demo")
+        self.tg.send(cid, text, keyboard=self.confirm_kb(cid, day) or None)
+
+    def saved_plan_text(self, chat, day: date) -> str:
+        """План на сегодня в том виде, как его зафиксировали утром."""
+        cid = chat["chat_id"]
+        rows = sorted(self.db.plan(cid, day), key=lambda r: -r["qty"])
+        lines = [f"<b>План на сегодня · {fmt_day(day)}</b>", "", "<b>Испечь</b>"]
+        lines += [f"• {esc(r['product'])} — <b>{r['qty']}</b> шт" for r in rows]
+        lines.append(f"\nВсего: <b>{sum(r['qty'] for r in rows)}</b> шт")
+        status, work = self.plan_status(cid, day)
+        if status == "ok":
+            lines.append(f"\n✅ План подтверждён {self.when(chat, work[0]['at'])}.")
+        elif status == "changed":
+            lines.append(f"\n⚠️ В работе прежний план — {sum(r['qty'] for r in work)} шт. Подтвердите этот, если он верный.")
+        else:
+            lines.append("\n<b>Подтвердите план</b> — без подтверждения он не идёт в работу.")
+        return "\n".join(lines)
 
     def cmd_event(self, chat):
         self.tg.send(chat["chat_id"], "Что будет завтра? Поправлю прогноз по всем позициям.", keyboard=[
@@ -543,22 +640,22 @@ class FreshBot:
     def itogi(self, chat, scheduled: bool = False):
         cid = chat["chat_id"]
         day = self.today(chat)
-        rows = self.db.plan(cid, day)
+        rows = self.db.work_plan(cid, day)
         if not rows:
             if not scheduled:
-                self.tg.send(cid, "На сегодня нет плана. Он появляется утром или по команде /plan.")
+                self.not_confirmed(chat, "итоги по нему не отметить")
             return
         self.tg.send(cid, self.itogi_text(cid, day), keyboard=self.itogi_kb(cid, day))
 
     def itogi_text(self, cid, day):
-        done = sum(1 for r in self.db.plan(cid, day) if self.db.sale(cid, day, r["product"]))
-        total = len(self.db.plan(cid, day))
+        rows = self.db.work_plan(cid, day)
+        done = sum(1 for r in rows if self.db.sale(cid, day, r["product"]))
         return (f"<b>Итоги дня · {fmt_day(day)}</b>\nОтметьте по каждой позиции: закончилась (и когда) или сколько осталось. "
-                f"Так прогноз станет точнее.\n\nОтмечено: {done} из {total}")
+                f"Так прогноз станет точнее.\n\nОтмечено: {done} из {len(rows)}")
 
     def itogi_kb(self, cid, day):
         kb = []
-        for i, r in enumerate(self.db.plan(cid, day)):
+        for i, r in enumerate(self.db.work_plan(cid, day)):
             s = self.db.sale(cid, day, r["product"])
             mark = ""
             if s:
@@ -568,8 +665,10 @@ class FreshBot:
 
     def record(self, chat, day: date, product: str, left: int | None, soldout: str | None):
         cid = chat["chat_id"]
-        row = next((r for r in self.db.plan(cid, day) if r["product"] == product), None)
-        baked = row["qty"] if row else 0
+        row = next((r for r in self.db.work_plan(cid, day) if r["product"] == product), None)
+        if not row:
+            raise ValueError("план на сегодня не подтверждён — итоги отмечаются по подтверждённому плану")
+        baked = row["qty"]
         sold = baked if soldout else max(0, baked - (left or 0))
         w = self.weather.day(chat["lat"], chat["lon"], day, time.time())
         self.db.upsert_sale(cid, Sale(day, product, sold, baked, soldout, w.rain, w.temp))
@@ -585,9 +684,9 @@ class FreshBot:
 
     def cmd_skidka(self, chat):
         cid = chat["chat_id"]
-        rows = self.db.plan(cid, self.today(chat))
+        rows = self.db.work_plan(cid, self.today(chat))
         if not rows:
-            return self.tg.send(cid, "На сегодня нет плана — сначала /plan")
+            return self.not_confirmed(chat, "советов по скидкам нет")
         kb = [[{"text": r["product"], "callback_data": f"s:{i}"}] for i, r in enumerate(rows)]
         self.tg.send(cid, "По какой позиции подсказать?", keyboard=kb)
 
@@ -795,6 +894,16 @@ class FreshBot:
             return self.tg.edit(cid, mid, "Отменено.")
         if key == "demo":
             return self.cmd_demo(chat, "да")
+        if key == "ok":  # подтвердили план
+            try:
+                day = date.fromisoformat(arg)
+            except ValueError:
+                return
+            if day < self.today(chat):
+                return self.tg.send(cid, "Этот день уже прошёл — подтвердить план на него нельзя.")
+            if not self.confirm(chat, day, mid):
+                return self.tg.send(cid, "Плана на этот день нет. Посчитать: /plan")
+            return
         if key == "ev":
             return self.cmd_event(chat)
         if key == "e":
@@ -805,7 +914,7 @@ class FreshBot:
             return self.cmd_plan(chat)
         if key == "d":  # итоги: выбрали позицию
             day = self.today(chat)
-            rows = self.db.plan(cid, day)
+            rows = self.db.work_plan(cid, day)
             i = int(arg)
             if i >= len(rows):
                 return
@@ -818,12 +927,16 @@ class FreshBot:
         if key == "o":
             i, t = arg.split(":", 1)
             day = self.today(chat)
-            rows = self.db.plan(cid, day)
+            rows = self.db.work_plan(cid, day)
+            if int(i) >= len(rows):
+                return
             self.record(chat, day, rows[int(i)]["product"], None, t)
             return self.tg.edit(cid, mid, self.itogi_text(cid, day), self.itogi_kb(cid, day))
         if key == "l":
             day = self.today(chat)
-            rows = self.db.plan(cid, day)
+            rows = self.db.work_plan(cid, day)
+            if int(arg) >= len(rows):
+                return
             p = rows[int(arg)]["product"]
             self.state[cid] = {"name": "left", "day": day, "product": p}
             return self.tg.send(cid, f"Сколько осталось: <b>{esc(p)}</b>? Напишите число.")
@@ -831,7 +944,9 @@ class FreshBot:
             day = self.today(chat)
             return self.tg.edit(cid, mid, self.itogi_text(cid, day), self.itogi_kb(cid, day))
         if key == "s":
-            rows = self.db.plan(cid, self.today(chat))
+            rows = self.db.work_plan(cid, self.today(chat))
+            if int(arg) >= len(rows):
+                return
             r = rows[int(arg)]
             self.state[cid] = {"name": "skidka", "product": r["product"], "mean": r["mean"]}
             return self.tg.send(cid, f"Сколько сейчас на витрине: <b>{esc(r['product'])}</b>?")

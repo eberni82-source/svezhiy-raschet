@@ -98,6 +98,13 @@ table.t { width: 100%; border-collapse: collapse; font-size: 14.5px; }
 .t .name { font-weight: 600; }
 .t .why { font-size: 13px; color: var(--ink-2); margin-top: 2px; }
 .t .big { font: 700 20px/1 var(--f-mono); }
+.t.confirmed .big { color: var(--ok); }
+.card h2 .chip { vertical-align: 3px; margin-left: 8px; }
+.confirm { display: flex; justify-content: space-between; align-items: center; gap: 12px 16px; flex-wrap: wrap; margin: 0 0 14px; padding: 14px 16px; border-radius: 12px; background: var(--warn-soft); font-size: 14px; color: var(--ink-2); }
+.confirm.ok { background: var(--ok-soft); }
+.confirm p { flex: 1 1 260px; max-width: 64ch; }
+.confirm b { color: var(--ink); }
+@media (max-width: 520px) { .confirm .btn { width: 100%; } }
 .t .muted { color: var(--ink-3); }
 .t tfoot td { font-weight: 700; border-top: 1px solid var(--line); border-bottom: 0; }
 .chip { display: inline-flex; align-items: center; gap: 5px; font: 600 12px/1 var(--f-body); padding: 5px 9px; border-radius: 999px; white-space: nowrap; }

@@ -32,6 +32,10 @@ CREATE TABLE IF NOT EXISTS plans (
     chat_id INTEGER, day TEXT, product TEXT, qty INTEGER, mean REAL,
     PRIMARY KEY (chat_id, day, product)
 );
+CREATE TABLE IF NOT EXISTS plan_ok (
+    chat_id INTEGER, day TEXT, product TEXT, qty INTEGER, mean REAL, at TEXT,
+    PRIMARY KEY (chat_id, day, product)
+);
 CREATE TABLE IF NOT EXISTS events (
     chat_id INTEGER, day TEXT, factor REAL,
     PRIMARY KEY (chat_id, day)
@@ -105,7 +109,7 @@ class Storage:
     def save_product(self, chat_id: int, p: Product, old_name: str | None = None):
         """Сохранить карточку товара из кабинета (значения заменяются целиком)."""
         if old_name and old_name != p.name:
-            for t in ("sales", "plans"):
+            for t in ("sales", "plans", "plan_ok"):
                 self.db.execute(f"UPDATE {t} SET product=? WHERE chat_id=? AND product=?", (p.name, chat_id, old_name))
             self.db.execute("DELETE FROM products WHERE chat_id=? AND name=?", (chat_id, old_name))
         self.db.execute(
@@ -119,7 +123,8 @@ class Storage:
         self.db.execute("INSERT INTO products (chat_id, name, active) VALUES (?,?,?) "
                         "ON CONFLICT(chat_id, name) DO UPDATE SET active=excluded.active", (chat_id, name, int(active)))
         if not active:  # убираем из сегодняшних и будущих планов
-            self.db.execute("DELETE FROM plans WHERE chat_id=? AND product=? AND day>=date('now','-1 day')", (chat_id, name))
+            for t in ("plans", "plan_ok"):
+                self.db.execute(f"DELETE FROM {t} WHERE chat_id=? AND product=? AND day>=date('now','-1 day')", (chat_id, name))
         self.db.commit()
 
     def history_days(self, chat_id: int) -> dict[str, int]:
@@ -160,7 +165,7 @@ class Storage:
         self.db.commit()
 
     def clear_sales(self, chat_id: int):
-        for t in ("sales", "products", "plans", "events", "batches"):
+        for t in ("sales", "products", "plans", "plan_ok", "events", "batches"):
             self.db.execute(f"DELETE FROM {t} WHERE chat_id=?", (chat_id,))
         self.db.commit()
 
@@ -173,7 +178,10 @@ class Storage:
         return self.db.execute("SELECT * FROM sales WHERE chat_id=? AND day=? AND product=?",
                                (chat_id, day.isoformat(), product)).fetchone()
 
-    def save_plan(self, chat_id: int, day: date, recs):
+    def save_plan(self, chat_id: int, day: date, recs, replace: bool = False):
+        """Расчёт плана на день (черновик). replace=True - пересчитали весь план заново."""
+        if replace:
+            self.db.execute("DELETE FROM plans WHERE chat_id=? AND day=?", (chat_id, day.isoformat()))
         for r in recs:
             self.db.execute("INSERT OR REPLACE INTO plans (chat_id, day, product, qty, mean) VALUES (?,?,?,?,?)",
                             (chat_id, day.isoformat(), r.product, r.qty, r.mean))
@@ -181,6 +189,25 @@ class Storage:
 
     def plan(self, chat_id: int, day: date) -> list[sqlite3.Row]:
         return self.db.execute("SELECT * FROM plans WHERE chat_id=? AND day=? ORDER BY product",
+                               (chat_id, day.isoformat())).fetchall()
+
+    def confirm_plan(self, chat_id: int, day: date, at: str) -> int:
+        """Владелец подтвердил план: текущий расчёт идёт в работу. Возвращает число позиций."""
+        d = day.isoformat()
+        self.db.execute("DELETE FROM plan_ok WHERE chat_id=? AND day=?", (chat_id, d))
+        cur = self.db.execute("INSERT INTO plan_ok (chat_id, day, product, qty, mean, at) "
+                              "SELECT chat_id, day, product, qty, mean, ? FROM plans WHERE chat_id=? AND day=?",
+                              (at, chat_id, d))
+        self.db.commit()
+        return cur.rowcount
+
+    def unconfirm_plan(self, chat_id: int, day: date):
+        self.db.execute("DELETE FROM plan_ok WHERE chat_id=? AND day=?", (chat_id, day.isoformat()))
+        self.db.commit()
+
+    def work_plan(self, chat_id: int, day: date) -> list[sqlite3.Row]:
+        """План в работе - только подтверждённый. По нему витрина, скидки и итоги дня."""
+        return self.db.execute("SELECT * FROM plan_ok WHERE chat_id=? AND day=? ORDER BY product",
                                (chat_id, day.isoformat())).fetchall()
 
     def set_event(self, chat_id: int, day: date, factor: float | None):

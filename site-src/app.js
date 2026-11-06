@@ -496,7 +496,15 @@
         out.push("", "<b>Сроки годности</b>");
         exp.forEach(function (e) { out.push("• " + esc(e.b.item) + " (" + esc(e.b.qty) + ") — " + e.st.label + " → " + e.tip); });
       }
-      kb = ["Завтра событие / праздник"];
+      var ps = planState(day, recs);
+      if (ps === "ok") out.push("\n✅ План подтверждён" + (S.planAt[day] ? " в " + S.planAt[day] : "") + ".");
+      else out.push("\n<b>Подтвердите план</b> кнопкой ниже — без подтверждения он не идёт в работу.");
+      kb = ps === "ok" ? [] : [ps === "draft" ? "✅ Подтвердить план" : "✅ Подтвердить новый план"];
+      if (day > TODAY) kb.push("Завтра событие / праздник");
+    } else if (!S.plans[day]) {
+      time = U.msg === "evening" ? "17:00" : "21:00";
+      out.push("План на сегодня не подтверждён, поэтому в работу не пошёл — " + (U.msg === "evening" ? "советов по витрине не будет" : "итоги по нему не отметить") + ". Подтвердить можно и сейчас:");
+      kb = ["✅ Подтвердить план"];
     } else if (U.msg === "evening") {
       time = "17:00";
       out.push("<b>17:00 · проверьте витрину</b>", "Если сейчас на витрине больше, чем указано, — ставьте скидку 30%:");
@@ -705,7 +713,7 @@
       toast("План на " + dayLabel(day) + " подтверждён и пошёл в работу");
     }
     S.edited = true;
-    save(); renderPlan(); renderNote();
+    save(); renderPlan(); renderPhone(); renderNote();
   });
   $("go-next").addEventListener("click", function () {
     var day = S.today, inWork = !!S.plans[day];

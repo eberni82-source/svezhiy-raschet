@@ -97,6 +97,19 @@ s = req("GET", "/api/state")
 check(all(x["item"] != "Салат «Оливье»" for x in s["batches"]), "партия списана")
 
 first = s["today"]["items"][0]["product"]
+check(s["today"]["plan"]["status"] == "draft" and all(i["ok_qty"] is None for i in s["today"]["items"]), "план на сегодня — черновик")
+req("POST", "/api/record", {"product": first, "soldout": "15:30"}, expect=400)  # без подтверждения итоги не отмечаются
+req("POST", "/api/plan/confirm", {"day": s["today"]["date"]})
+s = req("GET", "/api/state")
+check(s["today"]["plan"]["status"] == "ok" and s["today"]["plan"]["at"] and all(i["ok_qty"] == i["qty"] for i in s["today"]["items"]),
+      "план на сегодня подтверждён и в работе")
+req("POST", "/api/plan/unconfirm", {"day": s["today"]["date"]})
+check(req("GET", "/api/state")["today"]["plan"]["status"] == "draft", "подтверждение можно снять")
+req("POST", "/api/plan/confirm", {"day": s["today"]["date"]})
+req("POST", "/api/plan/confirm", {"day": "2020-01-01"}, expect=400)
+req("POST", "/api/plan/confirm", {"day": s["tomorrow"]["date"]})
+s = req("GET", "/api/state")
+check(s["tomorrow"]["plan"]["status"] == "ok", "план на завтра подтверждён заранее")
 req("POST", "/api/record", {"product": first, "soldout": "15:30"})
 second = s["today"]["items"][1]["product"]
 req("POST", "/api/record", {"product": second, "left": 4})
@@ -108,6 +121,8 @@ check(rec[first]["soldout"] == "15:30" and rec[second]["left"] == 4, "итоги
 req("POST", "/api/event", {"factor": 1.2})
 s = req("GET", "/api/state")
 check(abs(s["tomorrow"]["event"] - 1.2) < 1e-9, "событие на завтра")
+check(s["tomorrow"]["plan"]["status"] == "changed" and any(i["ok_qty"] != i["qty"] for i in s["tomorrow"]["items"]),
+      "после события план на завтра «изменился», в работе прежние цифры")
 req("POST", "/api/settings", {"business": "Булочная на Ленина", "morning": "05:30", "evening": "16:00", "closing": "20:00"})
 s = req("GET", "/api/state")
 check(s["business"]["name"] == "Булочная на Ленина" and s["times"]["morning"] == "05:30", "настройки сохранены")

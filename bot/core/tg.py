@@ -71,6 +71,16 @@ class Telegram:
                 return None
             raise
 
+    def edit_kb(self, chat_id: int, message_id: int, keyboard=None):
+        """Поменять только кнопки под сообщением, текст остаётся."""
+        try:
+            return self.call("editMessageReplyMarkup", chat_id=chat_id, message_id=message_id,
+                             reply_markup={"inline_keyboard": keyboard or []})
+        except TelegramError as e:
+            if "not modified" in str(e):
+                return None
+            raise
+
     def answer(self, callback_id: str, text: str | None = None):
         try:
             self.call("answerCallbackQuery", callback_query_id=callback_id, text=text)

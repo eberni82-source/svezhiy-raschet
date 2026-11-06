@@ -107,6 +107,13 @@ table.t { width: 100%; border-collapse: collapse; font-size: 14.5px; }
 .t .name { font-weight: 600; }
 .t .why { font-size: 13px; color: var(--ink-2); margin-top: 2px; }
 .t .big { font: 700 20px/1 var(--f-mono); }
+.t.confirmed .big { color: var(--ok); }
+.card h2 .chip { vertical-align: 3px; margin-left: 8px; }
+.confirm { display: flex; justify-content: space-between; align-items: center; gap: 12px 16px; flex-wrap: wrap; margin: 0 0 14px; padding: 14px 16px; border-radius: 12px; background: var(--warn-soft); font-size: 14px; color: var(--ink-2); }
+.confirm.ok { background: var(--ok-soft); }
+.confirm p { flex: 1 1 260px; max-width: 64ch; }
+.confirm b { color: var(--ink); }
+@media (max-width: 520px) { .confirm .btn { width: 100%; } }
 .t .muted { color: var(--ink-3); }
 .t tfoot td { font-weight: 700; border-top: 1px solid var(--line); border-bottom: 0; }
 .chip { display: inline-flex; align-items: center; gap: 5px; font: 600 12px/1 var(--f-body); padding: 5px 9px; border-radius: 999px; white-space: nowrap; }
@@ -1270,7 +1277,7 @@ var DEMO_CSV = "";
         products[k] = { name: k, price: p.price, cost: p.cost, shelf_life: (k === "Эклер" || k === "Сэндвич с курицей") ? 2 : 1, default_qty: null, active: true };
       });
       D = { v: 2, business: "Пекарня", example: true, times: { morning: "06:00", evening: "17:00", closing: "21:00" },
-            products: products, sales: r.sales, plans: {}, events: {}, nextId: 5,
+            products: products, sales: r.sales, plans: {}, ok: {}, events: {}, nextId: 5,
             batches: [[1, "Сливки 33%", "2 л", 1], [2, "Творог 5%", "3 кг", 2], [3, "Филе куриное", "1,5 кг", 0], [4, "Вишня замороженная", "2 кг", 20]]
               .map(function (b) { return { id: b[0], item: b[1], qty: b[2], exp: T + b[3], status: "active" }; }) };
       btCache = null; save();
@@ -1278,6 +1285,7 @@ var DEMO_CSV = "";
     function load() {
       try { var raw = localStorage.getItem(KEY); if (raw) { var d = JSON.parse(raw); if (d && d.v === 2) D = d; } } catch (e) { /* нет доступа */ }
       if (!D) example();
+      D.ok = D.ok || {};
       // пример в Челябинске, берём реальный прогноз
       M.loadWeather(55.16, 61.44, 3).then(function (w) { W = w; if (Object.keys(w).length && S.st) refresh(true); });
     }
@@ -1302,6 +1310,14 @@ var DEMO_CSV = "";
       var q = qty == null ? r.qty : qty, m = mean == null ? r.mean : mean;
       return { product: r.product, qty: q, mean: m, sd: r.sd, reasons: r.reasons, "new": r.n === 0, threshold: M.eveningThreshold({ mean: m }) };
     }
+    // план в работе - только подтверждённый: { at, items: { товар: { qty, mean } } }
+    function planInfo(ok, current) {
+      if (!ok) return { status: "draft", at: null, total_ok: null };
+      var keys = Object.keys(ok.items), total = keys.reduce(function (a, k) { return a + ok.items[k].qty; }, 0);
+      var same = keys.length === Object.keys(current).length && keys.every(function (k) { return current[k] === ok.items[k].qty; });
+      return { status: same ? "ok" : "changed", at: ok.at, total_ok: total };
+    }
+    function qtyOf(list) { var m = {}; list.forEach(function (r) { m[r.product] = r.qty; }); return m; }
     function sale(day, product) { for (var i = 0; i < D.sales.length; i++) if (D.sales[i].day === day && D.sales[i].product === product) return D.sales[i]; return null; }
     function productList() {
       var hist = {}, pm = prodMap(true);
@@ -1322,8 +1338,9 @@ var DEMO_CSV = "";
       var T = today(), days = [], week = {}, sum = function (q) { return q.reduce(function (x, y) { return x + y; }, 0); };
       for (var i = 0; i < 7; i++) {
         days.push(M.diso(T + i));
+        var fix = D.ok[T + i] ? D.ok[T + i].items : i === 0 ? D.plans[T] : null;
         recs(T + i).recs.forEach(function (r) {
-          var fixed = i === 0 && D.plans[T] && D.plans[T][r.product];
+          var fixed = fix && fix[r.product];
           (week[r.product] = week[r.product] || [0, 0, 0, 0, 0, 0, 0])[i] = fixed ? fixed.qty : r.qty;
         });
       }
@@ -1338,17 +1355,25 @@ var DEMO_CSV = "";
     }
     function state() {
       var now = new Date(), T = today(), m = now.getHours() * 60 + now.getMinutes();
-      Object.keys(D.plans).forEach(function (k) { if (+k < T - 14) delete D.plans[k]; });
-      var rt = recs(T), plan = D.plans[T] || (D.plans[T] = {}), changed = false;
+      [D.plans, D.ok].forEach(function (m) { Object.keys(m).forEach(function (k) { if (+k < T - 14) delete m[k]; }); });
+      var rt = recs(T), plan = D.plans[T] || (D.plans[T] = {}), changed = false, okT = D.ok[T], okM = D.ok[T + 1];
       rt.recs.forEach(function (r) { if (!plan[r.product]) { plan[r.product] = { qty: r.qty, mean: r.mean }; changed = true; } });
       if (changed) save();
       var items = rt.recs.map(function (r) {
-        var p = plan[r.product], it = item(r, p.qty, p.mean), s = sale(T, r.product);
+        var p = plan[r.product], it = item(r, p.qty, p.mean), s = sale(T, r.product), w = okT && okT.items[r.product];
+        it.ok_qty = w ? w.qty : null;
+        if (w) it.threshold = M.eveningThreshold({ mean: w.mean });
         it.record = s ? { soldout: s.soldout, baked: s.baked, left: s.soldout ? null : Math.max(0, Math.round((s.baked || 0) - s.sold)) } : null;
         return it;
       }).sort(function (a, b) { return b.qty - a.qty; });
+      var draft = {};
+      Object.keys(plan).forEach(function (k) { draft[k] = plan[k].qty; });
       var rm = recs(T + 1);
-      var tom = rm.recs.map(function (r) { var it = item(r); it.habit = rm.habit[r.product] != null ? Math.round(rm.habit[r.product]) : null; return it; });
+      var tom = rm.recs.map(function (r) {
+        var it = item(r); it.habit = rm.habit[r.product] != null ? Math.round(rm.habit[r.product]) : null;
+        it.ok_qty = okM && okM.items[r.product] ? okM.items[r.product].qty : null;
+        return it;
+      });
       var products = productList(), batches = batchList(T);
       var removed = Object.keys(D.products).filter(function (k) { return !D.products[k].active; }).sort();
       var days = D.sales.map(function (s) { return s.day; });
@@ -1360,8 +1385,9 @@ var DEMO_CSV = "";
       return {
         mode: "local", business: { name: D.business, city: D.example ? "Челябинск" : "", is_example: D.example },
         now: M.diso(T) + "T" + pad(now.getHours()) + ":" + pad(now.getMinutes()), phase: phaseOf(D.times, m), times: D.times,
-        today: { date: M.diso(T), rain: weather(T).rain, temp: weather(T).temp, event: D.events[T] || 1, items: items },
-        tomorrow: { date: M.diso(T + 1), rain: weather(T + 1).rain, temp: weather(T + 1).temp, event: D.events[T + 1] || 1, rain_effect: rm.eff, items: tom },
+        today: { date: M.diso(T), rain: weather(T).rain, temp: weather(T).temp, event: D.events[T] || 1, items: items, plan: planInfo(okT, draft) },
+        tomorrow: { date: M.diso(T + 1), rain: weather(T + 1).rain, temp: weather(T + 1).temp, event: D.events[T + 1] || 1, rain_effect: rm.eff, items: tom,
+                    plan: planInfo(okM, qtyOf(rm.recs)) },
         products: products, removed: removed, batches: batches,
         data: { rows: D.sales.length, first: days.length ? M.diso(Math.min.apply(null, days)) : null, last: days.length ? M.diso(Math.max.apply(null, days)) : null },
         summary: btCache.v
@@ -1383,6 +1409,7 @@ var DEMO_CSV = "";
           if (old && old !== nm) {
             D.sales.forEach(function (s) { if (s.product === old) s.product = nm; });
             Object.keys(D.plans).forEach(function (d) { if (D.plans[d][old]) { D.plans[d][nm] = D.plans[d][old]; delete D.plans[d][old]; } });
+            Object.keys(D.ok).forEach(function (d) { var x = D.ok[d].items; if (x[old]) { x[nm] = x[old]; delete x[old]; } });
             delete D.products[old]; btCache = null;
           }
           D.products[nm] = { name: nm, price: price, cost: cost, shelf_life: num(b.shelf_life, 0, 3650, true), default_qty: num(b.default_qty, 0, 1e5), active: true };
@@ -1390,7 +1417,7 @@ var DEMO_CSV = "";
           var n2 = name(b.name), on = path === "/api/product/restore";
           D.products[n2] = D.products[n2] || { name: n2, price: null, cost: null, shelf_life: null, default_qty: null };
           D.products[n2].active = on;
-          if (!on) [T - 1, T, T + 1].forEach(function (d) { if (D.plans[d]) delete D.plans[d][n2]; });
+          if (!on) [T - 1, T, T + 1].forEach(function (d) { if (D.plans[d]) delete D.plans[d][n2]; if (D.ok[d]) delete D.ok[d].items[n2]; });
         } else if (path === "/api/batch") {
           var it = name(b.item, "продукт"), exp = b.expires ? M.dnum(b.expires) : null;
           if (exp == null) {
@@ -1406,8 +1433,9 @@ var DEMO_CSV = "";
           if (so && !/^([01]?\d|2[0-3]):[0-5]\d$/.test(so)) throw new Error("время в формате 15:30");
           var left = so ? null : num(b.left, 0, 1e5, true);
           if (!so && left == null) throw new Error("укажите остаток или время, когда товар закончился");
-          var baked = (D.plans[T] && D.plans[T][pr]) ? D.plans[T][pr].qty : 0;
-          var s = sale(T, pr), sold = so ? baked : Math.max(0, baked - left);
+          var w = D.ok[T] && D.ok[T].items[pr];
+          if (!w) throw new Error("план на сегодня не подтверждён — итоги отмечаются по подтверждённому плану");
+          var baked = w.qty, s = sale(T, pr), sold = so ? baked : Math.max(0, baked - left);
           if (s) { s.sold = sold; s.baked = baked; s.soldout = so; } else D.sales.push({ day: T, product: pr, sold: sold, baked: baked, soldout: so, rain: weather(T).rain, temp: weather(T).temp });
           btCache = null;
         } else if (path === "/api/sales") {
@@ -1429,6 +1457,19 @@ var DEMO_CSV = "";
           var bi = name(b.item, "продукт"), be = b.expires ? M.dnum(b.expires) : null;
           if (be == null || isNaN(be)) throw new Error("годен до: нужна дата");
           D.batches.forEach(function (x) { if (x.id === +b.id) { x.item = bi; x.qty = String(b.qty || "").trim().slice(0, 20); x.exp = be; } });
+        } else if (path === "/api/plan/confirm" || path === "/api/plan/unconfirm") {
+          var day = M.dnum(String(b.day || ""));
+          if (day !== T && day !== T + 1) throw new Error("подтвердить можно план на сегодня или на завтра");
+          if (path === "/api/plan/unconfirm") delete D.ok[day];
+          else {
+            var src = {}, now = new Date();
+            if (day === T) src = D.plans[T] || {};
+            else recs(day).recs.forEach(function (r) { src[r.product] = { qty: r.qty, mean: r.mean }; });
+            if (!Object.keys(src).length) throw new Error("плана на этот день нет");
+            var copy = {};
+            Object.keys(src).forEach(function (k) { copy[k] = { qty: src[k].qty, mean: src[k].mean }; });
+            D.ok[day] = { at: M.diso(T) + "T" + pad(now.getHours()) + ":" + pad(now.getMinutes()), items: copy };
+          }
         } else if (path === "/api/event") {
           var f = num(b.factor, 0.3, 3);
           if (!f || Math.abs(f - 1) < 1e-9) delete D.events[T + 1]; else D.events[T + 1] = f;
@@ -1439,7 +1480,7 @@ var DEMO_CSV = "";
           });
         } else if (path === "/api/upload") {
           var r = M.parseCSV(String(b.csv || ""));
-          if (D.example) { D.sales = []; D.products = {}; D.plans = {}; D.events = {}; D.batches = []; D.example = false; D.business = ""; }
+          if (D.example) { D.sales = []; D.products = {}; D.plans = {}; D.ok = {}; D.events = {}; D.batches = []; D.example = false; D.business = ""; }
           var idx = {};
           D.sales.forEach(function (x, i) { idx[x.day + "|" + x.product] = i; });
           r.sales.forEach(function (x) { var k = x.day + "|" + x.product; if (k in idx) D.sales[idx[k]] = x; else { idx[k] = D.sales.length; D.sales.push(x); } });
@@ -1525,7 +1566,7 @@ var DEMO_CSV = "";
     var cur = PART_OF[ph], heads = {
       night: "Ночь: план на сегодня уже готов", morning: "Утро и день: работаем по плану",
       evening: "Вечер: проверьте витрину", closing: "Конец дня: отметьте итоги" };
-    var parts = [["plan", "План на день", t.morning, "сколько сделать и заказать"],
+    var parts = [["plan", "План на день", t.morning, st.today.plan.status === "ok" ? "✓ подтверждён" : "ждёт подтверждения"],
                  ["vitrina", "Витрина и скидки", t.evening, "что уценить, чтобы не выбросить"],
                  ["itogi", "Итоги дня", t.closing, "минута на отметки"]];
     var idxNow = { plan: 0, vitrina: 1, itogi: 2 }[cur];
@@ -1553,6 +1594,37 @@ var DEMO_CSV = "";
 
   function whyText(it) { return it.reasons.filter(function (x) { return x.indexOf("дождь") !== 0 && x.indexOf("событие") !== 0; }).slice(0, 2).join("; "); }
 
+  // подтверждение плана: в работу идёт только подтверждённый план
+  function when(at) {
+    var p = String(at || "").split("T"), t = (p[1] || "").slice(0, 5);
+    return p[0] === S.st.today.date ? "в " + t : M.ddmm(M.dnum(p[0])) + " в " + t;
+  }
+  function planChip(pl) {
+    return '<span class="chip ' + (pl.status === "ok" ? "ok" : "warn") + '">' + (pl.status === "draft" ? "Черновик" : pl.status === "ok" ? "✓ Подтверждён" : "Изменился") + "</span>";
+  }
+  function confirmBlock(d) {
+    var pl = d.plan, t = S.st.times, total = d.items.reduce(function (a, i) { return a + i.qty; }, 0), text, btn;
+    if (pl.status === "draft") {
+      text = "<b>План не подтверждён.</b> Проверьте цифры и подтвердите: без подтверждения план не идёт в работу — не будет советов по витрине и итогов дня.";
+      btn = '<button class="btn btn-primary" data-act="plan-ok" data-day="' + d.date + '">Подтвердить план</button>';
+    } else if (pl.status === "ok") {
+      text = "<b>План подтверждён " + esc(when(pl.at)) + ":</b> " + fmt(pl.total_ok) + " шт. По нему — витрина в " + esc(t.evening) + " и итоги в " + esc(t.closing) + ".";
+      btn = '<button class="btn btn-quiet" data-act="plan-undo" data-day="' + d.date + '">Отменить подтверждение</button>';
+    } else {
+      text = "<b>Расчёт изменился после подтверждения.</b> В работе " + fmt(pl.total_ok) + " шт, новый расчёт — " + fmt(total) + " шт. Подтвердите новый план или оставьте прежний.";
+      btn = '<button class="btn btn-primary" data-act="plan-ok" data-day="' + d.date + '">Подтвердить новый план</button>';
+    }
+    return '<div class="confirm' + (pl.status === "ok" ? " ok" : "") + '"><p>' + text + "</p>" + btn + "</div>";
+  }
+  function inWork(it) { return it.ok_qty != null && it.ok_qty !== it.qty ? '<div class="why">в работе ' + it.ok_qty + "</div>" : ""; }
+  function notConfirmed(title, what) {
+    return '<div class="card"><h2>' + title + '</h2><div class="confirm"><p><b>План на сегодня не подтверждён</b>, поэтому в работу не пошёл — ' + what +
+      ' появятся после подтверждения.</p><button class="btn btn-primary" data-act="plan-ok" data-day="' + S.st.today.date + '">Подтвердить план</button></div></div>';
+  }
+  function working() {
+    return S.st.today.items.filter(function (i) { return i.ok_qty != null; }).sort(function (a, b) { return a.product < b.product ? -1 : 1; });
+  }
+
   function viewPlan() {
     var st = S.st, items = st.today.items, total = items.reduce(function (a, i) { return a + i.qty; }, 0), exp = st.batches.filter(function (b) { return b.left <= 1; });
     var h = '<div class="kpis"><div class="kpi"><b class="num">' + total + '</b><span>штук сделать сегодня</span></div>' +
@@ -1561,11 +1633,12 @@ var DEMO_CSV = "";
       '<div class="kpi"><b>' + (st.today.event !== 1 ? M.signed((st.today.event - 1) * 100) : st.today.rain ? "дождь" : "обычный") + "</b><span>" +
       (st.today.event !== 1 ? "событие сегодня" : st.today.rain ? "спрос ниже обычного" : "день по прогнозу") + "</span></div></div>";
     if (!items.length) return h + emptyData();
-    h += '<div class="card"><h2>План на ' + dayLabel(st.today.date) + '</h2><p class="sub">Количество зафиксировано утром. Новые товары появляются в плане сразу после добавления.</p><div class="table-wrap"><table class="t"><thead><tr><th>Позиция</th><th class="r">Спрос</th><th class="r">Сделать</th></tr></thead><tbody>';
+    h += '<div class="card"><h2>План на ' + dayLabel(st.today.date) + " " + planChip(st.today.plan) + '</h2><p class="sub">Количество зафиксировано утром, новые товары добавляются сразу. В работу идёт только подтверждённый план.</p>' + confirmBlock(st.today) +
+      '<div class="table-wrap"><table class="t' + (st.today.plan.status === "ok" ? " confirmed" : "") + '"><thead><tr><th>Позиция</th><th class="r">Спрос</th><th class="r">Сделать</th></tr></thead><tbody>';
     items.forEach(function (it) {
       var w = whyText(it);
       h += "<tr><td><div class=\"name\">" + esc(it.product) + (it["new"] ? ' <span class="chip new">новый</span>' : "") + "</div>" + (w ? '<div class="why">' + esc(w) + "</div>" : "") +
-        '</td><td class="r num">≈' + Math.round(it.mean) + ' <span class="muted">±' + Math.round(it.sd) + '</span></td><td class="r"><span class="big">' + it.qty + "</span></td></tr>";
+        '</td><td class="r num">≈' + Math.round(it.mean) + ' <span class="muted">±' + Math.round(it.sd) + '</span></td><td class="r"><span class="big">' + it.qty + "</span>" + inWork(it) + "</td></tr>";
     });
     h += '</tbody><tfoot><tr><td>Всего</td><td></td><td class="r"><span class="big">' + total + "</span></td></tr></tfoot></table></div></div>";
     if (exp.length) {
@@ -1575,32 +1648,33 @@ var DEMO_CSV = "";
   }
 
   function viewVitrina() {
-    var items = S.st.today.items;
-    if (!items.length) return emptyData();
+    if (!S.st.today.items.length) return emptyData();
+    if (S.st.today.plan.status === "draft") return notConfirmed("Проверьте витрину", "советы по витрине и скидкам");
+    var items = working();
     var h = '<div class="card"><h2>Проверьте витрину</h2><p class="sub">После ' + esc(S.st.times.evening) + " обычно уходит около пятой части дневных продаж. Если на витрине больше порога — ставьте скидку, иначе остаток уйдёт в списание. Впишите, сколько сейчас лежит, и получите совет.</p>" +
       '<div class="table-wrap"><table class="t"><thead><tr><th>Позиция</th><th class="r">Сделали</th><th class="r">Скидка, если больше</th><th>Сейчас на витрине</th><th>Совет</th></tr></thead><tbody>';
-    items.slice().sort(function (a, b) { return a.product < b.product ? -1 : 1; }).forEach(function (it) {
+    items.forEach(function (it) {
       var v = S.vitrina[it.product], adv = "";
       if (v !== undefined && v !== "") {
         var a = M.discountAdvice({ mean: it.mean }, +v);
         adv = a.pct ? '<span class="chip warn">скидка ' + a.pct + "%</span>" : '<span class="chip ok">без скидки</span>';
       }
-      h += "<tr><td class=\"name\">" + esc(it.product) + '</td><td class="r num">' + it.qty + '</td><td class="r num"><b>' + it.threshold + " шт</b></td>" +
+      h += "<tr><td class=\"name\">" + esc(it.product) + '</td><td class="r num">' + it.ok_qty + '</td><td class="r num"><b>' + it.threshold + " шт</b></td>" +
         '<td><input class="small" type="number" min="0" inputmode="numeric" data-vitrina="' + esc(it.product) + '" value="' + esc(v == null ? "" : v) + '" aria-label="Сейчас на витрине: ' + esc(it.product) + '"></td><td data-adv="' + esc(it.product) + '">' + adv + "</td></tr>";
     });
     return h + "</tbody></table></div></div>";
   }
 
   function viewItogi() {
-    var items = S.st.today.items;
-    if (!items.length) return emptyData();
-    var done = items.filter(function (i) { return i.record; }).length;
+    if (!S.st.today.items.length) return emptyData();
+    if (S.st.today.plan.status === "draft") return notConfirmed("Итоги дня · " + dayLabel(S.st.today.date), "итоги дня");
+    var items = working(), done = items.filter(function (i) { return i.record; }).length;
     var h = '<div class="card"><h2>Итоги дня · ' + dayLabel(S.st.today.date) + '</h2><p class="sub">Отметьте по каждой позиции, когда она закончилась или сколько осталось. По этим отметкам сервис узнаёт реальный спрос и завтра считает точнее. То же можно сделать в боте.</p>' +
       '<p class="hint">Отмечено ' + done + " из " + items.length + '</p><div class="progress"><i style="width:' + (done / items.length * 100).toFixed(0) + '%"></i></div>' +
       '<div class="table-wrap" style="margin-top:14px"><table class="t"><thead><tr><th>Позиция</th><th class="r">Сделали</th><th>Закончилась</th><th>Или осталось</th><th>Отметка</th></tr></thead><tbody>';
-    items.slice().sort(function (a, b) { return a.product < b.product ? -1 : 1; }).forEach(function (it) {
+    items.forEach(function (it) {
       var r = it.record, mark = !r ? '<span class="chip mute">нет</span>' : r.soldout ? '<span class="chip ok">✓ кончились ' + esc(r.soldout) + "</span>" : '<span class="chip ok">✓ осталось ' + r.left + "</span>";
-      h += '<tr><td class="name">' + esc(it.product) + '</td><td class="r num">' + it.qty + '</td><td><div class="slots">' +
+      h += '<tr><td class="name">' + esc(it.product) + '</td><td class="r num">' + it.ok_qty + '</td><td><div class="slots">' +
         SLOTS.map(function (s) { return '<button class="slot" data-act="soldout" data-p="' + esc(it.product) + '" data-t="' + s[1] + '">' + s[0] + "</button>"; }).join("") +
         '</div></td><td><div class="left-in"><input type="number" min="0" inputmode="numeric" data-left="' + esc(it.product) + '" aria-label="Осталось: ' + esc(it.product) + '"><button class="btn btn-quiet btn-sm" data-act="left" data-p="' + esc(it.product) + '">OK</button></div></td><td>' + mark + "</td></tr>";
     });
@@ -1619,19 +1693,19 @@ var DEMO_CSV = "";
     if (t.temp != null) parts.push(M.deg(t.temp));
     var weather = parts.length ? parts.join(" · ") : "Прогноз погоды пока недоступен";
     var opts = [[1, "Обычный день"], [1.1, "Небольшое событие +10%"], [1.2, "Праздник, ярмарка +20%"], [1.3, "Большое событие +30%"], [0.8, "Меньше людей −20%"]];
-    var h = '<div class="card"><div class="day-head" style="margin:0 0 10px"><div><h2>Завтра, ' + dayLabel(t.date) + '</h2><p class="sub" style="margin:0">' + esc(weather) + '</p></div>' +
+    var h = '<div class="card"><div class="day-head" style="margin:0 0 10px"><div><h2>Завтра, ' + dayLabel(t.date) + (items.length ? " " + planChip(t.plan) : "") + '</h2><p class="sub" style="margin:0">' + esc(weather) + '</p></div>' +
       '<label style="display:grid;gap:4px;font-size:12.5px;color:var(--ink-3);min-width:220px">Событие завтра<select data-act="event">' +
       opts.map(function (o) { return '<option value="' + o[0] + '"' + (Math.abs(o[0] - t.event) < 1e-9 ? " selected" : "") + ">" + o[1] + "</option>"; }).join("") + "</select></label></div>";
     if (!items.length) return h + emptyData() + "</div>";
-    h += '<div class="table-wrap"><table class="t"><thead><tr><th>Позиция</th><th class="r">Спрос</th><th class="r">Сделать</th><th class="r">Обычно</th></tr></thead><tbody>';
+    h += confirmBlock(t) + '<div class="table-wrap"><table class="t' + (t.plan.status === "ok" ? " confirmed" : "") + '"><thead><tr><th>Позиция</th><th class="r">Спрос</th><th class="r">Сделать</th><th class="r">Обычно</th></tr></thead><tbody>';
     items.forEach(function (it) {
       total += it.qty; if (it.habit != null) { habit += it.habit; hasH = true; } else habit += it.qty;
       var w = whyText(it);
       h += "<tr><td><div class=\"name\">" + esc(it.product) + (it["new"] ? ' <span class="chip new">новый</span>' : "") + "</div>" + (w ? '<div class="why">' + esc(w) + "</div>" : "") +
-        '</td><td class="r num">≈' + Math.round(it.mean) + '</td><td class="r"><span class="big">' + it.qty + '</span></td><td class="r num muted">' + (it.habit != null ? it.habit : "—") + "</td></tr>";
+        '</td><td class="r num">≈' + Math.round(it.mean) + '</td><td class="r"><span class="big">' + it.qty + "</span>" + inWork(it) + '</td><td class="r num muted">' + (it.habit != null ? it.habit : "—") + "</td></tr>";
     });
     h += '</tbody><tfoot><tr><td>Всего</td><td></td><td class="r"><span class="big">' + total + '</span></td><td class="r num">' + (hasH ? Math.round(habit) : "—") + "</td></tr></tfoot></table></div>" +
-      '<p class="hint" style="margin-top:10px">«Обычно» — сколько в среднем делали в этот день недели за 4 недели. Утром в ' + esc(S.st.times.morning) + " план зафиксируется и придёт в Telegram.</p></div>";
+      '<p class="hint" style="margin-top:10px">«Обычно» — сколько в среднем делали в этот день недели за 4 недели. Подтвердить план можно заранее здесь или утром в Telegram, когда он придёт в ' + esc(S.st.times.morning) + ".</p></div>";
     return h;
   }
 
@@ -1815,6 +1889,8 @@ var DEMO_CSV = "";
     var a = t.getAttribute("data-act"), p = t.getAttribute("data-p");
     if (a === "logout") { API.post("/api/logout").catch(function () {}).then(function () { S.st = null; showLogin(); }); }
     else if (a === "reset") { Local.reset(); S.vitrina = {}; refresh(true).then(function () { toast("Пример восстановлен"); }); }
+    else if (a === "plan-ok") post("/api/plan/confirm", { day: t.getAttribute("data-day") }, "План подтверждён и пошёл в работу").catch(function () {});
+    else if (a === "plan-undo") post("/api/plan/unconfirm", { day: t.getAttribute("data-day") }, "Подтверждение снято — план снова черновик").catch(function () {});
     else if (a === "soldout") post("/api/record", { product: p, soldout: t.getAttribute("data-t") }, "Отмечено: " + p);
     else if (a === "left") {
       var inp = document.querySelector('[data-left="' + CSS.escape(p) + '"]');
