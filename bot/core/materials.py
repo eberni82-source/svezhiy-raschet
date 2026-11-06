@@ -52,7 +52,7 @@ def factor(unit: str) -> int:
 
 
 def parse_delivery(text: str | None) -> list[int]:
-    """"пн, чт" -> [0, 3]; "ежедневно" или пусто -> все дни недели."""
+    """Дни поставок: "пн, чт" -> [0, 3]; "ежедневно" или пусто -> все дни недели."""
     s = str(text or "").lower().replace("ё", "е")
     if not s.strip() or "ежеднев" in s or "каждый день" in s or "все дни" in s:
         return list(range(7))
@@ -77,7 +77,7 @@ def next_delivery(days: list[int], after: date) -> date:
 
 
 def parse_amount(text: str | None, unit: str | None = None) -> tuple[float | None, str | None]:
-    """"1,5 кг" -> (1.5, "кг"), "300 мл" -> (0.3, "л"). Без числа -> (None, None)."""
+    """Количество: "1,5 кг" -> (1.5, "кг"), "300 мл" -> (0.3, "л"). Без числа -> (None, None)."""
     s = str(text or "").strip().lower().replace(",", ".")
     m = re.match(r"^(\d+(?:\.\d+)?)\s*([a-zа-я.]*)", s)
     if not m:
@@ -218,7 +218,7 @@ def stock_report(materials: dict[str, Material], recipes, batches: list[dict],
 
 
 def waste_hint(row: dict, plan_today: dict[str, float] | None = None) -> str:
-    """"можно сделать больше: Эклер +20" - во что пустить остаток, который иначе спишется."""
+    """Во что пустить остаток, который иначе спишется: "можно сделать больше: Эклер +20"."""
     total = row["waste_total"]
     extra = []
     for product, a in row["uses"]:
