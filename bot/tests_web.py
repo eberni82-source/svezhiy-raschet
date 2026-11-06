@@ -67,6 +67,31 @@ check(s["phase"] in ("night", "morning", "evening", "closing"), f"фаза дн�
 check(s["summary"] and s["summary"]["waste_new"] < s["summary"]["waste_now"], "сводка: списания по плану ниже")
 check(all(p["shelf_life"] in (1, 2) for p in s["products"]), "у товаров примера есть срок хранения")
 
+s = req("GET", "/api/state")
+st = {r["name"]: r for r in s["stock"]["rows"]}
+check(len(st) == 10 and st["Мука пшеничная"]["need_today"] > 0 and st["Филе куриное"]["waste_total"] > 0, "сырьё: остатки, расход и списание")
+sh = req("GET", "/api/sheet")
+check(len(sh["materials"]) == 10 and any(r["material"] == "Сливки 33%" and r["unit"] == "л" for r in sh["recipes"]), "лист сырья и техкарт")
+req("POST", "/api/material", {"name": "Сыр твёрдый", "unit": "кг", "delivery": "вторник, пятница", "shelf_life": 30, "cost": 900})
+req("POST", "/api/material", {"name": "Сыр", "unit": "ведро"}, expect=400)
+req("POST", "/api/material", {"name": "Сыр", "unit": "кг", "delivery": "иногда"}, expect=400)
+req("POST", "/api/recipe", {"product": "Сэндвич с курицей", "material": "сыр твёрдый", "norm": 20})
+req("POST", "/api/recipe", {"product": "Сэндвич с курицей", "material": "Кетчуп", "norm": 10}, expect=400)
+req("POST", "/api/batch", {"item": "Сыр твёрдый", "amount": "800", "unit": "г", "expires": "2027-01-10"})
+req("POST", "/api/batch", {"item": "Сыр твёрдый", "amount": 2, "unit": "л", "expires": "2027-01-10"}, expect=400)
+s = req("GET", "/api/state")
+syr = {r["name"]: r for r in s["stock"]["rows"]}["Сыр твёрдый"]
+check(syr["delivery"] == "вт, пт" and abs(syr["stock"] - 0.8) < 1e-9 and syr["need_today"] > 0, "новое сырьё: поставки, остаток 800 г, расход по техкарте")
+b = [x for x in s["batches"] if x["item"] == "Сыр твёрдый"][0]
+check(b["amount"] == 0.8 and b["unit"] == "кг" and b["qty"] == "800 г", "партия сырья записана числом")
+req("POST", "/api/material", {"name": "Сыр Российский", "old_name": "Сыр твёрдый", "unit": "кг", "delivery": "вт, пт"})
+sh = req("GET", "/api/sheet")
+check(any(r["material"] == "Сыр Российский" for r in sh["recipes"]) and any(x["item"] == "Сыр Российский" for x in sh["batches"]),
+      "переименование сырья: техкарты и партии следом")
+req("POST", "/api/recipe/remove", {"product": "Сэндвич с курицей", "material": "Сыр Российский"})
+req("POST", "/api/material/remove", {"name": "Сыр Российский"})
+check(len(req("GET", "/api/sheet")["materials"]) == 10, "сырьё удалено")
+
 req("POST", "/api/product", {"name": "Салат «Оливье»", "price": 180, "cost": 70, "shelf_life": 2, "default_qty": 15})
 s = req("GET", "/api/state")
 olivie = [i for i in s["today"]["items"] if i["product"] == "Салат «Оливье»"]

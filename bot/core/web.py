@@ -18,6 +18,8 @@ from pathlib import Path
 
 from .csv_import import ImportErrorRu, parse_csv
 from .forecast import Product, Recommendation, Sale, backtest, evening_threshold, expiry_status, expiry_tip
+from .materials import Material, delivery_text, fmt_amount, mat_key, norm_unit, parse_amount, parse_delivery
+from .materials import round_up, waste_hint
 
 log = logging.getLogger("web")
 KABINET_HTML: str | None = None   # однофайловая версия бота подставляет сюда страницу кабинета
@@ -119,16 +121,72 @@ class Cabinet:
         products.sort(key=lambda p: p["name"].lower())
         return products
 
-    def _batches(self, cid: int, today: date) -> list[dict]:
-        batches = []
+    def _batches(self, cid: int, today: date, stock: dict | None = None) -> list[dict]:
+        batches, now = [], (stock or {}).get("left", {})
         for x in self.bot.db.batches(cid):
             exp = date.fromisoformat(x["expires"])
             st, left = expiry_status(exp, today)
             level = "bad" if left <= 0 else "warn" if left <= 2 else "ok"
+            rest = now.get(str(x["id"]))
             batches.append({"id": x["id"], "item": x["item"], "qty": x["qty"], "expires": x["expires"],
+                            "amount": x["amount"], "unit": x["unit"], "rest": rest,
+                            "rest_text": fmt_amount(rest, x["unit"]) if rest is not None else None,
                             "label": st, "left": left, "level": level,
                             "tip": ("спишите" if left < 0 else expiry_tip(x["item"])) if left <= 1 else None})
         return batches
+
+    def _stock(self, chat) -> dict | None:
+        """Сырьё для кабинета: остатки, нехватка, списание, заказ. Без справочника сырья - None."""
+        res = self.bot.stock(chat)
+        if not res:
+            return None
+        rep, plan = res
+        today = self.bot.today(chat)
+        iso = lambda d: d.isoformat() if d else None  # noqa: E731
+        rows = []
+        for r in rep["rows"]:
+            first = min((w["expires"] for w in r["waste"]), default=None)
+            f = lambda x: fmt_amount(x, r["unit"])  # noqa: E731
+            rest = round_up(r["short_before"] - r["short_today"], r["unit"])
+            rows.append({k: r[k] for k in ("name", "unit", "delivery", "cost", "stock", "need_today", "short_today",
+                                           "short_before", "cover", "order", "waste_total")} | {
+                "short_rest": rest, "short_first": iso(r["short_first"]), "next": iso(r["next"]), "waste_first": iso(first),
+                "uses": [p for p, _ in r["uses"]],
+                "hint": (waste_hint(r, plan.get(today)) or expiry_tip(r["name"])) if r["waste"] else None,
+                "text": {"stock": f(r["stock"]), "need_today": f(r["need_today"]),
+                         "short_today": f(round_up(r["short_today"], r["unit"])),
+                         "short_before": f(round_up(r["short_before"], r["unit"])), "short_rest": f(rest),
+                         "order": f(r["order"]), "waste_total": f(r["waste_total"])}})
+        return {"rows": rows, "left": {str(k): v for k, v in rep["left"].items()}}
+
+    def _amount(self, cid: int, item: str, body: dict) -> tuple[str, float | None, str | None]:
+        """Количество партии: числом (amount и unit) или текстом «2 л». Для сырья - в его единицах."""
+        m = {mat_key(n): x for n, x in self.bot.db.materials(cid).items()}.get(mat_key(item))
+        if body.get("amount") not in (None, ""):
+            x = _wnum(body.get("amount"), 0, 1e6)
+            amount, unit = parse_amount(f"{x} {body.get('unit') or ''}", m.unit if m else None)
+        else:
+            amount, unit = parse_amount(body.get("qty"), m.unit if m else None)
+        if m and unit and unit != m.unit:
+            raise ValueError(f"{m.name} считается в «{m.unit}» — укажите количество в {m.unit}")
+        qty = fmt_amount(amount, unit) if amount is not None else str(body.get("qty") or "").strip()[:20]
+        return qty, amount, unit
+
+    def _materials(self, cid: int, stock: dict | None) -> list[dict]:
+        rows = {r["name"]: r for r in (stock or {}).get("rows", [])}
+        out = []
+        for m in self.bot.db.materials(cid).values():
+            r = rows.get(m.name)
+            order = None
+            if r:
+                order = f"{r['text']['order']} к {r['next'][8:10]}.{r['next'][5:7]}" if r["order"] > 0 else "не нужно"
+            out.append({"name": m.name, "unit": m.unit, "delivery": m.delivery, "shelf_life": m.shelf_life, "cost": m.cost,
+                        "stock_text": r["text"]["stock"] if r else None, "order_text": order})
+        return out
+
+    def _recipes(self, cid: int) -> list[dict]:
+        units = {mat_key(n): m.unit for n, m in self.bot.db.materials(cid).items()}
+        return [{"product": p, "material": m, "norm": n, "unit": units.get(mat_key(m))} for p, m, n in self.bot.db.recipes(cid)]
 
     def state(self, chat) -> dict:
         b, db = self.bot, self.bot.db
@@ -171,7 +229,8 @@ class Cabinet:
         plan_m = plan_info(work_m, {r.product: r.qty for r in recs_m})
 
         products = self._products(cid)
-        batches = self._batches(cid, today)
+        stock = self._stock(chat)
+        batches = self._batches(cid, today, stock)
 
         sales = db.sales(cid)
         days = sorted({s.day for s in sales})
@@ -189,6 +248,7 @@ class Cabinet:
             "products": products,
             "removed": sorted(db.inactive_products(cid)),
             "batches": batches,
+            "stock": stock,
             "data": {"rows": len(sales), "first": days[0].isoformat() if days else None,
                      "last": days[-1].isoformat() if days else None},
             "summary": self._summary(cid),
@@ -211,8 +271,10 @@ class Cabinet:
             for r in recs:
                 week.setdefault(r.product, [0] * 7)[i] = fixed[i].get(r.product, r.qty) if i < 2 else r.qty
         rows = [{"product": p, "qty": q} for p, q in sorted(week.items(), key=lambda kv: -sum(kv[1]))]
+        stock = self._stock(chat)
         return {"today": today.isoformat(), "sales": sales, "products": self._products(cid),
-                "batches": self._batches(cid, today), "week": {"days": [d.isoformat() for d in days], "rows": rows}}
+                "batches": self._batches(cid, today, stock), "materials": self._materials(cid, stock),
+                "recipes": self._recipes(cid), "week": {"days": [d.isoformat() for d in days], "rows": rows}}
 
     def act(self, chat, path: str, body: dict) -> dict:
         b, db = self.bot, self.bot.db
@@ -234,15 +296,17 @@ class Cabinet:
             return {"ok": True}
         if path == "/api/batch":
             item = _wname(body.get("item"), "продукт")
-            qty = str(body.get("qty") or "").strip()[:20]
+            qty, amount, unit = self._amount(cid, item, body)
             exp = body.get("expires")
             if not exp:
                 made = date.fromisoformat(body.get("made") or today.isoformat())
                 p = db.products(cid).get(item)
-                if not p or not p.shelf_life:
-                    raise ValueError("укажите дату «годен до» или срок хранения у товара")
-                exp = (made + timedelta(days=p.shelf_life)).isoformat()
-            db.add_batch(cid, item, qty, date.fromisoformat(exp))
+                m = {mat_key(n): x for n, x in db.materials(cid).items()}.get(mat_key(item))
+                life = (p.shelf_life if p else None) or (m.shelf_life if m else None)
+                if not life:
+                    raise ValueError("укажите дату «годен до» или срок хранения у товара или сырья")
+                exp = (made + timedelta(days=life)).isoformat()
+            db.add_batch(cid, item, qty, date.fromisoformat(exp), amount=amount, unit=unit, arrived=today)
             return {"ok": True}
         if path == "/api/batch/close":
             status = body.get("status")
@@ -277,8 +341,36 @@ class Cabinet:
             self._bt_cache.pop(cid, None)
             return {"ok": True, "rows": len(rows)}
         if path == "/api/batch/edit":
-            db.update_batch(cid, int(body.get("id")), _wname(body.get("item"), "продукт"),
-                            str(body.get("qty") or "").strip()[:20], _wdate(body.get("expires"), "годен до"))
+            item = _wname(body.get("item"), "продукт")
+            qty, amount, unit = self._amount(cid, item, body)
+            db.update_batch(cid, int(body.get("id")), item, qty, _wdate(body.get("expires"), "годен до"), amount=amount, unit=unit)
+            return {"ok": True}
+        if path == "/api/material":
+            name = _wname(body.get("name"), "сырьё")
+            try:
+                days = parse_delivery(body.get("delivery"))
+            except ValueError as e:
+                raise ValueError(f"{name}: {e}")
+            m = Material(name, norm_unit(body.get("unit") or "кг"), delivery_text(days),
+                         _wnum(body.get("shelf_life"), 1, 3650, integer=True), _wnum(body.get("cost"), 0, 1e6))
+            db.save_material(cid, m, body.get("old_name") or None)
+            return {"ok": True}
+        if path == "/api/material/remove":
+            db.remove_material(cid, _wname(body.get("name"), "сырьё"))
+            return {"ok": True}
+        if path == "/api/recipe":
+            product, material = _wname(body.get("product"), "товар"), _wname(body.get("material"), "сырьё")
+            if mat_key(material) not in {mat_key(n) for n in db.materials(cid)}:
+                raise ValueError(f"сырья «{material}» нет в списке — добавьте его на листе «Сырьё»")
+            material = next(n for n in db.materials(cid) if mat_key(n) == mat_key(material))
+            norm = _wnum(body.get("norm"), 0, 1e5)
+            if not norm:
+                raise ValueError(f"{product}: укажите расход сырья на 1 шт")
+            old = (body.get("old_product"), body.get("old_material")) if body.get("old_product") else None
+            db.save_recipe(cid, product, material, norm, old)
+            return {"ok": True}
+        if path == "/api/recipe/remove":
+            db.delete_recipe(cid, _wname(body.get("product"), "товар"), _wname(body.get("material"), "сырьё"))
             return {"ok": True}
         if path == "/api/record":
             product = _wname(body.get("product"))

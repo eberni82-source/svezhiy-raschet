@@ -398,17 +398,24 @@
 
   // ---------------------------------------------------------------- четыре листа
   // adapter: today (ISO), load(), saveSales(upsert, remove), saveProduct(p, oldName), removeProduct(name),
-  //          addBatch(b), editBatch(b), deleteBatch(id), upload(text)?, toast(msg)
+  //          addBatch(b), editBatch(b), deleteBatch(id), saveMaterial(m, oldName), removeMaterial(name),
+  //          saveRecipe(r, old), removeRecipe(r), upload(text)?, toast(msg)
   function Sheets(el, a) {
     injectCss();
     this.el = el; this.a = a; this.tab = "sales"; this.period = 14; this.product = "";
-    this.data = null; this.drafts = { sales: [], products: [], batches: [] }; this.busy = false;
+    this.data = null; this.drafts = { sales: [], products: [], batches: [], materials: [], recipes: [] }; this.busy = false;
     var self = this;
     el.innerHTML = '<div class="xs-tabs" role="tablist" aria-label="Листы"></div><div class="xs-bar"></div><div class="xs-grid"></div><p class="xs-hint"></p>';
     el.addEventListener("click", function (e) { self.onClick(e); });
     el.addEventListener("change", function (e) { self.onChangeCtl(e); });
   }
-  var SHEETS = [["sales", "Продажи по дням"], ["products", "Товары"], ["batches", "Сроки годности"], ["week", "План на неделю"]];
+  var SHEETS = [["sales", "Продажи по дням"], ["products", "Товары"], ["materials", "Сырьё"], ["recipes", "Техкарты"],
+                ["batches", "Партии и сроки"], ["week", "План на неделю"]];
+  var SHEET_HINT = {
+    materials: " Поставки — дни недели через запятую («пн, чт») или «ежедневно». Срок — сколько дней годна новая поставка. Заказ считается к ближайшей поставке, чтобы хватило до следующей.",
+    recipes: " Расход на 1 шт: для сырья в кг — в граммах, в литрах — в миллилитрах, в штуках — в штуках.",
+    batches: " Количество — числом с единицей: «2 л», «800 г», «30 шт». Остаток уменьшается сам по тому, что произвели."
+  };
   var HINT = "Кликните ячейку и печатайте. Enter — изменить, стрелки и Tab — переход, Delete — очистить, Ctrl+C / Ctrl+V — копировать и вставить из Excel.";
 
   Sheets.prototype.load = function () {
@@ -453,6 +460,7 @@
     return [
       { key: "item", title: "Продукт", type: "text", width: 210, required: true },
       { key: "qty", title: "Количество", type: "text", width: 110, maxLength: 20 },
+      { key: "rest_text", title: "Осталось", type: "text", ro: true, width: 100, csv: false },
       { key: "expires", title: "Годен до", type: "date", width: 120,
         html: function (v) { return v ? '<span class="mute">' + weekday(v) + "</span> " + esc(text({ type: "date" }, v)) : ""; } },
       { key: "label", title: "Статус", type: "text", ro: true, width: 150,
@@ -460,6 +468,27 @@
       { key: "tip", title: "Что сделать", type: "text", ro: true, width: 300 }
     ];
   };
+  Sheets.prototype.materialColumns = function () {
+    return [
+      { key: "name", title: "Сырьё", type: "text", width: 210, required: true },
+      { key: "unit", title: "Ед.", type: "text", width: 60, required: true, maxLength: 3 },
+      { key: "delivery", title: "Поставки", type: "text", width: 130, maxLength: 40 },
+      { key: "shelf_life", title: "Срок, дней", type: "number", int: true, min: 1, max: 3650, width: 96 },
+      { key: "cost", title: "Цена за ед., ₽", type: "number", min: 0, max: 1e6, width: 116 },
+      { key: "stock_text", title: "Остаток на утро", type: "text", ro: true, width: 120, csv: false },
+      { key: "order_text", title: "Заказать", type: "text", ro: true, width: 150, csv: false }
+    ];
+  };
+  Sheets.prototype.recipeColumns = function () {
+    return [
+      { key: "product", title: "Товар", type: "text", width: 210, required: true },
+      { key: "material", title: "Сырьё", type: "text", width: 210, required: true },
+      { key: "norm", title: "Расход на 1 шт", type: "number", min: 0, max: 1e5, digits: 1, width: 120, required: true },
+      { key: "small", title: "Ед.", type: "text", ro: true, width: 60, csv: false,
+        value: function (r) { return { "кг": "г", "л": "мл", "шт": "шт" }[r.unit] || ""; } }
+    ];
+  };
+
   Sheets.prototype.weekColumns = function () {
     var days = this.data.week.days, cols = [{ key: "product", title: "Товар", type: "text", ro: true, width: 200 }];
     days.forEach(function (d, i) {
@@ -494,7 +523,7 @@
     }
     bar.push('<span class="xs-sp"></span>');
     if (t !== "week") {
-      bar.push('<button class="xs-btn" data-do="add">' + { sales: "+ Строка", products: "+ Товар", batches: "+ Партия" }[t] + "</button>");
+      bar.push('<button class="xs-btn" data-do="add">' + { sales: "+ Строка", products: "+ Товар", batches: "+ Партия", materials: "+ Сырьё", recipes: "+ Строка техкарты" }[t] + "</button>");
       bar.push('<button class="xs-btn" data-do="del" disabled>' + (t === "products" ? "Убрать из планов" : "Удалить строки") + "</button>");
     }
     if (t === "sales" && a.upload) bar.push('<span class="xs-btn xs-file">Загрузить CSV<input type="file" accept=".csv,.txt,text/csv" data-ctl="upload" aria-label="Загрузить CSV"></span>');
@@ -502,7 +531,7 @@
     this.el.querySelector(".xs-bar").innerHTML = bar.join("");
     this.el.querySelector(".xs-hint").textContent = t === "week"
       ? "План считается сам по истории продаж, дню недели, погоде и сезону. Выделите ячейки и нажмите Ctrl+C, чтобы вставить в Excel."
-      : HINT + (t === "sales" ? " Строка сохраняется, когда заполнены дата, товар и «продано»." : "");
+      : HINT + (t === "sales" ? " Строка сохраняется, когда заполнены дата, товар и «продано»." : SHEET_HINT[t] || "");
     var o = {
       onError: function (m) { a.toast(m); }, onInfo: function (m) { a.toast(m); },
       onSelect: function (g) { var b = self.el.querySelector('[data-do="del"]'); if (b) b.disabled = !self.grid || g.r0 >= self.grid.rows.length; }
@@ -522,9 +551,17 @@
       o.rows = this.data.products.slice().sort(function (x, y) { return x.name.localeCompare(y.name, "ru"); }).concat(this.drafts.products);
       o.onChange = function (rows) { self.saveProducts(rows); };
     } else if (t === "batches") {
-      o.label = "Сроки годности"; o.columns = this.batchColumns(); o.allowAdd = true;
+      o.label = "Партии и сроки"; o.columns = this.batchColumns(); o.allowAdd = true;
       o.rows = this.data.batches.slice().concat(this.drafts.batches);
       o.onChange = function (rows) { self.saveBatches(rows); };
+    } else if (t === "materials") {
+      o.label = "Сырьё"; o.columns = this.materialColumns(); o.allowAdd = true;
+      o.rows = (this.data.materials || []).slice().concat(this.drafts.materials);
+      o.onChange = function (rows) { self.saveMaterials(rows); };
+    } else if (t === "recipes") {
+      o.label = "Техкарты"; o.columns = this.recipeColumns(); o.allowAdd = true;
+      o.rows = (this.data.recipes || []).slice().concat(this.drafts.recipes);
+      o.onChange = function (rows) { self.saveRecipes(rows); };
     } else {
       o.label = "План на неделю"; o.columns = this.weekColumns(); o.rows = this.data.week.rows; o.empty = "Нет товаров для плана";
       o.footer = function (rows) {
@@ -556,7 +593,7 @@
     if (b.hasAttribute("data-sheet")) { this.tab = b.getAttribute("data-sheet"); this.show(); return; }
     var d = b.getAttribute("data-do"), self = this, t = this.tab;
     if (d === "csv") {
-      var names = { sales: "prodazhi", products: "tovary", batches: "sroki", week: "plan-na-nedelyu" };
+      var names = { sales: "prodazhi", products: "tovary", batches: "sroki", materials: "syrye", recipes: "tehkarty", week: "plan-na-nedelyu" };
       var rows = t === "sales" ? this.salesRows().filter(function (r) { return !r.__draft; }) : this.grid.rows.filter(function (r) { return !r.__draft; });
       Sheets.saveFile(names[t] + "-" + this.a.today + ".csv", csv(this.cols, rows), this.a.toast);
     } else if (d === "add") {
@@ -573,6 +610,8 @@
       var job;
       if (t === "sales") job = this.a.saveSales([], saved.map(function (r) { return { day: r.day, product: r.product }; }));
       else if (t === "products") job = chain(saved.map(function (p) { return function () { return self.a.removeProduct(p.name); }; }));
+      else if (t === "materials") job = chain(saved.map(function (m) { return function () { return self.a.removeMaterial(m.name); }; }));
+      else if (t === "recipes") job = chain(saved.map(function (r) { return function () { return self.a.removeRecipe(r); }; }));
       else job = chain(saved.map(function (x) { return function () { return self.a.deleteBatch(x.id); }; }));
       job.then(function () {
         self.a.toast(t === "products" ? "Убрано из планов: " + saved.length + ". История продаж сохранена." : "Удалено строк: " + saved.length);
@@ -651,6 +690,32 @@
         if (!b.expires) { self.a.toast("У партии должна быть дата «годен до»"); return; }
         jobs.push(function () { return self.a.editBatch({ id: b.id, item: b.item, qty: b.qty || "", expires: b.expires }); });
       }
+    });
+    if (!jobs.length) return this.show();
+    return chain(jobs).then(function () { return self.load(); }).catch(function (x) { self.err(x); return self.load(); });
+  };
+
+  Sheets.prototype.saveMaterials = function (rows) {
+    var self = this, jobs = [];
+    rows.forEach(function (m) {
+      var old = m.__old || {}; delete m.__old;
+      if (!m.name || !m.unit) { if (m.__draft && self.drafts.materials.indexOf(m) < 0) self.drafts.materials.push(m); return; }
+      var oldName = !m.__draft && "name" in old && old.name !== m.name ? old.name : null;
+      jobs.push(function () { return self.a.saveMaterial(clean(m, ["name", "unit", "delivery", "shelf_life", "cost"]), oldName); });
+      self.drafts.materials = self.drafts.materials.filter(function (x) { return x !== m; });
+    });
+    if (!jobs.length) return this.show();
+    return chain(jobs).then(function () { return self.load(); }).catch(function (x) { self.err(x); return self.load(); });
+  };
+  Sheets.prototype.saveRecipes = function (rows) {
+    var self = this, jobs = [];
+    rows.forEach(function (r) {
+      var old = r.__old || {}; delete r.__old;
+      if (!r.product || !r.material || !r.norm) { if (r.__draft && self.drafts.recipes.indexOf(r) < 0) self.drafts.recipes.push(r); return; }
+      var was = !r.__draft && (("product" in old && old.product !== r.product) || ("material" in old && old.material !== r.material))
+        ? { product: "product" in old ? old.product : r.product, material: "material" in old ? old.material : r.material } : null;
+      jobs.push(function () { return self.a.saveRecipe(clean(r, ["product", "material", "norm"]), was); });
+      self.drafts.recipes = self.drafts.recipes.filter(function (x) { return x !== r; });
     });
     if (!jobs.length) return this.show();
     return chain(jobs).then(function () { return self.load(); }).catch(function (x) { self.err(x); return self.load(); });

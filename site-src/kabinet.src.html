@@ -99,6 +99,16 @@ table.t { width: 100%; border-collapse: collapse; font-size: 14.5px; }
 .t .why { font-size: 13px; color: var(--ink-2); margin-top: 2px; }
 .t .big { font: 700 20px/1 var(--f-mono); }
 .t.confirmed .big { color: var(--ok); }
+.alerts { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.alerts li { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 10px; align-items: baseline; padding: 10px 12px; border-radius: 10px; background: var(--warn-soft); font-size: 14px; color: var(--ink-2); }
+.alerts li.bad { background: var(--bad-soft); }
+.alerts li b { color: var(--ink); }
+.alerts .ic { font-size: 15px; }
+.t tr.due td { background: var(--stamp-soft); }
+.t .order { font: 700 16px/1.2 var(--f-mono); white-space: nowrap; }
+.stock-t .m-only { display: none; }
+.stock-t td.r .why { white-space: normal; min-width: 92px; }
+@media (max-width: 620px) { .stock-t .c-need, .stock-t .c-del, .stock-t .c-next { display: none; } .stock-t .m-only { display: inline; } }
 .card h2 .chip { vertical-align: 3px; margin-left: 8px; }
 .confirm { display: flex; justify-content: space-between; align-items: center; gap: 12px 16px; flex-wrap: wrap; margin: 0 0 14px; padding: 14px 16px; border-radius: 12px; background: var(--warn-soft); font-size: 14px; color: var(--ink-2); }
 .confirm.ok { background: var(--ok-soft); }
@@ -190,6 +200,7 @@ input.small { width: 84px; }
       <button role="tab" data-tab="tomorrow" aria-selected="false">Завтра</button>
       <button role="tab" data-tab="products" aria-selected="false">Товары</button>
       <button role="tab" data-tab="batches" aria-selected="false">Сроки годности</button>
+      <button role="tab" data-tab="stock" aria-selected="false">Сырьё и заказ</button>
       <button role="tab" data-tab="tables" aria-selected="false">Таблицы</button>
       <button role="tab" data-tab="data" aria-selected="false">Данные и настройки</button>
     </nav>
@@ -207,6 +218,7 @@ input.small { width: 84px; }
 "use strict";
 var BOT_USERNAME = "svezhiy_raschet_bot";
 var DEMO_CSV = __DEMO_CSV__;
+var DEMO_STOCK = __DEMO_STOCK__;
 </script>
 <script>/*GRID*/</script>
 <script>/*KABINET*/</script>

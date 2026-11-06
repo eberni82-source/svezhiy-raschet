@@ -205,6 +205,19 @@ table.plan { width: 100%; border-collapse: collapse; font-size: 15px; }
 .plan-head { display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap; margin-bottom: 10px; }
 .plan-head .plan-h { margin-bottom: 0; }
 .plan.confirmed .qty { color: var(--ok); }
+.stock-note { margin-top: 10px; padding: 10px 14px; border-radius: 10px; background: var(--bg); font-size: 14px; color: var(--ink-2); }
+.stock-note b { color: var(--ink); }
+.linkbtn { border: 0; background: none; padding: 0; font: inherit; color: var(--stamp); text-decoration: underline; cursor: pointer; }
+.alerts { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.alerts li { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 10px; align-items: baseline; padding: 10px 12px; border-radius: 10px; background: var(--warn-soft); font-size: 14px; color: var(--ink-2); }
+.alerts li.bad { background: var(--bad-soft); }
+.alerts li b { color: var(--ink); }
+.stock-t tbody tr { cursor: default; }
+.stock-t tbody tr:hover td { background: none; }
+.stock-t tr.due td, .stock-t tr.due:hover td { background: var(--stamp-soft); }
+.stock-t .m-only { display: none; }
+.stock-t td.r .why { white-space: normal; min-width: 92px; }
+@media (max-width: 560px) { .stock-t .c-del, .stock-t .c-need, .stock-t .c-next { display: none; } .stock-t .m-only { display: inline; } }
 .next { display: flex; justify-content: space-between; align-items: center; gap: 12px 16px; flex-wrap: wrap; margin-top: 14px; padding: 14px 16px; border-radius: 12px; background: var(--warn-soft); font-size: 14px; color: var(--ink-2); }
 .next.ok { background: var(--ok-soft); }
 .next p { flex: 1 1 280px; max-width: 60ch; }
@@ -256,6 +269,7 @@ table.plan { width: 100%; border-collapse: collapse; font-size: 15px; }
 .batch .b-meta { font-size: 13px; color: var(--ink-2); }
 .batch .b-tip { grid-column: 1 / -1; font-size: 14px; color: var(--ink-2); }
 .batch .b-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+@media (max-width: 560px) { .batch { grid-template-columns: minmax(0, 1fr); } .batch .b-actions { justify-content: flex-start; } }
 .chip { display: inline-flex; align-items: center; gap: 6px; font: 600 12px/1 var(--f-body); padding: 5px 9px; border-radius: 999px; white-space: nowrap; }
 .chip.ok { background: var(--ok-soft); color: var(--ok); }
 .chip.warn { background: var(--warn-soft); color: var(--warn); }
@@ -510,7 +524,7 @@ footer { padding-block: 32px; font-size: 14px; color: var(--ink-3); }
           <div class="panel">
             <div class="tabs" role="tablist" aria-label="Разделы расчёта">
               <button role="tab" id="tab-plan" aria-selected="true" aria-controls="pane-plan">План на день</button>
-              <button role="tab" id="tab-exp" aria-selected="false" aria-controls="pane-exp">Сроки годности</button>
+              <button role="tab" id="tab-exp" aria-selected="false" aria-controls="pane-exp">Сырьё и сроки</button>
               <button role="tab" id="tab-bt" aria-selected="false" aria-controls="pane-bt">Проверка на истории</button>
               <button role="tab" id="tab-sheets" aria-selected="false" aria-controls="pane-sheets">Таблицы</button>
             </div>
@@ -538,6 +552,7 @@ footer { padding-block: 32px; font-size: 14px; color: var(--ink-3); }
                 </table>
               </div>
               <p class="rain-note" id="rain-note"></p>
+              <p class="stock-note" id="stock-note" hidden></p>
               <div class="next" id="confirm">
                 <p id="confirm-text"></p>
                 <div class="next-btns">
@@ -559,10 +574,13 @@ footer { padding-block: 32px; font-size: 14px; color: var(--ink-3); }
               </div>
             </div>
             <div role="tabpanel" id="pane-exp" aria-labelledby="tab-exp" hidden>
+              <h3 class="plan-h">Сырьё на сегодня</h3>
+              <div id="stock"></div>
+              <h3 class="plan-h" style="margin-top:22px">Партии и сроки годности</h3>
               <div class="batches" id="batches"></div>
               <form class="add-batch" id="add-batch">
                 <label>Продукт<input type="text" id="b-item" placeholder="Сливки 33%" required></label>
-                <label>Сколько<input type="text" id="b-qty" placeholder="2 л"></label>
+                <label>Сколько<input type="text" id="b-qty" placeholder="2 л, 800 г"></label>
                 <label>Годен до<input type="date" id="b-date" required></label>
                 <button class="btn btn-primary" type="submit">Добавить</button>
               </form>
@@ -734,6 +752,7 @@ footer { padding-block: 32px; font-size: 14px; color: var(--ink-3); }
 "use strict";
 var BOT_USERNAME = "svezhiy_raschet_bot";
 var DEMO_CSV = __DEMO_CSV__;
+var DEMO_STOCK = __DEMO_STOCK__;
 </script>
 <script>/*GRID*/</script>
 <script>/*APP*/</script>

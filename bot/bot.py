@@ -26,6 +26,8 @@ try:
     from core.csv_import import ImportErrorRu, parse_csv
     from core.forecast import (WEEKDAYS_SHORT, Product, Sale, backtest, discount_advice, evening_threshold,
                                expiry_status, expiry_tip, forecast, rain_effect, Recommendation)
+    from core.materials import (DEMO_BATCHES, DEMO_MATERIALS, DEMO_RECIPES, HORIZON, Material, fmt_amount, mat_key,
+                                parse_amount, round_up, stock_report, waste_hint)
     from core.storage import Storage
     from core.tg import Telegram, TelegramError
     from core.weather import WeatherCache, geocode
@@ -50,11 +52,11 @@ ROOT = Path(__file__).resolve().parent
 log = logging.getLogger("bot")
 esc = html.escape
 
-MENU = [["План на завтра", "Итоги дня"], ["Скидка сейчас", "Сроки годности"], ["Добавить партию", "Личный кабинет"],
-        ["Помощь"]]
+MENU = [["План на завтра", "Итоги дня"], ["Скидка сейчас", "Сроки годности"], ["Добавить партию", "Сырьё и заказ"],
+        ["Личный кабинет", "Помощь"]]
 BUTTON_TO_CMD = {"План на завтра": "/plan", "Итоги дня": "/itogi", "Скидка сейчас": "/skidka",
-                 "Сроки годности": "/batches", "Добавить партию": "/batch", "Личный кабинет": "/web",
-                 "Помощь": "/help"}
+                 "Сроки годности": "/batches", "Добавить партию": "/batch", "Сырьё и заказ": "/syrye",
+                 "Личный кабинет": "/web", "Помощь": "/help"}
 SOLDOUT_SLOTS = [("до 12:00", "11:00"), ("12–15", "13:30"), ("15–18", "16:30"), ("после 18", "19:30")]
 KINDS = ["Пекарня", "Кофейня", "Кулинария", "Столовая", "Другое"]
 
@@ -74,6 +76,7 @@ HELP = """<b>Что умеет бот</b>
 /skidka — нужна ли скидка прямо сейчас
 /batch — добавить партию продуктов со сроком годности
 /batches — что скоро испортится
+/syrye — остатки сырья и что заказать к ближайшей поставке
 /event — отметить событие завтра (праздник, ярмарка)
 /products — позиции, цены, себестоимость
 /price Круассан 120 40 — задать цену и себестоимость
@@ -82,6 +85,8 @@ HELP = """<b>Что умеет бот</b>
 /web — войти в личный кабинет на сайте
 /demo — загрузить пример «Пекарня»
 /stop — выключить рассылку, /start — включить
+
+<b>Сырьё</b> — техкарты (сколько сырья уходит на штуку) и график поставок задаются в личном кабинете: /web. Тогда утром в плане будет, хватит ли сырья, что спишется и сколько заказать.
 
 <b>Свои продажи</b> — пришлите CSV-файл (выгрузку из кассы или Excel → «Сохранить как CSV») с колонками:
 <code>дата;товар;продано</code> и по желанию <code>испечено;закончилось;цена;себестоимость;дождь;температура</code>"""
@@ -273,9 +278,15 @@ class FreshBot:
         if info["habit"] and habit_total > total * 1.03:
             lines.append(f"Обычно в этот день пекли ~{habit_total:.0f} шт — план на {habit_total - total:.0f} шт меньше")
         today = self.today(chat)
-        exp = self.expiry_lines(chat, today, horizon=max(1, (day - today).days + 1))
+        stock = self.stock(chat) if day == today else None
+        skip = {mat_key(n) for n in self.db.materials(chat["chat_id"])} if stock else set()
+        exp = self.expiry_lines(chat, today, horizon=max(1, (day - today).days + 1), skip=skip)
         if exp:
             lines += ["", "<b>Сроки годности</b>"] + exp
+        if stock:
+            lines += self.stock_lines(chat, *stock, brief=True)
+        elif day > today and self.db.materials(chat["chat_id"]):
+            lines.append("\nСырьё и заказ поставщикам: /syrye")
         status, work = self.plan_status(chat["chat_id"], day)
         if status == "draft":
             lines.append("\n<b>Подтвердите план</b> кнопкой ниже — без подтверждения он не идёт в работу: "
@@ -287,14 +298,121 @@ class FreshBot:
                          f"новый — {sum(r.qty for r in recs)} шт. Подтвердите новый план или оставьте прежний.")
         return "\n".join(lines)
 
-    def expiry_lines(self, chat, day: date, horizon: int = 1) -> list[str]:
+    def expiry_lines(self, chat, day: date, horizon: int = 1, skip: set | None = None) -> list[str]:
         out = []
         for b in self.db.batches(chat["chat_id"]):
+            if skip and b["amount"] is not None and mat_key(b["item"]) in skip:
+                continue  # сырьё с остатком в числах - про него раздел «Сырьё»
             status, left = expiry_status(date.fromisoformat(b["expires"]), day)
             if left <= horizon:
                 tip = "спишите" if left < 0 else expiry_tip(b["item"])
                 out.append(f"• {esc(b['item'])} ({esc(b['qty'])}) — {status} → {tip}")
         return out
+
+    # ---------------------------------------------------------------- сырьё
+    def plan_days(self, chat, days: list[date]) -> dict[date, dict[str, int]]:
+        """План по дням для расчёта сырья: подтверждённый, иначе утренний расчёт, иначе прогноз."""
+        cid = chat["chat_id"]
+        used = {r[0] for r in self.db.recipes(cid)}
+        sales = self.db.sales(cid)
+        products = {k: p for k, p in self.db.products(cid).items() if k in used}
+        for s in sales:
+            if s.product in used:
+                products.setdefault(s.product, Product(s.product))
+        eff, _ = rain_effect(sales, chat["open_h"], chat["close_h"])
+        today, now_ts, out = self.today(chat), time.time(), {}
+        for d in days:
+            fixed = self.db.work_plan(cid, d) or (self.db.plan(cid, d) if d == today else [])
+            if fixed:
+                out[d] = {r["product"]: r["qty"] for r in fixed}
+                continue
+            w = self.weather.day(chat["lat"], chat["lon"], d, now_ts)
+            ev = self.db.event(cid, d)
+            out[d] = {p.name: forecast(sales, p, d, bool(w.rain), ev, chat["open_h"], chat["close_h"], eff, w.temp).qty
+                      for p in products.values()}
+        return out
+
+    def made(self, cid: int, start: date, today: date) -> dict[date, dict[str, float]]:
+        """Что произвели в прошлые дни: «испечено» из продаж, иначе подтверждённый план."""
+        out: dict[date, dict[str, float]] = {}
+        d = start
+        while d < today:
+            out[d] = {r["product"]: r["qty"] for r in self.db.work_plan(cid, d)}
+            d += timedelta(days=1)
+        for s in self.db.sales(cid):
+            if start <= s.day < today and s.baked is not None:
+                out[s.day][s.product] = s.baked
+        return out
+
+    def stock(self, chat) -> tuple[dict, dict] | None:
+        """Отчёт по сырью и план по дням, по которому он посчитан. Без справочника сырья - None."""
+        cid = chat["chat_id"]
+        mats = self.db.materials(cid)
+        if not mats:
+            return None
+        today = self.today(chat)
+        batches = [{"id": b["id"], "item": b["item"], "amount": b["amount"], "expires": date.fromisoformat(b["expires"]),
+                    "arrived": date.fromisoformat(b["arrived"]) if b["arrived"] else today} for b in self.db.batches(cid)]
+        start = min((b["arrived"] for b in batches if b["amount"]), default=today)
+        plan = self.plan_days(chat, [today + timedelta(days=i) for i in range(HORIZON)])
+        return stock_report(mats, self.db.recipes(cid), batches, self.made(cid, start, today), plan, today), plan
+
+    def stock_lines(self, chat, rep: dict, plan: dict, brief: bool = False) -> list[str]:
+        """Раздел «Сырьё»: нехватка, будущее списание и заказ поставщикам."""
+        today = self.today(chat)
+        alerts, orders = [], []
+        for r in rep["rows"]:
+            f = lambda x: fmt_amount(x, r["unit"])  # noqa: E731
+            name = esc(r["name"])
+            if r["short_today"] > 0:
+                line = f"⚠️ {name}: на сегодня нужно {f(r['need_today'])}, есть {f(r['stock'])} — не хватит {f(round_up(r['short_today'], r['unit']))}"
+                rest = r["short_before"] - r["short_today"]
+                if rest > 1e-9:
+                    line += f", до поставки {fmt_day(r['next'])} — ещё {f(round_up(rest, r['unit']))}"
+                alerts.append(line)
+            elif r["short_before"] > 0:
+                alerts.append(f"⚠️ {name}: хватит до {fmt_day(r['short_first'] - timedelta(days=1))}, поставка {fmt_day(r['next'])} — "
+                              f"докупите {f(round_up(r['short_before'], r['unit']))}")
+            if r["waste"]:
+                first = min(w["expires"] for w in r["waste"])
+                status, _ = expiry_status(first, today)
+                if first < today:
+                    alerts.append(f"🗑 {name}: просрочено — спишите {f(r['waste_total'])}")
+                else:
+                    cost = f" (≈ {money(r['waste_total'] * r['cost'])})" if r["cost"] else ""
+                    tip = waste_hint(r, plan.get(today)) or expiry_tip(r["name"])
+                    alerts.append(f"🗑 {name}: {status} — по плану не уйдёт {f(r['waste_total'])}{cost} → {esc(tip)}")
+            if r["order"] > 0 and (not brief or r["next"] == today + timedelta(days=1)):
+                orders.append(f"• {name} — <b>{f(r['order'])}</b>" +
+                              ("" if brief else f" к {fmt_day(r['next'])}, на {r['cover']} {plural(r['cover'], 'день', 'дня', 'дней')}"))
+        out = []
+        if alerts:
+            out += ["", "<b>Сырьё</b>"] + alerts
+        if orders:
+            out += ["", "<b>Заказать сегодня — поставка завтра</b>" if brief else "<b>Заказ к ближайшей поставке</b>"] + orders
+        if brief:
+            if not alerts and not orders:
+                out += ["", "<b>Сырьё</b>", "Сырья хватает до ближайших поставок."]
+            out.append("Все остатки и заказы: /syrye")
+        return out
+
+    def cmd_syrye(self, chat):
+        cid = chat["chat_id"]
+        stock = self.stock(chat)
+        if not stock:
+            return self.tg.send(cid, "Сырьё пока не заведено. Добавьте сырьё, график поставок и техкарты в личном кабинете (/web) "
+                                     "или загрузите пример: /demo")
+        rep, plan = stock
+        today = self.today(chat)
+        lines = [f"<b>Сырьё · {fmt_day(today)}</b>", "Остаток на утро · уйдёт сегодня по плану · поставки"]
+        for r in rep["rows"]:
+            lines.append(f"• {esc(r['name'])} — {fmt_amount(r['stock'], r['unit'])} · {fmt_amount(r['need_today'], r['unit'])} · {r['delivery']}")
+        lines += self.stock_lines(chat, rep, plan)
+        if not any(r["order"] > 0 for r in rep["rows"]):
+            lines += ["", "Заказывать пока ничего не нужно."]
+        lines.append("\nЗаказ — к ближайшей поставке, чтобы хватило до следующей, с запасом 10% и в пределах срока годности. "
+                     "Техкарты и график поставок — в личном кабинете: /web")
+        self.tg.send(cid, "\n".join(lines))
 
     def tick(self):
         """Раз в ~20 секунд проверяем, кому пора отправить утренний/вечерний/итоговый пост."""
@@ -366,6 +484,7 @@ class FreshBot:
                 {"command": "skidka", "description": "Нужна ли скидка сейчас"},
                 {"command": "batch", "description": "Добавить партию со сроком"},
                 {"command": "batches", "description": "Что скоро испортится"},
+                {"command": "syrye", "description": "Сырьё и заказ поставщикам"},
                 {"command": "event", "description": "Событие завтра"},
                 {"command": "web", "description": "Личный кабинет на сайте"},
                 {"command": "help", "description": "Помощь"},
@@ -518,7 +637,7 @@ class FreshBot:
         self.tg.send(chat["chat_id"], "Рассылка выключена. Включить снова: /start")
 
     def load_example(self, chat):
-        """Пример «Пекарня»: год продаж и несколько партий со сроками годности."""
+        """Пример «Пекарня»: год продаж, сырьё с техкартами и графиком поставок, партии со сроками."""
         cid = chat["chat_id"]
         text = (ROOT / "data" / "demo_sales.csv").read_text(encoding="utf-8")
         sales, products = parse_csv(text)
@@ -531,9 +650,14 @@ class FreshBot:
         self.db.import_sales(cid, sales, products)
         self.db.set_chat(cid, is_demo=1)
         today = self.today(chat)
-        for item, qty, days in [("Сливки 33%", "2 л", 1), ("Творог 5%", "3 кг", 2),
-                                ("Филе куриное", "1,5 кг", 0), ("Вишня замороженная", "2 кг", 20)]:
-            self.db.add_batch(cid, item, qty, today + timedelta(days=days))
+        for m in DEMO_MATERIALS:
+            self.db.save_material(cid, Material(*m))
+        for product, material, norm in DEMO_RECIPES:
+            self.db.save_recipe(cid, product, material, norm)
+        units = {m[0]: m[1] for m in DEMO_MATERIALS}
+        for item, amount, days in DEMO_BATCHES:
+            self.db.add_batch(cid, item, fmt_amount(amount, units[item]), today + timedelta(days=days),
+                              amount=amount, unit=units[item], arrived=today)
         self.plan_text(self.db.chat(cid), today, "План")  # сохраняем план на сегодня для вечерних советов
         return sales, products
 
@@ -545,8 +669,9 @@ class FreshBot:
                                            {"text": "Отмена", "callback_data": "x"}]])
         sales, products = self.load_example(chat)
         bt = backtest(sales, products)
-        lines = [f"Загрузил пример <b>«Пекарня»</b> (Челябинск): {len(products)} позиций, продажи за год с погодой. "
-                 "Продажи смоделированы — это пример, чтобы посмотреть, как работает бот."]
+        lines = [f"Загрузил пример <b>«Пекарня»</b> (Челябинск): {len(products)} позиций, продажи за год с погодой, "
+                 f"{len(DEMO_MATERIALS)} видов сырья с техкартами и графиком поставок. "
+                 "Данные смоделированы — это пример, чтобы посмотреть, как работает бот. Сырьё и заказ: /syrye"]
         if bt:
             lines += ["", "<b>Если бы последние 4 недели пекли по плану бота</b>",
                       f"Списания: {money(bt.waste_now)} → <b>{money(bt.waste_new)}</b> "
@@ -710,7 +835,15 @@ class FreshBot:
         self.tg.send(chat["chat_id"], "Сколько? Например: <i>2 л</i> или <i>3 кг</i>")
 
     def st_batch_qty(self, chat, text, st):
-        st["data"]["qty"] = text[:20]
+        mats = {mat_key(n): m for n, m in self.db.materials(chat["chat_id"]).items()}
+        m = mats.get(mat_key(st["data"]["item"]))
+        amount, unit = parse_amount(text, m.unit if m else None)
+        if amount is None:
+            return self.tg.send(chat["chat_id"], "Напишите количество числом, например <i>2 л</i>, <i>1,5 кг</i> или <i>30 шт</i> — "
+                                                 "тогда остаток будет уменьшаться по плану сам.")
+        if m and unit and unit != m.unit:
+            return self.tg.send(chat["chat_id"], f"{esc(m.name)} считается в «{m.unit}». Напишите количество в {m.unit}, например 2 {m.unit}")
+        st["data"].update(amount=amount, unit=unit, qty=fmt_amount(amount, unit) if unit else text[:20])
         st["name"] = "batch_exp"
         kb = [[{"text": t, "callback_data": f"b:{d}"} for t, d in row] for row in
               [[("Сегодня", 0), ("Завтра", 1), ("+2 дня", 2)], [("+3 дня", 3), ("+5 дней", 5), ("+7 дней", 7)]]]
@@ -734,7 +867,8 @@ class FreshBot:
 
     def save_batch(self, chat, st, d: date):
         cid = chat["chat_id"]
-        self.db.add_batch(cid, st["data"]["item"], st["data"]["qty"], d)
+        self.db.add_batch(cid, st["data"]["item"], st["data"]["qty"], d, amount=st["data"].get("amount"),
+                          unit=st["data"].get("unit"), arrived=self.today(chat))
         self.state.pop(cid, None)
         status, left = expiry_status(d, self.today(chat))
         self.tg.send(cid, f"Записал: {esc(st['data']['item'])}, {esc(st['data']['qty'])}, годен до {d:%d.%m} ({status}). "
@@ -746,13 +880,18 @@ class FreshBot:
         if not rows:
             return self.tg.send(cid, "Партий нет. Добавить: /batch")
         today = self.today(chat)
+        stock = self.stock(chat)
+        now_left = stock[0]["left"] if stock else {}
         lines = ["<b>Партии и сроки</b>"]
         kb = []
         for b in rows:
             d = date.fromisoformat(b["expires"])
             status, left = expiry_status(d, today)
             mark = "🔴" if left <= 0 else "🟡" if left <= 2 else "🟢"
-            line = f"{mark} {esc(b['item'])} ({esc(b['qty'])}) — до {d:%d.%m}, {status}"
+            qty = esc(b["qty"])
+            if b["id"] in now_left and b["amount"] and now_left[b["id"]] < b["amount"] - 1e-9:
+                qty = f"осталось {fmt_amount(now_left[b['id']], b['unit'])} из {fmt_amount(b['amount'], b['unit'])}"
+            line = f"{mark} {esc(b['item'])} ({qty}) — до {d:%d.%m}, {status}"
             if left <= 1:
                 line += f"\n    → {'спишите' if left < 0 else expiry_tip(b['item'])}"
             lines.append(line)

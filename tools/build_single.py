@@ -92,7 +92,7 @@ def bot_body() -> str:
 
 
 parts = [HEADER]
-for name in ("forecast.py", "csv_import.py", "storage.py", "tg.py", "weather.py", "web.py"):
+for name in ("forecast.py", "materials.py", "csv_import.py", "storage.py", "tg.py", "weather.py", "web.py"):
     parts.append(module_body(BOT / "core" / name))
 parts.append("# страница личного кабинета\nKABINET_HTML = " +
              json.dumps((BOT / "web" / "kabinet.html").read_text(encoding="utf-8"), ensure_ascii=False))

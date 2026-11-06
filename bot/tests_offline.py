@@ -104,6 +104,9 @@ out = msg(999, "/start") + msg(999, "Челябинск"); show("город Че
 check(bot.db.chat(999)["tz"] == "Asia/Yekaterinburg" and bot.db.chat(999)["city"] == "Челябинск", "Челябинск: часовой пояс +5 без интернета")
 out = msg(USER, "/demo"); show("/demo", out)
 check(any("Списания" in p["text"] for _, p in out) and any("План на завтра" in p["text"] for _, p in out), "демо + бэктест + план")
+check(len(bot.db.materials(USER)) == 10 and len(bot.db.recipes(USER)) >= 20, "демо: сырьё и техкарты загружены")
+SENT.clear(); bot.job_morning(bot.db.chat(USER)); show("утренний план с сырьём", SENT)
+check("<b>Сырьё</b>" in SENT[-1][1]["text"] and "Заказать сегодня" in SENT[-1][1]["text"], "утром: раздел «Сырьё» и заказ к завтрашней поставке")
 def buttons(out):
     return [b for _, p in out for row in (p.get("reply_markup") or {}).get("inline_keyboard", []) for b in row]
 
@@ -132,6 +135,9 @@ check(any("не подтверждён" in p["text"] for _, p in out) and any(b[
 out = msg(USER, "/skidka"); check(any("не подтверждён" in p["text"] for _, p in out), "скидки без подтверждённого плана не считаются")
 bot.job_evening(bot.db.chat(USER)); show("вечер без подтверждения", SENT[-1:])
 check("советов по витрине не будет" in SENT[-1][1]["text"], "вечером бот напоминает, что план не подтверждён")
+out = msg(USER, "/syrye"); show("/syrye", out)
+check(any("Заказ к ближайшей поставке" in p["text"] and "Масло сливочное 82%" in p["text"] for _, p in out), "/syrye: остатки сырья и заказ поставщикам")
+check(any("Филе куриное: истекает сегодня" in p["text"] for _, p in out), "/syrye: видно сырьё, которое спишется")
 out = msg(USER, "/today"); show("/today", out)
 check(any("План на сегодня" in p["text"] for _, p in out) and any(b["callback_data"] == f"ok:{today}" for b in buttons(out)), "/today показывает план и кнопку")
 out = cb(USER, f"ok:{today}"); show("подтвердили план на сегодня", out)
@@ -143,7 +149,15 @@ out = cb(USER, "l:1"); out += msg(USER, "4"); show("осталось 4", out)
 check(any("✓ осталось 4" in b["text"] for _, p in out if p.get("reply_markup") for row in p["reply_markup"].get("inline_keyboard", []) for b in row), "остаток сохранён")
 out = msg(USER, "/skidka"); out += cb(USER, "s:0"); out += msg(USER, "30"); show("скидка", out)
 check(any("скидка" in p["text"].lower() for _, p in out), "совет по скидке")
-out = msg(USER, "/batch") + msg(USER, "Сметана 20%") + msg(USER, "1 кг") + cb(USER, "b:1"); show("партия", out)
+out = msg(USER, "/batch") + msg(USER, "Сметана 20%") + msg(USER, "немного"); show("партия: количество не числом", out)
+check(any("числом" in p["text"] for _, p in out), "партия: просит количество числом")
+out = msg(USER, "1 кг") + cb(USER, "b:1"); show("партия", out)
+smet = [b for b in bot.db.batches(USER) if b["item"] == "Сметана 20%"]
+check(smet and smet[0]["amount"] == 1 and smet[0]["unit"] == "кг", "партия: количество записано числом")
+out = msg(USER, "/batch") + msg(USER, "Сливки 33%") + msg(USER, "2 кг"); show("сырьё не в той единице", out)
+check(any("считается в «л»" in p["text"] for _, p in out), "партия сырья: единица как в справочнике")
+out = msg(USER, "500 мл") + cb(USER, "b:2")
+check(any(b["item"] == "Сливки 33%" and abs(b["amount"] - 0.5) < 1e-9 for b in bot.db.batches(USER)), "партия: 500 мл = 0,5 л")
 out = msg(USER, "/batches"); show("/batches", out)
 check(any("Сметана" in p["text"] for _, p in out), "партия в списке")
 

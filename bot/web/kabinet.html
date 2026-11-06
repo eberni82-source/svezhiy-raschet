@@ -108,6 +108,16 @@ table.t { width: 100%; border-collapse: collapse; font-size: 14.5px; }
 .t .why { font-size: 13px; color: var(--ink-2); margin-top: 2px; }
 .t .big { font: 700 20px/1 var(--f-mono); }
 .t.confirmed .big { color: var(--ok); }
+.alerts { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.alerts li { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 10px; align-items: baseline; padding: 10px 12px; border-radius: 10px; background: var(--warn-soft); font-size: 14px; color: var(--ink-2); }
+.alerts li.bad { background: var(--bad-soft); }
+.alerts li b { color: var(--ink); }
+.alerts .ic { font-size: 15px; }
+.t tr.due td { background: var(--stamp-soft); }
+.t .order { font: 700 16px/1.2 var(--f-mono); white-space: nowrap; }
+.stock-t .m-only { display: none; }
+.stock-t td.r .why { white-space: normal; min-width: 92px; }
+@media (max-width: 620px) { .stock-t .c-need, .stock-t .c-del, .stock-t .c-next { display: none; } .stock-t .m-only { display: inline; } }
 .card h2 .chip { vertical-align: 3px; margin-left: 8px; }
 .confirm { display: flex; justify-content: space-between; align-items: center; gap: 12px 16px; flex-wrap: wrap; margin: 0 0 14px; padding: 14px 16px; border-radius: 12px; background: var(--warn-soft); font-size: 14px; color: var(--ink-2); }
 .confirm.ok { background: var(--ok-soft); }
@@ -199,6 +209,7 @@ input.small { width: 84px; }
       <button role="tab" data-tab="tomorrow" aria-selected="false">Завтра</button>
       <button role="tab" data-tab="products" aria-selected="false">Товары</button>
       <button role="tab" data-tab="batches" aria-selected="false">Сроки годности</button>
+      <button role="tab" data-tab="stock" aria-selected="false">Сырьё и заказ</button>
       <button role="tab" data-tab="tables" aria-selected="false">Таблицы</button>
       <button role="tab" data-tab="data" aria-selected="false">Данные и настройки</button>
     </nav>
@@ -564,7 +575,173 @@ input.small { width: 84px; }
     return xs.length ? avg(xs) : null;
   }
 
+  // ---------------------------------------------------------------- сырьё: техкарты, остатки, заказ
+  // та же логика, что в bot/core/materials.py
+  var UNITS = { "кг": ["г", 1000], "л": ["мл", 1000], "шт": ["шт", 1] };
+  var UNIT_WORDS = { "кг": "кг", "kg": "кг", "килограмм": "кг", "г": "г", "гр": "г", "грамм": "г", "g": "г",
+    "л": "л", "l": "л", "литр": "л", "литра": "л", "литров": "л", "мл": "мл", "ml": "мл",
+    "шт": "шт", "штук": "шт", "штуки": "шт", "штука": "шт", "pcs": "шт", "уп": "шт" };
+  var DAY_WORDS = ["понед", "вторн", "сред", "четв", "пятн", "субб", "воскр"];
+  var RESERVE = 0.10, HORIZON = 21, EPS = 1e-9;
+  function mkey(name) { return String(name || "").toLowerCase().split(/\s+/).filter(Boolean).join(" "); }
+  function rnd(x, digits) { var p = Math.pow(10, digits || 0); return Math.floor(x * p + 0.5) / p; }
+  function normUnit(text) {
+    var u = UNIT_WORDS[String(text || "").trim().toLowerCase().replace(/\.$/, "")];
+    if (!UNITS[u]) throw new Error("единица сырья: кг, л или шт");
+    return u;
+  }
+  function smallUnit(unit) { return (UNITS[unit] || ["шт", 1])[0]; }
+  function unitFactor(unit) { return (UNITS[unit] || ["шт", 1])[1]; }
+  function parseDelivery(text) {
+    var s = String(text || "").toLowerCase().replace(/ё/g, "е"), found = {};
+    if (!s.trim() || s.indexOf("ежеднев") >= 0 || s.indexOf("каждый день") >= 0 || s.indexOf("все дни") >= 0) return [0, 1, 2, 3, 4, 5, 6];
+    if (s.indexOf("будн") >= 0) [0, 1, 2, 3, 4].forEach(function (i) { found[i] = 1; });
+    WDS.forEach(function (short, i) {
+      if (s.indexOf(DAY_WORDS[i]) >= 0 || new RegExp("(^|[^а-я])" + short + "([^а-я]|$)").test(s)) found[i] = 1;
+    });
+    var out = Object.keys(found).map(Number).sort(function (a, b) { return a - b; });
+    if (!out.length) throw new Error("дни поставок: например «пн, чт» или «ежедневно»");
+    return out;
+  }
+  function deliveryText(days) { return days.length === 7 ? "ежедневно" : days.map(function (i) { return WDS[i]; }).join(", "); }
+  function nextDelivery(days, after) { var d = after + 1; while (days.indexOf(wday(d)) < 0) d++; return d; }
+  function parseAmount(text, unit) {
+    var m = String(text == null ? "" : text).trim().toLowerCase().replace(",", ".").match(/^(\d+(?:\.\d+)?)\s*([a-zа-я.]*)/);
+    if (!m) return { amount: null, unit: null };
+    var x = parseFloat(m[1]), w = UNIT_WORDS[m[2].replace(/\.$/, "")];
+    if (w === "г") return { amount: x / 1000, unit: "кг" };
+    if (w === "мл") return { amount: x / 1000, unit: "л" };
+    return { amount: x, unit: w || unit || null };
+  }
+  function fmtAmount(x, unit) {
+    if (!UNITS[unit]) return String(rnd(x, 1)).replace(".", ",") + (unit ? " " + unit : "");
+    if (unit === "шт") return rnd(x) + " шт";
+    if (x > 0 && x < 1) return rnd(x * 1000) + " " + smallUnit(unit);
+    return String(rnd(x, 1)).replace(".", ",") + " " + unit;
+  }
+  function roundUp(x, unit) {
+    if (x <= EPS) return 0;
+    return unit === "шт" ? Math.ceil(x - EPS) : Math.ceil(x * 10 - EPS) / 10;
+  }
+  function perPiece(materials, recipes) {
+    var mats = {}, out = {};
+    Object.keys(materials).forEach(function (k) { mats[mkey(materials[k].name)] = materials[k]; });
+    recipes.forEach(function (r) {
+      var mk = mkey(r.material);
+      if (mats[mk] && r.norm > 0) (out[r.product] = out[r.product] || []).push([mk, r.norm / unitFactor(mats[mk].unit)]);
+    });
+    return out;
+  }
+  function needsOf(per, dayPlan) {
+    var out = {};
+    Object.keys(dayPlan || {}).forEach(function (p) {
+      (per[p] || []).forEach(function (x) { out[x[0]] = (out[x[0]] || 0) + dayPlan[p] * x[1]; });
+    });
+    return out;
+  }
+  function takeFrom(batches, day, amount) {
+    for (var i = 0; i < batches.length && amount > EPS; i++) {
+      var b = batches[i];
+      if (b.left <= EPS || b.arrived > day || b.expires < day) continue;
+      var t = Math.min(b.left, amount); b.left -= t; amount -= t;
+    }
+    return amount > EPS ? amount : 0;
+  }
+  // materials: { имя: { name, unit, delivery, shelf_life, cost } }, recipes: [{ product, material, norm }]
+  // batches: [{ id, item, amount, expires, arrived }] — дни числами, made и plan: { день: { товар: штук } }
+  function stockReport(materials, recipes, batches, made, plan, today) {
+    var mats = {}, per = perPiece(materials, recipes), pool = {};
+    Object.keys(materials).forEach(function (k) { mats[mkey(materials[k].name)] = materials[k]; });
+    batches.forEach(function (b) {
+      if (b.amount == null || b.amount <= 0) return;
+      var k = mkey(b.item);
+      (pool[k] = pool[k] || []).push({ id: b.id, left: +b.amount, expires: b.expires, arrived: b.arrived });
+    });
+    var arrived = [];
+    Object.keys(pool).forEach(function (k) {
+      pool[k].sort(function (a, b) { return a.expires - b.expires || a.id - b.id; });
+      pool[k].forEach(function (b) { arrived.push(b.arrived); });
+    });
+    for (var d = arrived.length ? Math.min.apply(null, arrived) : today; d < today; d++) {
+      var nd = needsOf(per, made[d]);
+      Object.keys(nd).forEach(function (mk) { if (pool[mk]) takeFrom(pool[mk], d, nd[mk]); });
+    }
+    var leftNow = {}, uses = {};
+    Object.keys(pool).forEach(function (k) { pool[k].forEach(function (b) { leftNow[b.id] = b.left; }); });
+    Object.keys(per).forEach(function (p) { per[p].forEach(function (x) { (uses[x[0]] = uses[x[0]] || []).push([p, x[1]]); }); });
+    var rows = Object.keys(mats).sort().map(function (mk) {
+      var m = mats[mk], days = parseDelivery(m.delivery), first = nextDelivery(days, today);
+      var cover = nextDelivery(days, first) - first;
+      if (m.shelf_life) cover = Math.min(cover, Math.max(1, Math.floor(m.shelf_life)));
+      var end = Math.min(first + cover, today + HORIZON);
+      var bs = (pool[mk] || []).map(function (b) { return { id: b.id, left: b.left, expires: b.expires, arrived: b.arrived }; });
+      var stock = bs.reduce(function (a, b) { return a + (b.expires >= today && b.arrived <= today ? b.left : 0); }, 0);
+      var needToday = needsOf(per, plan[today])[mk] || 0;
+      var shortToday = 0, shortBefore = 0, unmetCover = 0, needCover = 0, shortFirst = null;
+      for (var dd = today; dd < end; dd++) {
+        var n = needsOf(per, plan[dd])[mk] || 0;
+        if (dd >= first) needCover += n;
+        var u = takeFrom(bs, dd, n);
+        if (u > 0) {
+          if (dd === today) shortToday = u;
+          if (dd < first) { shortBefore += u; if (shortFirst == null) shortFirst = dd; } else unmetCover += u;
+        }
+      }
+      var waste = bs.filter(function (b) { return b.left > EPS && b.expires < end; }).map(function (b) { return { id: b.id, left: b.left, expires: b.expires }; });
+      var later = bs.reduce(function (a, b) { return a + (b.expires >= end ? b.left : 0); }, 0);
+      var us = (uses[mk] || []).slice().sort(function (a, b) { return a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : a[1] - b[1]; });
+      return { name: m.name, unit: m.unit, cost: m.cost == null ? null : m.cost, delivery: deliveryText(days),
+        stock: stock, need_today: needToday, short_today: shortToday, short_first: shortFirst, short_before: shortBefore,
+        next: first, cover: cover, order: roundUp(unmetCover + RESERVE * needCover - later, m.unit), need_cover: needCover,
+        waste: waste, waste_total: waste.reduce(function (a, w) { return a + w.left; }, 0), uses: us };
+    });
+    return { rows: rows, left: leftNow };
+  }
+  function wasteHint(row, planToday) {
+    var extra = [];
+    row.uses.forEach(function (u) { var n = u[1] > 0 ? Math.floor(row.waste_total / u[1] + EPS) : 0; if (n > 0) extra.push([n, u[0]]); });
+    if (!extra.length) return "";
+    var q = function (p) { return (planToday || {})[p] || 0; };
+    extra.sort(function (a, b) { return q(b[1]) - q(a[1]) || (a[1] < b[1] ? -1 : a[1] > b[1] ? 1 : 0); });
+    return "можно сделать больше: " + extra.slice(0, 2).map(function (x) { return x[1] + " +" + x[0]; }).join(" или ");
+  }
+
+  // отчёт по сырью в виде для экрана — тот же, что отдаёт сервер бота (web.py, Cabinet._stock)
+  function stockView(rep, planToday) {
+    var iso = function (d) { return d == null ? null : diso(d); };
+    return { rows: rep.rows.map(function (r) {
+      var first = r.waste.length ? Math.min.apply(null, r.waste.map(function (w) { return w.expires; })) : null;
+      var rest = roundUp(r.short_before - r.short_today, r.unit), f = function (x) { return fmtAmount(x, r.unit); };
+      return { name: r.name, unit: r.unit, delivery: r.delivery, cost: r.cost, stock: r.stock, need_today: r.need_today,
+        short_today: r.short_today, short_before: r.short_before, short_rest: rest, cover: r.cover, order: r.order, waste_total: r.waste_total,
+        short_first: iso(r.short_first), next: iso(r.next), waste_first: iso(first), uses: r.uses.map(function (u) { return u[0]; }),
+        hint: r.waste.length ? (wasteHint(r, planToday) || expiryTip(r.name)) : null,
+        text: { stock: f(r.stock), need_today: f(r.need_today), short_today: f(roundUp(r.short_today, r.unit)),
+                short_before: f(roundUp(r.short_before, r.unit)), short_rest: f(rest), order: f(r.order), waste_total: f(r.waste_total) } };
+    }), left: rep.left };
+  }
+  // что важно по сырью сегодня: нехватка и будущее списание. label(iso) — подпись дня, «пн, 09.11»
+  function stockAlerts(view, todayIso, label) {
+    var out = [], T = dnum(todayIso);
+    view.rows.forEach(function (r) {
+      if (r.short_today > 0) {
+        out.push({ level: "bad", name: r.name, text: "на сегодня нужно " + r.text.need_today + ", есть " + r.text.stock + " — не хватит " + r.text.short_today +
+          (r.short_rest > 0 ? ", до поставки " + label(r.next) + " — ещё " + r.text.short_rest : "") });
+      } else if (r.short_before > 0) {
+        out.push({ level: "warn", name: r.name, text: "хватит до " + label(diso(dnum(r.short_first) - 1)) + ", поставка " + label(r.next) + " — докупите " + r.text.short_before });
+      }
+      if (r.waste_total > 0) {
+        var st = expiryStatus(dnum(r.waste_first), T);
+        out.push({ level: st.left < 0 ? "bad" : "warn", name: r.name, waste: true, text: st.left < 0 ? "просрочено — спишите " + r.text.waste_total
+          : st.label + " — по плану не уйдёт " + r.text.waste_total + (r.cost ? " (≈ " + Math.round(r.waste_total * r.cost).toLocaleString("ru-RU") + " ₽)" : "") + " → " + r.hint });
+      }
+    });
+    return out;
+  }
+
   var api = { dnum: dnum, diso: diso, wday: wday, ddmm: ddmm, WD: WD, WDS: WDS, demand: demand, rainEffect: rainEffect,
+    stockReport: stockReport, stockView: stockView, stockAlerts: stockAlerts, roundUp: roundUp, wasteHint: wasteHint, parseDelivery: parseDelivery, deliveryText: deliveryText, parseAmount: parseAmount,
+    fmtAmount: fmtAmount, normUnit: normUnit, smallUnit: smallUnit, mkey: mkey, HORIZON: HORIZON,
     criticalRatio: criticalRatio, forecast: forecast, eveningThreshold: eveningThreshold, discountAdvice: discountAdvice,
     backtest: backtest, expiryStatus: expiryStatus, expiryTip: expiryTip, parseCSV: parseCSV, signed: signed, SHARE_EVENING: SHARE_EVENING,
     loadWeather: loadWeather, deg: deg, recentTemp: recentTemp };
@@ -575,6 +752,7 @@ input.small { width: 84px; }
 "use strict";
 var BOT_USERNAME = "svezhiy_raschet_bot";
 var DEMO_CSV = "";
+var DEMO_STOCK = null;
 </script>
 <script>// таблицы как в Excel: ячейки, клавиатура, вставка из Excel, выгрузка для Excel
 (function (root) {
@@ -976,17 +1154,24 @@ var DEMO_CSV = "";
 
   // ---------------------------------------------------------------- четыре листа
   // adapter: today (ISO), load(), saveSales(upsert, remove), saveProduct(p, oldName), removeProduct(name),
-  //          addBatch(b), editBatch(b), deleteBatch(id), upload(text)?, toast(msg)
+  //          addBatch(b), editBatch(b), deleteBatch(id), saveMaterial(m, oldName), removeMaterial(name),
+  //          saveRecipe(r, old), removeRecipe(r), upload(text)?, toast(msg)
   function Sheets(el, a) {
     injectCss();
     this.el = el; this.a = a; this.tab = "sales"; this.period = 14; this.product = "";
-    this.data = null; this.drafts = { sales: [], products: [], batches: [] }; this.busy = false;
+    this.data = null; this.drafts = { sales: [], products: [], batches: [], materials: [], recipes: [] }; this.busy = false;
     var self = this;
     el.innerHTML = '<div class="xs-tabs" role="tablist" aria-label="Листы"></div><div class="xs-bar"></div><div class="xs-grid"></div><p class="xs-hint"></p>';
     el.addEventListener("click", function (e) { self.onClick(e); });
     el.addEventListener("change", function (e) { self.onChangeCtl(e); });
   }
-  var SHEETS = [["sales", "Продажи по дням"], ["products", "Товары"], ["batches", "Сроки годности"], ["week", "План на неделю"]];
+  var SHEETS = [["sales", "Продажи по дням"], ["products", "Товары"], ["materials", "Сырьё"], ["recipes", "Техкарты"],
+                ["batches", "Партии и сроки"], ["week", "План на неделю"]];
+  var SHEET_HINT = {
+    materials: " Поставки — дни недели через запятую («пн, чт») или «ежедневно». Срок — сколько дней годна новая поставка. Заказ считается к ближайшей поставке, чтобы хватило до следующей.",
+    recipes: " Расход на 1 шт: для сырья в кг — в граммах, в литрах — в миллилитрах, в штуках — в штуках.",
+    batches: " Количество — числом с единицей: «2 л», «800 г», «30 шт». Остаток уменьшается сам по тому, что произвели."
+  };
   var HINT = "Кликните ячейку и печатайте. Enter — изменить, стрелки и Tab — переход, Delete — очистить, Ctrl+C / Ctrl+V — копировать и вставить из Excel.";
 
   Sheets.prototype.load = function () {
@@ -1031,6 +1216,7 @@ var DEMO_CSV = "";
     return [
       { key: "item", title: "Продукт", type: "text", width: 210, required: true },
       { key: "qty", title: "Количество", type: "text", width: 110, maxLength: 20 },
+      { key: "rest_text", title: "Осталось", type: "text", ro: true, width: 100, csv: false },
       { key: "expires", title: "Годен до", type: "date", width: 120,
         html: function (v) { return v ? '<span class="mute">' + weekday(v) + "</span> " + esc(text({ type: "date" }, v)) : ""; } },
       { key: "label", title: "Статус", type: "text", ro: true, width: 150,
@@ -1038,6 +1224,27 @@ var DEMO_CSV = "";
       { key: "tip", title: "Что сделать", type: "text", ro: true, width: 300 }
     ];
   };
+  Sheets.prototype.materialColumns = function () {
+    return [
+      { key: "name", title: "Сырьё", type: "text", width: 210, required: true },
+      { key: "unit", title: "Ед.", type: "text", width: 60, required: true, maxLength: 3 },
+      { key: "delivery", title: "Поставки", type: "text", width: 130, maxLength: 40 },
+      { key: "shelf_life", title: "Срок, дней", type: "number", int: true, min: 1, max: 3650, width: 96 },
+      { key: "cost", title: "Цена за ед., ₽", type: "number", min: 0, max: 1e6, width: 116 },
+      { key: "stock_text", title: "Остаток на утро", type: "text", ro: true, width: 120, csv: false },
+      { key: "order_text", title: "Заказать", type: "text", ro: true, width: 150, csv: false }
+    ];
+  };
+  Sheets.prototype.recipeColumns = function () {
+    return [
+      { key: "product", title: "Товар", type: "text", width: 210, required: true },
+      { key: "material", title: "Сырьё", type: "text", width: 210, required: true },
+      { key: "norm", title: "Расход на 1 шт", type: "number", min: 0, max: 1e5, digits: 1, width: 120, required: true },
+      { key: "small", title: "Ед.", type: "text", ro: true, width: 60, csv: false,
+        value: function (r) { return { "кг": "г", "л": "мл", "шт": "шт" }[r.unit] || ""; } }
+    ];
+  };
+
   Sheets.prototype.weekColumns = function () {
     var days = this.data.week.days, cols = [{ key: "product", title: "Товар", type: "text", ro: true, width: 200 }];
     days.forEach(function (d, i) {
@@ -1072,7 +1279,7 @@ var DEMO_CSV = "";
     }
     bar.push('<span class="xs-sp"></span>');
     if (t !== "week") {
-      bar.push('<button class="xs-btn" data-do="add">' + { sales: "+ Строка", products: "+ Товар", batches: "+ Партия" }[t] + "</button>");
+      bar.push('<button class="xs-btn" data-do="add">' + { sales: "+ Строка", products: "+ Товар", batches: "+ Партия", materials: "+ Сырьё", recipes: "+ Строка техкарты" }[t] + "</button>");
       bar.push('<button class="xs-btn" data-do="del" disabled>' + (t === "products" ? "Убрать из планов" : "Удалить строки") + "</button>");
     }
     if (t === "sales" && a.upload) bar.push('<span class="xs-btn xs-file">Загрузить CSV<input type="file" accept=".csv,.txt,text/csv" data-ctl="upload" aria-label="Загрузить CSV"></span>');
@@ -1080,7 +1287,7 @@ var DEMO_CSV = "";
     this.el.querySelector(".xs-bar").innerHTML = bar.join("");
     this.el.querySelector(".xs-hint").textContent = t === "week"
       ? "План считается сам по истории продаж, дню недели, погоде и сезону. Выделите ячейки и нажмите Ctrl+C, чтобы вставить в Excel."
-      : HINT + (t === "sales" ? " Строка сохраняется, когда заполнены дата, товар и «продано»." : "");
+      : HINT + (t === "sales" ? " Строка сохраняется, когда заполнены дата, товар и «продано»." : SHEET_HINT[t] || "");
     var o = {
       onError: function (m) { a.toast(m); }, onInfo: function (m) { a.toast(m); },
       onSelect: function (g) { var b = self.el.querySelector('[data-do="del"]'); if (b) b.disabled = !self.grid || g.r0 >= self.grid.rows.length; }
@@ -1100,9 +1307,17 @@ var DEMO_CSV = "";
       o.rows = this.data.products.slice().sort(function (x, y) { return x.name.localeCompare(y.name, "ru"); }).concat(this.drafts.products);
       o.onChange = function (rows) { self.saveProducts(rows); };
     } else if (t === "batches") {
-      o.label = "Сроки годности"; o.columns = this.batchColumns(); o.allowAdd = true;
+      o.label = "Партии и сроки"; o.columns = this.batchColumns(); o.allowAdd = true;
       o.rows = this.data.batches.slice().concat(this.drafts.batches);
       o.onChange = function (rows) { self.saveBatches(rows); };
+    } else if (t === "materials") {
+      o.label = "Сырьё"; o.columns = this.materialColumns(); o.allowAdd = true;
+      o.rows = (this.data.materials || []).slice().concat(this.drafts.materials);
+      o.onChange = function (rows) { self.saveMaterials(rows); };
+    } else if (t === "recipes") {
+      o.label = "Техкарты"; o.columns = this.recipeColumns(); o.allowAdd = true;
+      o.rows = (this.data.recipes || []).slice().concat(this.drafts.recipes);
+      o.onChange = function (rows) { self.saveRecipes(rows); };
     } else {
       o.label = "План на неделю"; o.columns = this.weekColumns(); o.rows = this.data.week.rows; o.empty = "Нет товаров для плана";
       o.footer = function (rows) {
@@ -1134,7 +1349,7 @@ var DEMO_CSV = "";
     if (b.hasAttribute("data-sheet")) { this.tab = b.getAttribute("data-sheet"); this.show(); return; }
     var d = b.getAttribute("data-do"), self = this, t = this.tab;
     if (d === "csv") {
-      var names = { sales: "prodazhi", products: "tovary", batches: "sroki", week: "plan-na-nedelyu" };
+      var names = { sales: "prodazhi", products: "tovary", batches: "sroki", materials: "syrye", recipes: "tehkarty", week: "plan-na-nedelyu" };
       var rows = t === "sales" ? this.salesRows().filter(function (r) { return !r.__draft; }) : this.grid.rows.filter(function (r) { return !r.__draft; });
       Sheets.saveFile(names[t] + "-" + this.a.today + ".csv", csv(this.cols, rows), this.a.toast);
     } else if (d === "add") {
@@ -1151,6 +1366,8 @@ var DEMO_CSV = "";
       var job;
       if (t === "sales") job = this.a.saveSales([], saved.map(function (r) { return { day: r.day, product: r.product }; }));
       else if (t === "products") job = chain(saved.map(function (p) { return function () { return self.a.removeProduct(p.name); }; }));
+      else if (t === "materials") job = chain(saved.map(function (m) { return function () { return self.a.removeMaterial(m.name); }; }));
+      else if (t === "recipes") job = chain(saved.map(function (r) { return function () { return self.a.removeRecipe(r); }; }));
       else job = chain(saved.map(function (x) { return function () { return self.a.deleteBatch(x.id); }; }));
       job.then(function () {
         self.a.toast(t === "products" ? "Убрано из планов: " + saved.length + ". История продаж сохранена." : "Удалено строк: " + saved.length);
@@ -1234,6 +1451,32 @@ var DEMO_CSV = "";
     return chain(jobs).then(function () { return self.load(); }).catch(function (x) { self.err(x); return self.load(); });
   };
 
+  Sheets.prototype.saveMaterials = function (rows) {
+    var self = this, jobs = [];
+    rows.forEach(function (m) {
+      var old = m.__old || {}; delete m.__old;
+      if (!m.name || !m.unit) { if (m.__draft && self.drafts.materials.indexOf(m) < 0) self.drafts.materials.push(m); return; }
+      var oldName = !m.__draft && "name" in old && old.name !== m.name ? old.name : null;
+      jobs.push(function () { return self.a.saveMaterial(clean(m, ["name", "unit", "delivery", "shelf_life", "cost"]), oldName); });
+      self.drafts.materials = self.drafts.materials.filter(function (x) { return x !== m; });
+    });
+    if (!jobs.length) return this.show();
+    return chain(jobs).then(function () { return self.load(); }).catch(function (x) { self.err(x); return self.load(); });
+  };
+  Sheets.prototype.saveRecipes = function (rows) {
+    var self = this, jobs = [];
+    rows.forEach(function (r) {
+      var old = r.__old || {}; delete r.__old;
+      if (!r.product || !r.material || !r.norm) { if (r.__draft && self.drafts.recipes.indexOf(r) < 0) self.drafts.recipes.push(r); return; }
+      var was = !r.__draft && (("product" in old && old.product !== r.product) || ("material" in old && old.material !== r.material))
+        ? { product: "product" in old ? old.product : r.product, material: "material" in old ? old.material : r.material } : null;
+      jobs.push(function () { return self.a.saveRecipe(clean(r, ["product", "material", "norm"]), was); });
+      self.drafts.recipes = self.drafts.recipes.filter(function (x) { return x !== r; });
+    });
+    if (!jobs.length) return this.show();
+    return chain(jobs).then(function () { return self.load(); }).catch(function (x) { self.err(x); return self.load(); });
+  };
+
   Sheets.saveFile = download;
   root.Sheets = Sheets;
   root.SheetGrid = Grid;
@@ -1264,9 +1507,9 @@ var DEMO_CSV = "";
     clearTimeout(toastT); toastT = setTimeout(function () { t.hidden = true; }, 2600);
   }
   var Local = (function () {
-    var KEY = "svezhiy-kabinet-v2", D = null, btCache = null, W = {};
+    var KEY = "svezhiy-kabinet-v3", D = null, btCache = null, W = {}, ver = 0, stockCache = null;
     function today() { var n = new Date(); return M.dnum(n.getFullYear() + "-" + pad(n.getMonth() + 1) + "-" + pad(n.getDate())); }
-    function save() { try { localStorage.setItem(KEY, JSON.stringify(D)); } catch (e) { /* без localStorage работаем в памяти */ } }
+    function save() { ver++; try { localStorage.setItem(KEY, JSON.stringify(D)); } catch (e) { /* без localStorage работаем в памяти */ } }
     function example() {
       var r = DEMO_CSV ? M.parseCSV(DEMO_CSV) : { sales: [], products: {} }, T = today();
       var last = Math.max.apply(null, r.sales.map(function (s) { return s.day; }));
@@ -1276,16 +1519,23 @@ var DEMO_CSV = "";
         var p = r.products[k];
         products[k] = { name: k, price: p.price, cost: p.cost, shelf_life: (k === "Эклер" || k === "Сэндвич с курицей") ? 2 : 1, default_qty: null, active: true };
       });
-      D = { v: 2, business: "Пекарня", example: true, times: { morning: "06:00", evening: "17:00", closing: "21:00" },
-            products: products, sales: r.sales, plans: {}, ok: {}, events: {}, nextId: 5,
-            batches: [[1, "Сливки 33%", "2 л", 1], [2, "Творог 5%", "3 кг", 2], [3, "Филе куриное", "1,5 кг", 0], [4, "Вишня замороженная", "2 кг", 20]]
-              .map(function (b) { return { id: b[0], item: b[1], qty: b[2], exp: T + b[3], status: "active" }; }) };
+      // сырьё, техкарты и партии примера - из bot/core/materials.py
+      var DS = DEMO_STOCK || { materials: [], recipes: [], batches: [] }, mats = {};
+      DS.materials.forEach(function (m) { mats[m[0]] = { name: m[0], unit: m[1], delivery: m[2], shelf_life: m[3], cost: m[4] }; });
+      D = { v: 3, business: "Пекарня", example: true, times: { morning: "06:00", evening: "17:00", closing: "21:00" },
+            products: products, sales: r.sales, plans: {}, ok: {}, events: {}, materials: mats,
+            recipes: DS.recipes.map(function (x) { return { product: x[0], material: x[1], norm: x[2] }; }),
+            batches: DS.batches.map(function (b, i) {
+              var u = mats[b[0]].unit;
+              return { id: i + 1, item: b[0], qty: M.fmtAmount(b[1], u), amount: b[1], unit: u, exp: T + b[2], arrived: T, status: "active" };
+            }) };
+      D.nextId = D.batches.length + 1;
       btCache = null; save();
     }
     function load() {
-      try { var raw = localStorage.getItem(KEY); if (raw) { var d = JSON.parse(raw); if (d && d.v === 2) D = d; } } catch (e) { /* нет доступа */ }
+      try { var raw = localStorage.getItem(KEY); if (raw) { var d = JSON.parse(raw); if (d && d.v === 3) D = d; } } catch (e) { /* нет доступа */ }
       if (!D) example();
-      D.ok = D.ok || {};
+      D.ok = D.ok || {}; D.materials = D.materials || {}; D.recipes = D.recipes || [];
       // пример в Челябинске, берём реальный прогноз
       M.loadWeather(55.16, 61.44, 3).then(function (w) { W = w; if (Object.keys(w).length && S.st) refresh(true); });
     }
@@ -1327,12 +1577,65 @@ var DEMO_CSV = "";
         return { name: k, price: p.price, cost: p.cost, shelf_life: p.shelf_life == null ? null : p.shelf_life, default_qty: p.default_qty == null ? null : p.default_qty, history_days: hist[k] ? Object.keys(hist[k]).length : 0 };
       }).sort(function (a, b) { return a.name.toLowerCase() < b.name.toLowerCase() ? -1 : 1; });
     }
-    function batchList(T) {
+    function batchList(T, view) {
+      var now = view ? view.left : {};
       return D.batches.filter(function (b) { return b.status === "active"; }).sort(function (a, b) { return a.exp - b.exp || a.id - b.id; }).map(function (b) {
-        var st = M.expiryStatus(b.exp, T);
-        return { id: b.id, item: b.item, qty: b.qty, expires: M.diso(b.exp), label: st.label, left: st.left, level: st.left <= 0 ? "bad" : st.left <= 2 ? "warn" : "ok",
-                 tip: st.left <= 1 ? (st.left < 0 ? "спишите" : M.expiryTip(b.item)) : null };
+        var st = M.expiryStatus(b.exp, T), rest = now[b.id] != null ? now[b.id] : null;
+        return { id: b.id, item: b.item, qty: b.qty, amount: b.amount == null ? null : b.amount, unit: b.unit || null, rest: rest,
+                 rest_text: rest == null ? null : M.fmtAmount(rest, b.unit), expires: M.diso(b.exp), label: st.label, left: st.left,
+                 level: st.left <= 0 ? "bad" : st.left <= 2 ? "warn" : "ok", tip: st.left <= 1 ? (st.left < 0 ? "спишите" : M.expiryTip(b.item)) : null };
       });
+    }
+    // сырьё: остатки по тому, что произвели, и заказ к ближайшей поставке (M.stockReport)
+    function matByName(name) {
+      var k = M.mkey(name), hit = null;
+      Object.keys(D.materials).forEach(function (n) { if (M.mkey(n) === k) hit = D.materials[n]; });
+      return hit;
+    }
+    function dayPlan(day, T) {
+      var ok = D.ok[day], out = {};
+      if (ok) { Object.keys(ok.items).forEach(function (k) { out[k] = ok.items[k].qty; }); return out; }
+      if (day === T && D.plans[T]) { Object.keys(D.plans[T]).forEach(function (k) { out[k] = D.plans[T][k].qty; }); return out; }
+      return qtyOf(recs(day).recs);
+    }
+    function stock() {
+      if (!Object.keys(D.materials).length) return null;
+      var T = today(), tag = ver + "|" + T + "|" + JSON.stringify(W);
+      if (stockCache && stockCache.tag === tag) return stockCache.view;
+      var active = D.batches.filter(function (b) { return b.status === "active"; }).map(function (b) {
+        return { id: b.id, item: b.item, amount: b.amount == null ? null : b.amount, expires: b.exp, arrived: b.arrived == null ? T : b.arrived };
+      });
+      var arr = active.filter(function (b) { return b.amount; }).map(function (b) { return b.arrived; });
+      var made = {}, plan = {};
+      for (var d = arr.length ? Math.min.apply(null, arr) : T; d < T; d++) {
+        made[d] = {};
+        if (D.ok[d]) Object.keys(D.ok[d].items).forEach(function (k) { made[d][k] = D.ok[d].items[k].qty; });
+      }
+      D.sales.forEach(function (s) { if (made[s.day] && s.baked != null) made[s.day][s.product] = s.baked; });
+      for (var i = 0; i < M.HORIZON; i++) plan[T + i] = dayPlan(T + i, T);
+      var view = M.stockView(M.stockReport(D.materials, D.recipes, active, made, plan, T), plan[T]);
+      stockCache = { tag: tag, view: view };
+      return view;
+    }
+    function materialList(view) {
+      var rows = {};
+      (view ? view.rows : []).forEach(function (r) { rows[r.name] = r; });
+      return Object.keys(D.materials).sort().map(function (k) {
+        var m = D.materials[k], r = rows[m.name];
+        return { name: m.name, unit: m.unit, delivery: m.delivery, shelf_life: m.shelf_life == null ? null : m.shelf_life, cost: m.cost == null ? null : m.cost,
+                 stock_text: r ? r.text.stock : null, order_text: r && r.order > 0 ? r.text.order + " к " + M.ddmm(M.dnum(r.next)) : r ? "не нужно" : null };
+      });
+    }
+    function recipeList() {
+      return D.recipes.map(function (r) { var m = matByName(r.material); return { product: r.product, material: r.material, norm: r.norm, unit: m ? m.unit : null }; })
+        .sort(function (a, b) { return a.product < b.product ? -1 : a.product > b.product ? 1 : a.material < b.material ? -1 : 1; });
+    }
+    function amountOf(item, b) {
+      var m = matByName(item), mu = m ? m.unit : null, r;
+      if (b.amount != null && b.amount !== "") r = M.parseAmount(num(b.amount, 0, 1e6) + " " + (b.unit || ""), mu);
+      else r = M.parseAmount(b.qty, mu);
+      if (m && r.unit && r.unit !== m.unit) throw new Error(m.name + " считается в «" + m.unit + "» — укажите количество в " + m.unit);
+      return { qty: r.amount != null ? M.fmtAmount(r.amount, r.unit) : String(b.qty || "").trim().slice(0, 20), amount: r.amount, unit: r.unit };
     }
     function sheet() {
       var T = today(), days = [], week = {}, sum = function (q) { return q.reduce(function (x, y) { return x + y; }, 0); };
@@ -1344,8 +1647,9 @@ var DEMO_CSV = "";
           (week[r.product] = week[r.product] || [0, 0, 0, 0, 0, 0, 0])[i] = fixed ? fixed.qty : r.qty;
         });
       }
+      var view = stock();
       return {
-        today: M.diso(T), products: productList(), batches: batchList(T),
+        today: M.diso(T), products: productList(), batches: batchList(T, view), materials: materialList(view), recipes: recipeList(),
         sales: D.sales.map(function (s) {
           return { day: M.diso(s.day), product: s.product, baked: s.baked == null ? null : s.baked, sold: s.sold, soldout: s.soldout || null,
                    rain: s.rain == null ? null : s.rain, temp: s.temp == null ? null : s.temp };
@@ -1374,7 +1678,7 @@ var DEMO_CSV = "";
         it.ok_qty = okM && okM.items[r.product] ? okM.items[r.product].qty : null;
         return it;
       });
-      var products = productList(), batches = batchList(T);
+      var products = productList(), view = stock(), batches = batchList(T, view);
       var removed = Object.keys(D.products).filter(function (k) { return !D.products[k].active; }).sort();
       var days = D.sales.map(function (s) { return s.day; });
       if (!btCache || btCache.n !== D.sales.length) {
@@ -1388,7 +1692,7 @@ var DEMO_CSV = "";
         today: { date: M.diso(T), rain: weather(T).rain, temp: weather(T).temp, event: D.events[T] || 1, items: items, plan: planInfo(okT, draft) },
         tomorrow: { date: M.diso(T + 1), rain: weather(T + 1).rain, temp: weather(T + 1).temp, event: D.events[T + 1] || 1, rain_effect: rm.eff, items: tom,
                     plan: planInfo(okM, qtyOf(rm.recs)) },
-        products: products, removed: removed, batches: batches,
+        products: products, removed: removed, batches: batches, stock: view,
         data: { rows: D.sales.length, first: days.length ? M.diso(Math.min.apply(null, days)) : null, last: days.length ? M.diso(Math.max.apply(null, days)) : null },
         summary: btCache.v
       };
@@ -1410,6 +1714,7 @@ var DEMO_CSV = "";
             D.sales.forEach(function (s) { if (s.product === old) s.product = nm; });
             Object.keys(D.plans).forEach(function (d) { if (D.plans[d][old]) { D.plans[d][nm] = D.plans[d][old]; delete D.plans[d][old]; } });
             Object.keys(D.ok).forEach(function (d) { var x = D.ok[d].items; if (x[old]) { x[nm] = x[old]; delete x[old]; } });
+            D.recipes.forEach(function (r) { if (r.product === old) r.product = nm; });
             delete D.products[old]; btCache = null;
           }
           D.products[nm] = { name: nm, price: price, cost: cost, shelf_life: num(b.shelf_life, 0, 3650, true), default_qty: num(b.default_qty, 0, 1e5), active: true };
@@ -1419,13 +1724,13 @@ var DEMO_CSV = "";
           D.products[n2].active = on;
           if (!on) [T - 1, T, T + 1].forEach(function (d) { if (D.plans[d]) delete D.plans[d][n2]; if (D.ok[d]) delete D.ok[d].items[n2]; });
         } else if (path === "/api/batch") {
-          var it = name(b.item, "продукт"), exp = b.expires ? M.dnum(b.expires) : null;
+          var it = name(b.item, "продукт"), exp = b.expires ? M.dnum(b.expires) : null, am = amountOf(it, b);
           if (exp == null) {
-            var p = D.products[it];
-            if (!p || !p.shelf_life) throw new Error("укажите дату «годен до» или срок хранения у товара");
-            exp = M.dnum(b.made || M.diso(T)) + p.shelf_life;
+            var p = D.products[it], mm = matByName(it), life = (p && p.shelf_life) || (mm && mm.shelf_life);
+            if (!life) throw new Error("укажите дату «годен до» или срок хранения у товара или сырья");
+            exp = M.dnum(b.made || M.diso(T)) + life;
           }
-          D.batches.push({ id: D.nextId++, item: it, qty: String(b.qty || "").trim().slice(0, 20), exp: exp, status: "active" });
+          D.batches.push({ id: D.nextId++, item: it, qty: am.qty, amount: am.amount, unit: am.unit, exp: exp, arrived: T, status: "active" });
         } else if (path === "/api/batch/close") {
           D.batches.forEach(function (x) { if (x.id === +b.id) x.status = b.status; });
         } else if (path === "/api/record") {
@@ -1454,9 +1759,33 @@ var DEMO_CSV = "";
           ups.forEach(function (x) { var k = x.day + "|" + x.product; if (k in at) D.sales[at[k]] = x; else { at[k] = D.sales.length; D.sales.push(x); } });
           btCache = null;
         } else if (path === "/api/batch/edit") {
-          var bi = name(b.item, "продукт"), be = b.expires ? M.dnum(b.expires) : null;
+          var bi = name(b.item, "продукт"), be = b.expires ? M.dnum(b.expires) : null, ba = amountOf(bi, b);
           if (be == null || isNaN(be)) throw new Error("годен до: нужна дата");
-          D.batches.forEach(function (x) { if (x.id === +b.id) { x.item = bi; x.qty = String(b.qty || "").trim().slice(0, 20); x.exp = be; } });
+          D.batches.forEach(function (x) { if (x.id === +b.id) { x.item = bi; x.qty = ba.qty; x.amount = ba.amount; x.unit = ba.unit; x.exp = be; } });
+        } else if (path === "/api/material") {
+          var mn = name(b.name, "сырьё"), days;
+          try { days = M.parseDelivery(b.delivery); } catch (x) { throw new Error(mn + ": " + x.message); }
+          var mat = { name: mn, unit: M.normUnit(b.unit || "кг"), delivery: M.deliveryText(days), shelf_life: num(b.shelf_life, 1, 3650, true), cost: num(b.cost, 0, 1e6) };
+          if (b.old_name && b.old_name !== mn) {
+            delete D.materials[b.old_name];
+            D.recipes.forEach(function (r) { if (r.material === b.old_name) r.material = mn; });
+            D.batches.forEach(function (x) { if (x.item === b.old_name && x.status === "active") x.item = mn; });
+          }
+          D.materials[mn] = mat;
+        } else if (path === "/api/material/remove") {
+          var rn = name(b.name, "сырьё");
+          delete D.materials[rn];
+          D.recipes = D.recipes.filter(function (r) { return r.material !== rn; });
+        } else if (path === "/api/recipe") {
+          var rp = name(b.product, "товар"), rm0 = matByName(b.material), norm = num(b.norm, 0, 1e5);
+          if (!rm0) throw new Error("сырья «" + String(b.material || "") + "» нет в списке — добавьте его на листе «Сырьё»");
+          if (!norm) throw new Error(rp + ": укажите расход сырья на 1 шт");
+          var drop = function (pr, ma) { D.recipes = D.recipes.filter(function (r) { return !(r.product === pr && r.material === ma); }); };
+          if (b.old_product) drop(b.old_product, b.old_material);
+          drop(rp, rm0.name);
+          D.recipes.push({ product: rp, material: rm0.name, norm: norm });
+        } else if (path === "/api/recipe/remove") {
+          D.recipes = D.recipes.filter(function (r) { return !(r.product === b.product && r.material === b.material); });
         } else if (path === "/api/plan/confirm" || path === "/api/plan/unconfirm") {
           var day = M.dnum(String(b.day || ""));
           if (day !== T && day !== T + 1) throw new Error("подтвердить можно план на сегодня или на завтра");
@@ -1480,7 +1809,7 @@ var DEMO_CSV = "";
           });
         } else if (path === "/api/upload") {
           var r = M.parseCSV(String(b.csv || ""));
-          if (D.example) { D.sales = []; D.products = {}; D.plans = {}; D.ok = {}; D.events = {}; D.batches = []; D.example = false; D.business = ""; }
+          if (D.example) { D.sales = []; D.products = {}; D.plans = {}; D.ok = {}; D.events = {}; D.batches = []; D.materials = {}; D.recipes = []; D.example = false; D.business = ""; }
           var idx = {};
           D.sales.forEach(function (x, i) { idx[x.day + "|" + x.product] = i; });
           r.sales.forEach(function (x) { var k = x.day + "|" + x.product; if (k in idx) D.sales[idx[k]] = x; else { idx[k] = D.sales.length; D.sales.push(x); } });
@@ -1625,6 +1954,46 @@ var DEMO_CSV = "";
     return S.st.today.items.filter(function (i) { return i.ok_qty != null; }).sort(function (a, b) { return a.product < b.product ? -1 : 1; });
   }
 
+  // ---------------------------------------------------------------- сырьё
+  function alertList(list) {
+    return '<ul class="alerts">' + list.map(function (a) {
+      return '<li class="' + a.level + '"><span class="ic" aria-hidden="true">' + (a.waste ? "🗑" : "⚠️") + "</span><span><b>" + esc(a.name) + ":</b> " + esc(a.text) + "</span></li>";
+    }).join("") + "</ul>";
+  }
+  function stockCard() {
+    var st = S.st, v = st.stock;
+    if (!v) return "";
+    var al = M.stockAlerts(v, st.today.date, dayLabel), tom = st.tomorrow.date;
+    var due = v.rows.filter(function (r) { return r.order > 0 && r.next === tom; });
+    var h = '<div class="card"><h2>Сырьё на сегодня</h2>';
+    if (!al.length && !due.length) return h + '<p class="sub" style="margin:0">Сырья хватает до ближайших поставок.</p></div>';
+    if (al.length) h += alertList(al);
+    if (due.length) h += '<p class="hint" style="margin-top:12px"><b>Заказать сегодня — поставка завтра:</b> ' +
+      due.map(function (r) { return esc(r.name) + " — " + esc(r.text.order); }).join(", ") + "</p>";
+    return h + '<div class="acts" style="justify-content:flex-start;margin-top:12px"><button class="btn btn-quiet btn-sm" data-tab="stock">Все остатки и заказ</button></div></div>';
+  }
+  function viewStock() {
+    var st = S.st, v = st.stock;
+    if (!v) return '<div class="card"><h2>Сырьё и заказ</h2><div class="empty">Сырьё пока не заведено. Откройте «Таблицы» и заполните листы «Сырьё» (единица, дни поставок, срок) и «Техкарты» (сколько сырья уходит на 1 шт товара). Потом добавьте партии с количеством во вкладке «Сроки годности».</div></div>';
+    var al = M.stockAlerts(v, st.today.date, dayLabel), tom = st.tomorrow.date, orders = v.rows.filter(function (r) { return r.order > 0; });
+    var h = '<div class="kpis"><div class="kpi' + (al.some(function (a) { return !a.waste; }) ? " bad" : "") + '"><b class="num">' + al.filter(function (a) { return !a.waste; }).length +
+      '</b><span>не хватит до поставки</span></div><div class="kpi' + (al.some(function (a) { return a.waste; }) ? " warn" : "") + '"><b class="num">' + al.filter(function (a) { return a.waste; }).length +
+      '</b><span>спишется, если не пустить в работу</span></div><div class="kpi"><b class="num">' + orders.length + "</b><span>" + plural(orders.length, "позиция", "позиции", "позиций") + " к заказу</span></div></div>";
+    if (al.length) h += '<div class="card"><h2>Что важно</h2><p class="sub">По плану на сегодня и прогнозу до следующих поставок.</p>' + alertList(al) + "</div>";
+    h += '<div class="card"><h2>Заказ поставщикам</h2><p class="sub">Остаток на утро уменьшается сам: по тому, сколько испекли, а если это не отмечено — по подтверждённому плану. Заказ — к ближайшей поставке, чтобы хватило до следующей, с запасом 10% и не больше, чем успеете использовать до конца срока.</p>' +
+      '<div class="table-wrap"><table class="t stock-t"><thead><tr><th>Сырьё</th><th class="r">На утро</th><th class="r c-need">Сегодня уйдёт</th><th class="c-del">Поставки</th><th class="c-next">Ближайшая</th><th class="r">Заказать</th></tr></thead><tbody>';
+    v.rows.forEach(function (r) {
+      var isDue = r.order > 0 && r.next === tom;
+      h += '<tr class="' + (isDue ? "due" : "") + '"><td class="name">' + esc(r.name) + '</td><td class="r num">' + esc(r.text.stock) + '</td><td class="r num c-need">' + esc(r.text.need_today) +
+        '</td><td class="c-del">' + esc(r.delivery) + '</td><td class="c-next">' + dayLabel(r.next) + (isDue ? ' <span class="chip new">заказ сегодня</span>' : "") +
+        '</td><td class="r">' + (r.order > 0 ? '<span class="order">' + esc(r.text.order) + '</span><div class="why"><span class="m-only">' + (isDue ? "заказ сегодня, " : "к " + dayLabel(r.next) + ", ") +
+          "</span>на " + r.cover + " " + plural(r.cover, "день", "дня", "дней") + "</div>" : '<span class="muted">не нужно</span>') + "</td></tr>";
+    });
+    h += '</tbody></table></div><p class="hint" style="margin-top:10px">Сырьё, дни поставок и техкарты меняются во вкладке «Таблицы» — листы «Сырьё» и «Техкарты».' +
+      (st.business.is_example ? " В примере расход сырья ориентировочный." : "") + "</p></div>";
+    return h;
+  }
+
   function viewPlan() {
     var st = S.st, items = st.today.items, total = items.reduce(function (a, i) { return a + i.qty; }, 0), exp = st.batches.filter(function (b) { return b.left <= 1; });
     var h = '<div class="kpis"><div class="kpi"><b class="num">' + total + '</b><span>штук сделать сегодня</span></div>' +
@@ -1641,6 +2010,8 @@ var DEMO_CSV = "";
         '</td><td class="r num">≈' + Math.round(it.mean) + ' <span class="muted">±' + Math.round(it.sd) + '</span></td><td class="r"><span class="big">' + it.qty + "</span>" + inWork(it) + "</td></tr>";
     });
     h += '</tbody><tfoot><tr><td>Всего</td><td></td><td class="r"><span class="big">' + total + "</span></td></tr></tfoot></table></div></div>";
+    h += stockCard();
+    if (st.stock) exp = exp.filter(function (b) { return !st.stock.rows.some(function (r) { return M.mkey(r.name) === M.mkey(b.item); }); });
     if (exp.length) {
       h += '<div class="card"><h2>Пора пустить в работу</h2><p class="sub">Партии, у которых срок заканчивается сегодня или завтра.</p>' + batchRows(exp, true) + "</div>";
     }
@@ -1756,7 +2127,8 @@ var DEMO_CSV = "";
     var glyph = { ok: "●", warn: "▲", bad: "✕" };
     var h = '<div class="table-wrap"><table class="t"><thead><tr><th>Продукт</th><th>Количество</th><th>Годен до</th><th>Статус</th>' + (compact ? "" : "<th></th>") + "</tr></thead><tbody>";
     list.forEach(function (b) {
-      h += '<tr><td><div class="name">' + esc(b.item) + "</div>" + (b.tip ? '<div class="why">→ ' + esc(b.tip) + "</div>" : "") + "</td><td>" + esc(b.qty || "—") +
+      var q = b.rest != null && b.amount && b.rest < b.amount - 1e-9 ? esc(b.rest_text) + ' <span class="muted">из ' + esc(b.qty) + "</span>" : esc(b.qty || "—");
+      h += '<tr><td><div class="name">' + esc(b.item) + "</div>" + (b.tip ? '<div class="why">→ ' + esc(b.tip) + "</div>" : "") + "</td><td>" + q +
         '</td><td class="num">' + dayLabel(b.expires) + '</td><td><span class="chip ' + b.level + '">' + glyph[b.level] + " " + esc(b.label) + "</span></td>" +
         (compact ? "" : '<td><div class="acts"><button class="btn btn-quiet btn-sm" data-act="batch" data-id="' + b.id + '" data-s="used">Использовано</button><button class="btn btn-quiet btn-sm" data-act="batch" data-id="' + b.id + '" data-s="written_off">Списано</button><button class="btn btn-quiet btn-sm" data-act="batch" data-id="' + b.id + '" data-s="deleted" aria-label="Удалить запись">Удалить</button></div></td>') + "</tr>";
     });
@@ -1767,7 +2139,7 @@ var DEMO_CSV = "";
     var st = S.st, today = st.today.date;
     var h = '<div class="card"><h2>Добавить партию</h2><p class="sub">Выберите товар со сроком хранения — дата «годен до» посчитается сама. Для сырья (сливки, творог) укажите дату с упаковки.</p>' +
       '<form class="form" data-form="batch-add"><label class="wide">Продукт<input type="text" name="item" list="prodlist" maxlength="60" required placeholder="Сливки 33% или товар из списка"></label>' +
-      '<label>Количество<input type="text" name="qty" maxlength="20" placeholder="2 л, 20 шт"></label>' +
+      '<label>Количество<input type="text" name="qty" maxlength="20" placeholder="2 л, 800 г, 30 шт"></label>' +
       '<label>Изготовлено / поставлено<input type="date" name="made" value="' + today + '"></label>' +
       '<label>Годен до<input type="date" name="expires"></label><button class="btn btn-primary" type="submit">Добавить</button></form>' +
       '<datalist id="prodlist">' + st.products.map(function (p) { return '<option value="' + esc(p.name) + '">' + (p.shelf_life ? "срок " + p.shelf_life + " дн." : "") + "</option>"; }).join("") + "</datalist></div>";
@@ -1820,6 +2192,10 @@ var DEMO_CSV = "";
     addBatch: function (b) { var body = { item: b.item, qty: b.qty, made: b.made }; if (b.expires) body.expires = b.expires; return API.post("/api/batch", body).then(touched).catch(unlogged); },
     editBatch: function (b) { return API.post("/api/batch/edit", b).then(touched).catch(unlogged); },
     deleteBatch: function (id) { return API.post("/api/batch/close", { id: id, status: "deleted" }).then(touched).catch(unlogged); },
+    saveMaterial: function (m, oldName) { var body = Object.assign({}, m); if (oldName) body.old_name = oldName; return API.post("/api/material", body).then(touched).catch(unlogged); },
+    removeMaterial: function (n) { return API.post("/api/material/remove", { name: n }).then(touched).catch(unlogged); },
+    saveRecipe: function (r, old) { var body = Object.assign({}, r); if (old) { body.old_product = old.product; body.old_material = old.material; } return API.post("/api/recipe", body).then(touched).catch(unlogged); },
+    removeRecipe: function (r) { return API.post("/api/recipe/remove", { product: r.product, material: r.material }).then(touched).catch(unlogged); },
     upload: function (text) { return API.post("/api/upload", { csv: text }).then(touched).catch(unlogged); },
     toast: function (m) { toast(m); }
   };
@@ -1834,6 +2210,7 @@ var DEMO_CSV = "";
     else if (S.tab === "tomorrow") v = viewTomorrow();
     else if (S.tab === "products") v = viewProducts();
     else if (S.tab === "batches") v = viewBatches();
+    else if (S.tab === "stock") v = viewStock();
     else v = viewData();
     $("view").innerHTML = v;
   }

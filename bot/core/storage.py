@@ -5,6 +5,7 @@ import sqlite3
 from datetime import date, datetime
 
 from .forecast import Product, Sale
+from .materials import Material, parse_amount
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS chats (
@@ -43,7 +44,16 @@ CREATE TABLE IF NOT EXISTS events (
 CREATE TABLE IF NOT EXISTS batches (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     chat_id INTEGER, item TEXT, qty TEXT, expires TEXT,
-    status TEXT DEFAULT 'active', created_at TEXT
+    status TEXT DEFAULT 'active', created_at TEXT,
+    amount REAL, unit TEXT, arrived TEXT
+);
+CREATE TABLE IF NOT EXISTS materials (
+    chat_id INTEGER, name TEXT, unit TEXT, delivery TEXT, shelf_life INTEGER, cost REAL,
+    PRIMARY KEY (chat_id, name)
+);
+CREATE TABLE IF NOT EXISTS recipes (
+    chat_id INTEGER, product TEXT, material TEXT, norm REAL,
+    PRIMARY KEY (chat_id, product, material)
 );
 CREATE TABLE IF NOT EXISTS login_codes (
     code TEXT PRIMARY KEY, chat_id INTEGER, expires REAL
@@ -66,9 +76,15 @@ class Storage:
         self.db.executescript(SCHEMA)
         # миграция старых баз: новые колонки
         for table, col, typ in (("products", "shelf_life", "INTEGER"), ("products", "default_qty", "REAL"),
-                                ("products", "active", "INTEGER DEFAULT 1"), ("sales", "temp", "REAL")):
+                                ("products", "active", "INTEGER DEFAULT 1"), ("sales", "temp", "REAL"),
+                                ("batches", "amount", "REAL"), ("batches", "unit", "TEXT"), ("batches", "arrived", "TEXT")):
             if col not in {r["name"] for r in self.db.execute(f"PRAGMA table_info({table})")}:
                 self.db.execute(f"ALTER TABLE {table} ADD COLUMN {col} {typ}")
+        # старые партии: количество было текстом «2 л» - достаём число
+        for r in self.db.execute("SELECT id, qty, created_at FROM batches WHERE amount IS NULL AND arrived IS NULL").fetchall():
+            amount, unit = parse_amount(r["qty"])
+            self.db.execute("UPDATE batches SET amount=?, unit=?, arrived=? WHERE id=?",
+                            (amount, unit, (r["created_at"] or "")[:10] or None, r["id"]))
         self.db.commit()
 
     def upsert_chat(self, chat_id: int, username: str | None, first_name: str | None):
@@ -109,7 +125,7 @@ class Storage:
     def save_product(self, chat_id: int, p: Product, old_name: str | None = None):
         """Сохранить карточку товара из кабинета (значения заменяются целиком)."""
         if old_name and old_name != p.name:
-            for t in ("sales", "plans", "plan_ok"):
+            for t in ("sales", "plans", "plan_ok", "recipes"):
                 self.db.execute(f"UPDATE {t} SET product=? WHERE chat_id=? AND product=?", (p.name, chat_id, old_name))
             self.db.execute("DELETE FROM products WHERE chat_id=? AND name=?", (chat_id, old_name))
         self.db.execute(
@@ -165,7 +181,7 @@ class Storage:
         self.db.commit()
 
     def clear_sales(self, chat_id: int):
-        for t in ("sales", "products", "plans", "plan_ok", "events", "batches"):
+        for t in ("sales", "products", "plans", "plan_ok", "events", "batches", "materials", "recipes"):
             self.db.execute(f"DELETE FROM {t} WHERE chat_id=?", (chat_id,))
         self.db.commit()
 
@@ -223,9 +239,14 @@ class Storage:
                             (chat_id, day.isoformat())).fetchone()
         return r["factor"] if r else 1.0
 
-    def add_batch(self, chat_id: int, item: str, qty: str, expires: date) -> int:
-        cur = self.db.execute("INSERT INTO batches (chat_id, item, qty, expires, created_at) VALUES (?,?,?,?,?)",
-                              (chat_id, item, qty, expires.isoformat(), datetime.utcnow().isoformat(timespec="seconds")))
+    def add_batch(self, chat_id: int, item: str, qty: str, expires: date, amount: float | None = None,
+                  unit: str | None = None, arrived: date | None = None) -> int:
+        if amount is None:
+            amount, unit = parse_amount(qty, unit)
+        cur = self.db.execute(
+            "INSERT INTO batches (chat_id, item, qty, expires, created_at, amount, unit, arrived) VALUES (?,?,?,?,?,?,?,?)",
+            (chat_id, item, qty, expires.isoformat(), datetime.utcnow().isoformat(timespec="seconds"), amount, unit,
+             (arrived or date.today()).isoformat()))
         self.db.commit()
         return cur.lastrowid
 
@@ -236,9 +257,45 @@ class Storage:
     def batch_count(self, chat_id: int) -> int:
         return self.db.execute("SELECT COUNT(*) FROM batches WHERE chat_id=? AND status='active'", (chat_id,)).fetchone()[0]
 
-    def update_batch(self, chat_id: int, batch_id: int, item: str, qty: str, expires: date):
-        self.db.execute("UPDATE batches SET item=?, qty=?, expires=? WHERE chat_id=? AND id=? AND status='active'",
-                        (item, qty, expires.isoformat(), chat_id, batch_id))
+    def update_batch(self, chat_id: int, batch_id: int, item: str, qty: str, expires: date,
+                     amount: float | None = None, unit: str | None = None):
+        if amount is None:
+            amount, unit = parse_amount(qty, unit)
+        self.db.execute("UPDATE batches SET item=?, qty=?, expires=?, amount=?, unit=? WHERE chat_id=? AND id=? AND status='active'",
+                        (item, qty, expires.isoformat(), amount, unit, chat_id, batch_id))
+        self.db.commit()
+
+    def materials(self, chat_id: int) -> dict[str, Material]:
+        rows = self.db.execute("SELECT * FROM materials WHERE chat_id=? ORDER BY name", (chat_id,))
+        return {r["name"]: Material(r["name"], r["unit"] or "кг", r["delivery"] or "", r["shelf_life"], r["cost"]) for r in rows}
+
+    def save_material(self, chat_id: int, m: Material, old_name: str | None = None):
+        if old_name and old_name != m.name:
+            self.db.execute("DELETE FROM materials WHERE chat_id=? AND name=?", (chat_id, old_name))
+            self.db.execute("UPDATE recipes SET material=? WHERE chat_id=? AND material=?", (m.name, chat_id, old_name))
+            self.db.execute("UPDATE batches SET item=? WHERE chat_id=? AND item=? AND status='active'", (m.name, chat_id, old_name))
+        self.db.execute("INSERT OR REPLACE INTO materials (chat_id, name, unit, delivery, shelf_life, cost) VALUES (?,?,?,?,?,?)",
+                        (chat_id, m.name, m.unit, m.delivery, m.shelf_life, m.cost))
+        self.db.commit()
+
+    def remove_material(self, chat_id: int, name: str):
+        self.db.execute("DELETE FROM materials WHERE chat_id=? AND name=?", (chat_id, name))
+        self.db.execute("DELETE FROM recipes WHERE chat_id=? AND material=?", (chat_id, name))
+        self.db.commit()
+
+    def recipes(self, chat_id: int) -> list[tuple[str, str, float]]:
+        return [(r["product"], r["material"], r["norm"]) for r in self.db.execute(
+            "SELECT * FROM recipes WHERE chat_id=? ORDER BY product, material", (chat_id,))]
+
+    def save_recipe(self, chat_id: int, product: str, material: str, norm: float, old: tuple[str, str] | None = None):
+        if old and old != (product, material):
+            self.db.execute("DELETE FROM recipes WHERE chat_id=? AND product=? AND material=?", (chat_id, *old))
+        self.db.execute("INSERT OR REPLACE INTO recipes (chat_id, product, material, norm) VALUES (?,?,?,?)",
+                        (chat_id, product, material, norm))
+        self.db.commit()
+
+    def delete_recipe(self, chat_id: int, product: str, material: str):
+        self.db.execute("DELETE FROM recipes WHERE chat_id=? AND product=? AND material=?", (chat_id, product, material))
         self.db.commit()
 
     def close_batch(self, chat_id: int, batch_id: int, status: str):

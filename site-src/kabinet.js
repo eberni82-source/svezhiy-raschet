@@ -23,9 +23,9 @@
     clearTimeout(toastT); toastT = setTimeout(function () { t.hidden = true; }, 2600);
   }
   var Local = (function () {
-    var KEY = "svezhiy-kabinet-v2", D = null, btCache = null, W = {};
+    var KEY = "svezhiy-kabinet-v3", D = null, btCache = null, W = {}, ver = 0, stockCache = null;
     function today() { var n = new Date(); return M.dnum(n.getFullYear() + "-" + pad(n.getMonth() + 1) + "-" + pad(n.getDate())); }
-    function save() { try { localStorage.setItem(KEY, JSON.stringify(D)); } catch (e) { /* без localStorage работаем в памяти */ } }
+    function save() { ver++; try { localStorage.setItem(KEY, JSON.stringify(D)); } catch (e) { /* без localStorage работаем в памяти */ } }
     function example() {
       var r = DEMO_CSV ? M.parseCSV(DEMO_CSV) : { sales: [], products: {} }, T = today();
       var last = Math.max.apply(null, r.sales.map(function (s) { return s.day; }));
@@ -35,16 +35,23 @@
         var p = r.products[k];
         products[k] = { name: k, price: p.price, cost: p.cost, shelf_life: (k === "Эклер" || k === "Сэндвич с курицей") ? 2 : 1, default_qty: null, active: true };
       });
-      D = { v: 2, business: "Пекарня", example: true, times: { morning: "06:00", evening: "17:00", closing: "21:00" },
-            products: products, sales: r.sales, plans: {}, ok: {}, events: {}, nextId: 5,
-            batches: [[1, "Сливки 33%", "2 л", 1], [2, "Творог 5%", "3 кг", 2], [3, "Филе куриное", "1,5 кг", 0], [4, "Вишня замороженная", "2 кг", 20]]
-              .map(function (b) { return { id: b[0], item: b[1], qty: b[2], exp: T + b[3], status: "active" }; }) };
+      // сырьё, техкарты и партии примера - из bot/core/materials.py
+      var DS = DEMO_STOCK || { materials: [], recipes: [], batches: [] }, mats = {};
+      DS.materials.forEach(function (m) { mats[m[0]] = { name: m[0], unit: m[1], delivery: m[2], shelf_life: m[3], cost: m[4] }; });
+      D = { v: 3, business: "Пекарня", example: true, times: { morning: "06:00", evening: "17:00", closing: "21:00" },
+            products: products, sales: r.sales, plans: {}, ok: {}, events: {}, materials: mats,
+            recipes: DS.recipes.map(function (x) { return { product: x[0], material: x[1], norm: x[2] }; }),
+            batches: DS.batches.map(function (b, i) {
+              var u = mats[b[0]].unit;
+              return { id: i + 1, item: b[0], qty: M.fmtAmount(b[1], u), amount: b[1], unit: u, exp: T + b[2], arrived: T, status: "active" };
+            }) };
+      D.nextId = D.batches.length + 1;
       btCache = null; save();
     }
     function load() {
-      try { var raw = localStorage.getItem(KEY); if (raw) { var d = JSON.parse(raw); if (d && d.v === 2) D = d; } } catch (e) { /* нет доступа */ }
+      try { var raw = localStorage.getItem(KEY); if (raw) { var d = JSON.parse(raw); if (d && d.v === 3) D = d; } } catch (e) { /* нет доступа */ }
       if (!D) example();
-      D.ok = D.ok || {};
+      D.ok = D.ok || {}; D.materials = D.materials || {}; D.recipes = D.recipes || [];
       // пример в Челябинске, берём реальный прогноз
       M.loadWeather(55.16, 61.44, 3).then(function (w) { W = w; if (Object.keys(w).length && S.st) refresh(true); });
     }
@@ -86,12 +93,65 @@
         return { name: k, price: p.price, cost: p.cost, shelf_life: p.shelf_life == null ? null : p.shelf_life, default_qty: p.default_qty == null ? null : p.default_qty, history_days: hist[k] ? Object.keys(hist[k]).length : 0 };
       }).sort(function (a, b) { return a.name.toLowerCase() < b.name.toLowerCase() ? -1 : 1; });
     }
-    function batchList(T) {
+    function batchList(T, view) {
+      var now = view ? view.left : {};
       return D.batches.filter(function (b) { return b.status === "active"; }).sort(function (a, b) { return a.exp - b.exp || a.id - b.id; }).map(function (b) {
-        var st = M.expiryStatus(b.exp, T);
-        return { id: b.id, item: b.item, qty: b.qty, expires: M.diso(b.exp), label: st.label, left: st.left, level: st.left <= 0 ? "bad" : st.left <= 2 ? "warn" : "ok",
-                 tip: st.left <= 1 ? (st.left < 0 ? "спишите" : M.expiryTip(b.item)) : null };
+        var st = M.expiryStatus(b.exp, T), rest = now[b.id] != null ? now[b.id] : null;
+        return { id: b.id, item: b.item, qty: b.qty, amount: b.amount == null ? null : b.amount, unit: b.unit || null, rest: rest,
+                 rest_text: rest == null ? null : M.fmtAmount(rest, b.unit), expires: M.diso(b.exp), label: st.label, left: st.left,
+                 level: st.left <= 0 ? "bad" : st.left <= 2 ? "warn" : "ok", tip: st.left <= 1 ? (st.left < 0 ? "спишите" : M.expiryTip(b.item)) : null };
       });
+    }
+    // сырьё: остатки по тому, что произвели, и заказ к ближайшей поставке (M.stockReport)
+    function matByName(name) {
+      var k = M.mkey(name), hit = null;
+      Object.keys(D.materials).forEach(function (n) { if (M.mkey(n) === k) hit = D.materials[n]; });
+      return hit;
+    }
+    function dayPlan(day, T) {
+      var ok = D.ok[day], out = {};
+      if (ok) { Object.keys(ok.items).forEach(function (k) { out[k] = ok.items[k].qty; }); return out; }
+      if (day === T && D.plans[T]) { Object.keys(D.plans[T]).forEach(function (k) { out[k] = D.plans[T][k].qty; }); return out; }
+      return qtyOf(recs(day).recs);
+    }
+    function stock() {
+      if (!Object.keys(D.materials).length) return null;
+      var T = today(), tag = ver + "|" + T + "|" + JSON.stringify(W);
+      if (stockCache && stockCache.tag === tag) return stockCache.view;
+      var active = D.batches.filter(function (b) { return b.status === "active"; }).map(function (b) {
+        return { id: b.id, item: b.item, amount: b.amount == null ? null : b.amount, expires: b.exp, arrived: b.arrived == null ? T : b.arrived };
+      });
+      var arr = active.filter(function (b) { return b.amount; }).map(function (b) { return b.arrived; });
+      var made = {}, plan = {};
+      for (var d = arr.length ? Math.min.apply(null, arr) : T; d < T; d++) {
+        made[d] = {};
+        if (D.ok[d]) Object.keys(D.ok[d].items).forEach(function (k) { made[d][k] = D.ok[d].items[k].qty; });
+      }
+      D.sales.forEach(function (s) { if (made[s.day] && s.baked != null) made[s.day][s.product] = s.baked; });
+      for (var i = 0; i < M.HORIZON; i++) plan[T + i] = dayPlan(T + i, T);
+      var view = M.stockView(M.stockReport(D.materials, D.recipes, active, made, plan, T), plan[T]);
+      stockCache = { tag: tag, view: view };
+      return view;
+    }
+    function materialList(view) {
+      var rows = {};
+      (view ? view.rows : []).forEach(function (r) { rows[r.name] = r; });
+      return Object.keys(D.materials).sort().map(function (k) {
+        var m = D.materials[k], r = rows[m.name];
+        return { name: m.name, unit: m.unit, delivery: m.delivery, shelf_life: m.shelf_life == null ? null : m.shelf_life, cost: m.cost == null ? null : m.cost,
+                 stock_text: r ? r.text.stock : null, order_text: r && r.order > 0 ? r.text.order + " к " + M.ddmm(M.dnum(r.next)) : r ? "не нужно" : null };
+      });
+    }
+    function recipeList() {
+      return D.recipes.map(function (r) { var m = matByName(r.material); return { product: r.product, material: r.material, norm: r.norm, unit: m ? m.unit : null }; })
+        .sort(function (a, b) { return a.product < b.product ? -1 : a.product > b.product ? 1 : a.material < b.material ? -1 : 1; });
+    }
+    function amountOf(item, b) {
+      var m = matByName(item), mu = m ? m.unit : null, r;
+      if (b.amount != null && b.amount !== "") r = M.parseAmount(num(b.amount, 0, 1e6) + " " + (b.unit || ""), mu);
+      else r = M.parseAmount(b.qty, mu);
+      if (m && r.unit && r.unit !== m.unit) throw new Error(m.name + " считается в «" + m.unit + "» — укажите количество в " + m.unit);
+      return { qty: r.amount != null ? M.fmtAmount(r.amount, r.unit) : String(b.qty || "").trim().slice(0, 20), amount: r.amount, unit: r.unit };
     }
     function sheet() {
       var T = today(), days = [], week = {}, sum = function (q) { return q.reduce(function (x, y) { return x + y; }, 0); };
@@ -103,8 +163,9 @@
           (week[r.product] = week[r.product] || [0, 0, 0, 0, 0, 0, 0])[i] = fixed ? fixed.qty : r.qty;
         });
       }
+      var view = stock();
       return {
-        today: M.diso(T), products: productList(), batches: batchList(T),
+        today: M.diso(T), products: productList(), batches: batchList(T, view), materials: materialList(view), recipes: recipeList(),
         sales: D.sales.map(function (s) {
           return { day: M.diso(s.day), product: s.product, baked: s.baked == null ? null : s.baked, sold: s.sold, soldout: s.soldout || null,
                    rain: s.rain == null ? null : s.rain, temp: s.temp == null ? null : s.temp };
@@ -133,7 +194,7 @@
         it.ok_qty = okM && okM.items[r.product] ? okM.items[r.product].qty : null;
         return it;
       });
-      var products = productList(), batches = batchList(T);
+      var products = productList(), view = stock(), batches = batchList(T, view);
       var removed = Object.keys(D.products).filter(function (k) { return !D.products[k].active; }).sort();
       var days = D.sales.map(function (s) { return s.day; });
       if (!btCache || btCache.n !== D.sales.length) {
@@ -147,7 +208,7 @@
         today: { date: M.diso(T), rain: weather(T).rain, temp: weather(T).temp, event: D.events[T] || 1, items: items, plan: planInfo(okT, draft) },
         tomorrow: { date: M.diso(T + 1), rain: weather(T + 1).rain, temp: weather(T + 1).temp, event: D.events[T + 1] || 1, rain_effect: rm.eff, items: tom,
                     plan: planInfo(okM, qtyOf(rm.recs)) },
-        products: products, removed: removed, batches: batches,
+        products: products, removed: removed, batches: batches, stock: view,
         data: { rows: D.sales.length, first: days.length ? M.diso(Math.min.apply(null, days)) : null, last: days.length ? M.diso(Math.max.apply(null, days)) : null },
         summary: btCache.v
       };
@@ -169,6 +230,7 @@
             D.sales.forEach(function (s) { if (s.product === old) s.product = nm; });
             Object.keys(D.plans).forEach(function (d) { if (D.plans[d][old]) { D.plans[d][nm] = D.plans[d][old]; delete D.plans[d][old]; } });
             Object.keys(D.ok).forEach(function (d) { var x = D.ok[d].items; if (x[old]) { x[nm] = x[old]; delete x[old]; } });
+            D.recipes.forEach(function (r) { if (r.product === old) r.product = nm; });
             delete D.products[old]; btCache = null;
           }
           D.products[nm] = { name: nm, price: price, cost: cost, shelf_life: num(b.shelf_life, 0, 3650, true), default_qty: num(b.default_qty, 0, 1e5), active: true };
@@ -178,13 +240,13 @@
           D.products[n2].active = on;
           if (!on) [T - 1, T, T + 1].forEach(function (d) { if (D.plans[d]) delete D.plans[d][n2]; if (D.ok[d]) delete D.ok[d].items[n2]; });
         } else if (path === "/api/batch") {
-          var it = name(b.item, "продукт"), exp = b.expires ? M.dnum(b.expires) : null;
+          var it = name(b.item, "продукт"), exp = b.expires ? M.dnum(b.expires) : null, am = amountOf(it, b);
           if (exp == null) {
-            var p = D.products[it];
-            if (!p || !p.shelf_life) throw new Error("укажите дату «годен до» или срок хранения у товара");
-            exp = M.dnum(b.made || M.diso(T)) + p.shelf_life;
+            var p = D.products[it], mm = matByName(it), life = (p && p.shelf_life) || (mm && mm.shelf_life);
+            if (!life) throw new Error("укажите дату «годен до» или срок хранения у товара или сырья");
+            exp = M.dnum(b.made || M.diso(T)) + life;
           }
-          D.batches.push({ id: D.nextId++, item: it, qty: String(b.qty || "").trim().slice(0, 20), exp: exp, status: "active" });
+          D.batches.push({ id: D.nextId++, item: it, qty: am.qty, amount: am.amount, unit: am.unit, exp: exp, arrived: T, status: "active" });
         } else if (path === "/api/batch/close") {
           D.batches.forEach(function (x) { if (x.id === +b.id) x.status = b.status; });
         } else if (path === "/api/record") {
@@ -213,9 +275,33 @@
           ups.forEach(function (x) { var k = x.day + "|" + x.product; if (k in at) D.sales[at[k]] = x; else { at[k] = D.sales.length; D.sales.push(x); } });
           btCache = null;
         } else if (path === "/api/batch/edit") {
-          var bi = name(b.item, "продукт"), be = b.expires ? M.dnum(b.expires) : null;
+          var bi = name(b.item, "продукт"), be = b.expires ? M.dnum(b.expires) : null, ba = amountOf(bi, b);
           if (be == null || isNaN(be)) throw new Error("годен до: нужна дата");
-          D.batches.forEach(function (x) { if (x.id === +b.id) { x.item = bi; x.qty = String(b.qty || "").trim().slice(0, 20); x.exp = be; } });
+          D.batches.forEach(function (x) { if (x.id === +b.id) { x.item = bi; x.qty = ba.qty; x.amount = ba.amount; x.unit = ba.unit; x.exp = be; } });
+        } else if (path === "/api/material") {
+          var mn = name(b.name, "сырьё"), days;
+          try { days = M.parseDelivery(b.delivery); } catch (x) { throw new Error(mn + ": " + x.message); }
+          var mat = { name: mn, unit: M.normUnit(b.unit || "кг"), delivery: M.deliveryText(days), shelf_life: num(b.shelf_life, 1, 3650, true), cost: num(b.cost, 0, 1e6) };
+          if (b.old_name && b.old_name !== mn) {
+            delete D.materials[b.old_name];
+            D.recipes.forEach(function (r) { if (r.material === b.old_name) r.material = mn; });
+            D.batches.forEach(function (x) { if (x.item === b.old_name && x.status === "active") x.item = mn; });
+          }
+          D.materials[mn] = mat;
+        } else if (path === "/api/material/remove") {
+          var rn = name(b.name, "сырьё");
+          delete D.materials[rn];
+          D.recipes = D.recipes.filter(function (r) { return r.material !== rn; });
+        } else if (path === "/api/recipe") {
+          var rp = name(b.product, "товар"), rm0 = matByName(b.material), norm = num(b.norm, 0, 1e5);
+          if (!rm0) throw new Error("сырья «" + String(b.material || "") + "» нет в списке — добавьте его на листе «Сырьё»");
+          if (!norm) throw new Error(rp + ": укажите расход сырья на 1 шт");
+          var drop = function (pr, ma) { D.recipes = D.recipes.filter(function (r) { return !(r.product === pr && r.material === ma); }); };
+          if (b.old_product) drop(b.old_product, b.old_material);
+          drop(rp, rm0.name);
+          D.recipes.push({ product: rp, material: rm0.name, norm: norm });
+        } else if (path === "/api/recipe/remove") {
+          D.recipes = D.recipes.filter(function (r) { return !(r.product === b.product && r.material === b.material); });
         } else if (path === "/api/plan/confirm" || path === "/api/plan/unconfirm") {
           var day = M.dnum(String(b.day || ""));
           if (day !== T && day !== T + 1) throw new Error("подтвердить можно план на сегодня или на завтра");
@@ -239,7 +325,7 @@
           });
         } else if (path === "/api/upload") {
           var r = M.parseCSV(String(b.csv || ""));
-          if (D.example) { D.sales = []; D.products = {}; D.plans = {}; D.ok = {}; D.events = {}; D.batches = []; D.example = false; D.business = ""; }
+          if (D.example) { D.sales = []; D.products = {}; D.plans = {}; D.ok = {}; D.events = {}; D.batches = []; D.materials = {}; D.recipes = []; D.example = false; D.business = ""; }
           var idx = {};
           D.sales.forEach(function (x, i) { idx[x.day + "|" + x.product] = i; });
           r.sales.forEach(function (x) { var k = x.day + "|" + x.product; if (k in idx) D.sales[idx[k]] = x; else { idx[k] = D.sales.length; D.sales.push(x); } });
@@ -384,6 +470,46 @@
     return S.st.today.items.filter(function (i) { return i.ok_qty != null; }).sort(function (a, b) { return a.product < b.product ? -1 : 1; });
   }
 
+  // ---------------------------------------------------------------- сырьё
+  function alertList(list) {
+    return '<ul class="alerts">' + list.map(function (a) {
+      return '<li class="' + a.level + '"><span class="ic" aria-hidden="true">' + (a.waste ? "🗑" : "⚠️") + "</span><span><b>" + esc(a.name) + ":</b> " + esc(a.text) + "</span></li>";
+    }).join("") + "</ul>";
+  }
+  function stockCard() {
+    var st = S.st, v = st.stock;
+    if (!v) return "";
+    var al = M.stockAlerts(v, st.today.date, dayLabel), tom = st.tomorrow.date;
+    var due = v.rows.filter(function (r) { return r.order > 0 && r.next === tom; });
+    var h = '<div class="card"><h2>Сырьё на сегодня</h2>';
+    if (!al.length && !due.length) return h + '<p class="sub" style="margin:0">Сырья хватает до ближайших поставок.</p></div>';
+    if (al.length) h += alertList(al);
+    if (due.length) h += '<p class="hint" style="margin-top:12px"><b>Заказать сегодня — поставка завтра:</b> ' +
+      due.map(function (r) { return esc(r.name) + " — " + esc(r.text.order); }).join(", ") + "</p>";
+    return h + '<div class="acts" style="justify-content:flex-start;margin-top:12px"><button class="btn btn-quiet btn-sm" data-tab="stock">Все остатки и заказ</button></div></div>';
+  }
+  function viewStock() {
+    var st = S.st, v = st.stock;
+    if (!v) return '<div class="card"><h2>Сырьё и заказ</h2><div class="empty">Сырьё пока не заведено. Откройте «Таблицы» и заполните листы «Сырьё» (единица, дни поставок, срок) и «Техкарты» (сколько сырья уходит на 1 шт товара). Потом добавьте партии с количеством во вкладке «Сроки годности».</div></div>';
+    var al = M.stockAlerts(v, st.today.date, dayLabel), tom = st.tomorrow.date, orders = v.rows.filter(function (r) { return r.order > 0; });
+    var h = '<div class="kpis"><div class="kpi' + (al.some(function (a) { return !a.waste; }) ? " bad" : "") + '"><b class="num">' + al.filter(function (a) { return !a.waste; }).length +
+      '</b><span>не хватит до поставки</span></div><div class="kpi' + (al.some(function (a) { return a.waste; }) ? " warn" : "") + '"><b class="num">' + al.filter(function (a) { return a.waste; }).length +
+      '</b><span>спишется, если не пустить в работу</span></div><div class="kpi"><b class="num">' + orders.length + "</b><span>" + plural(orders.length, "позиция", "позиции", "позиций") + " к заказу</span></div></div>";
+    if (al.length) h += '<div class="card"><h2>Что важно</h2><p class="sub">По плану на сегодня и прогнозу до следующих поставок.</p>' + alertList(al) + "</div>";
+    h += '<div class="card"><h2>Заказ поставщикам</h2><p class="sub">Остаток на утро уменьшается сам: по тому, сколько испекли, а если это не отмечено — по подтверждённому плану. Заказ — к ближайшей поставке, чтобы хватило до следующей, с запасом 10% и не больше, чем успеете использовать до конца срока.</p>' +
+      '<div class="table-wrap"><table class="t stock-t"><thead><tr><th>Сырьё</th><th class="r">На утро</th><th class="r c-need">Сегодня уйдёт</th><th class="c-del">Поставки</th><th class="c-next">Ближайшая</th><th class="r">Заказать</th></tr></thead><tbody>';
+    v.rows.forEach(function (r) {
+      var isDue = r.order > 0 && r.next === tom;
+      h += '<tr class="' + (isDue ? "due" : "") + '"><td class="name">' + esc(r.name) + '</td><td class="r num">' + esc(r.text.stock) + '</td><td class="r num c-need">' + esc(r.text.need_today) +
+        '</td><td class="c-del">' + esc(r.delivery) + '</td><td class="c-next">' + dayLabel(r.next) + (isDue ? ' <span class="chip new">заказ сегодня</span>' : "") +
+        '</td><td class="r">' + (r.order > 0 ? '<span class="order">' + esc(r.text.order) + '</span><div class="why"><span class="m-only">' + (isDue ? "заказ сегодня, " : "к " + dayLabel(r.next) + ", ") +
+          "</span>на " + r.cover + " " + plural(r.cover, "день", "дня", "дней") + "</div>" : '<span class="muted">не нужно</span>') + "</td></tr>";
+    });
+    h += '</tbody></table></div><p class="hint" style="margin-top:10px">Сырьё, дни поставок и техкарты меняются во вкладке «Таблицы» — листы «Сырьё» и «Техкарты».' +
+      (st.business.is_example ? " В примере расход сырья ориентировочный." : "") + "</p></div>";
+    return h;
+  }
+
   function viewPlan() {
     var st = S.st, items = st.today.items, total = items.reduce(function (a, i) { return a + i.qty; }, 0), exp = st.batches.filter(function (b) { return b.left <= 1; });
     var h = '<div class="kpis"><div class="kpi"><b class="num">' + total + '</b><span>штук сделать сегодня</span></div>' +
@@ -400,6 +526,8 @@
         '</td><td class="r num">≈' + Math.round(it.mean) + ' <span class="muted">±' + Math.round(it.sd) + '</span></td><td class="r"><span class="big">' + it.qty + "</span>" + inWork(it) + "</td></tr>";
     });
     h += '</tbody><tfoot><tr><td>Всего</td><td></td><td class="r"><span class="big">' + total + "</span></td></tr></tfoot></table></div></div>";
+    h += stockCard();
+    if (st.stock) exp = exp.filter(function (b) { return !st.stock.rows.some(function (r) { return M.mkey(r.name) === M.mkey(b.item); }); });
     if (exp.length) {
       h += '<div class="card"><h2>Пора пустить в работу</h2><p class="sub">Партии, у которых срок заканчивается сегодня или завтра.</p>' + batchRows(exp, true) + "</div>";
     }
@@ -515,7 +643,8 @@
     var glyph = { ok: "●", warn: "▲", bad: "✕" };
     var h = '<div class="table-wrap"><table class="t"><thead><tr><th>Продукт</th><th>Количество</th><th>Годен до</th><th>Статус</th>' + (compact ? "" : "<th></th>") + "</tr></thead><tbody>";
     list.forEach(function (b) {
-      h += '<tr><td><div class="name">' + esc(b.item) + "</div>" + (b.tip ? '<div class="why">→ ' + esc(b.tip) + "</div>" : "") + "</td><td>" + esc(b.qty || "—") +
+      var q = b.rest != null && b.amount && b.rest < b.amount - 1e-9 ? esc(b.rest_text) + ' <span class="muted">из ' + esc(b.qty) + "</span>" : esc(b.qty || "—");
+      h += '<tr><td><div class="name">' + esc(b.item) + "</div>" + (b.tip ? '<div class="why">→ ' + esc(b.tip) + "</div>" : "") + "</td><td>" + q +
         '</td><td class="num">' + dayLabel(b.expires) + '</td><td><span class="chip ' + b.level + '">' + glyph[b.level] + " " + esc(b.label) + "</span></td>" +
         (compact ? "" : '<td><div class="acts"><button class="btn btn-quiet btn-sm" data-act="batch" data-id="' + b.id + '" data-s="used">Использовано</button><button class="btn btn-quiet btn-sm" data-act="batch" data-id="' + b.id + '" data-s="written_off">Списано</button><button class="btn btn-quiet btn-sm" data-act="batch" data-id="' + b.id + '" data-s="deleted" aria-label="Удалить запись">Удалить</button></div></td>') + "</tr>";
     });
@@ -526,7 +655,7 @@
     var st = S.st, today = st.today.date;
     var h = '<div class="card"><h2>Добавить партию</h2><p class="sub">Выберите товар со сроком хранения — дата «годен до» посчитается сама. Для сырья (сливки, творог) укажите дату с упаковки.</p>' +
       '<form class="form" data-form="batch-add"><label class="wide">Продукт<input type="text" name="item" list="prodlist" maxlength="60" required placeholder="Сливки 33% или товар из списка"></label>' +
-      '<label>Количество<input type="text" name="qty" maxlength="20" placeholder="2 л, 20 шт"></label>' +
+      '<label>Количество<input type="text" name="qty" maxlength="20" placeholder="2 л, 800 г, 30 шт"></label>' +
       '<label>Изготовлено / поставлено<input type="date" name="made" value="' + today + '"></label>' +
       '<label>Годен до<input type="date" name="expires"></label><button class="btn btn-primary" type="submit">Добавить</button></form>' +
       '<datalist id="prodlist">' + st.products.map(function (p) { return '<option value="' + esc(p.name) + '">' + (p.shelf_life ? "срок " + p.shelf_life + " дн." : "") + "</option>"; }).join("") + "</datalist></div>";
@@ -579,6 +708,10 @@
     addBatch: function (b) { var body = { item: b.item, qty: b.qty, made: b.made }; if (b.expires) body.expires = b.expires; return API.post("/api/batch", body).then(touched).catch(unlogged); },
     editBatch: function (b) { return API.post("/api/batch/edit", b).then(touched).catch(unlogged); },
     deleteBatch: function (id) { return API.post("/api/batch/close", { id: id, status: "deleted" }).then(touched).catch(unlogged); },
+    saveMaterial: function (m, oldName) { var body = Object.assign({}, m); if (oldName) body.old_name = oldName; return API.post("/api/material", body).then(touched).catch(unlogged); },
+    removeMaterial: function (n) { return API.post("/api/material/remove", { name: n }).then(touched).catch(unlogged); },
+    saveRecipe: function (r, old) { var body = Object.assign({}, r); if (old) { body.old_product = old.product; body.old_material = old.material; } return API.post("/api/recipe", body).then(touched).catch(unlogged); },
+    removeRecipe: function (r) { return API.post("/api/recipe/remove", { product: r.product, material: r.material }).then(touched).catch(unlogged); },
     upload: function (text) { return API.post("/api/upload", { csv: text }).then(touched).catch(unlogged); },
     toast: function (m) { toast(m); }
   };
@@ -593,6 +726,7 @@
     else if (S.tab === "tomorrow") v = viewTomorrow();
     else if (S.tab === "products") v = viewProducts();
     else if (S.tab === "batches") v = viewBatches();
+    else if (S.tab === "stock") v = viewStock();
     else v = viewData();
     $("view").innerHTML = v;
   }

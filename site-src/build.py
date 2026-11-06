@@ -7,11 +7,14 @@ kabinet.html        - кабинет: на GitHub Pages работает как 
 bot/web/kabinet.html - тот же кабинет, его раздаёт бот (свои данные, вход по коду)
 """
 import json
+import sys
 from urllib.parse import quote
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
+sys.path.insert(0, str(ROOT / "bot"))
+from core.materials import DEMO_BATCHES, DEMO_MATERIALS, DEMO_RECIPES  # noqa: E402  пример сырья - один на бот и сайт
 ICON = ("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='#2346C8'/>"
         "<text x='16' y='22.5' text-anchor='middle' font-family='Arial,sans-serif' font-size='19' font-weight='700' fill='#fff'>С</text></svg>")
 
@@ -36,6 +39,8 @@ def build(src_name: str, app_name: str, marker: str, example: bool = True) -> st
     csv = (ROOT / "bot" / "data" / "demo_sales.csv").read_text(encoding="utf-8") if example else ""
     return (read(src_name).replace("/*MODEL*/", read("model.js")).replace("/*GRID*/", read("grid.js"))
             .replace("__DEMO_CSV__", json.dumps(csv, ensure_ascii=False))
+            .replace("__DEMO_STOCK__", json.dumps({"materials": DEMO_MATERIALS, "recipes": DEMO_RECIPES, "batches": DEMO_BATCHES}
+                                                   if example else None, ensure_ascii=False))
             .replace(marker, read(app_name)))
 
 

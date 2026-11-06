@@ -351,7 +351,173 @@
     return xs.length ? avg(xs) : null;
   }
 
+  // ---------------------------------------------------------------- сырьё: техкарты, остатки, заказ
+  // та же логика, что в bot/core/materials.py
+  var UNITS = { "кг": ["г", 1000], "л": ["мл", 1000], "шт": ["шт", 1] };
+  var UNIT_WORDS = { "кг": "кг", "kg": "кг", "килограмм": "кг", "г": "г", "гр": "г", "грамм": "г", "g": "г",
+    "л": "л", "l": "л", "литр": "л", "литра": "л", "литров": "л", "мл": "мл", "ml": "мл",
+    "шт": "шт", "штук": "шт", "штуки": "шт", "штука": "шт", "pcs": "шт", "уп": "шт" };
+  var DAY_WORDS = ["понед", "вторн", "сред", "четв", "пятн", "субб", "воскр"];
+  var RESERVE = 0.10, HORIZON = 21, EPS = 1e-9;
+  function mkey(name) { return String(name || "").toLowerCase().split(/\s+/).filter(Boolean).join(" "); }
+  function rnd(x, digits) { var p = Math.pow(10, digits || 0); return Math.floor(x * p + 0.5) / p; }
+  function normUnit(text) {
+    var u = UNIT_WORDS[String(text || "").trim().toLowerCase().replace(/\.$/, "")];
+    if (!UNITS[u]) throw new Error("единица сырья: кг, л или шт");
+    return u;
+  }
+  function smallUnit(unit) { return (UNITS[unit] || ["шт", 1])[0]; }
+  function unitFactor(unit) { return (UNITS[unit] || ["шт", 1])[1]; }
+  function parseDelivery(text) {
+    var s = String(text || "").toLowerCase().replace(/ё/g, "е"), found = {};
+    if (!s.trim() || s.indexOf("ежеднев") >= 0 || s.indexOf("каждый день") >= 0 || s.indexOf("все дни") >= 0) return [0, 1, 2, 3, 4, 5, 6];
+    if (s.indexOf("будн") >= 0) [0, 1, 2, 3, 4].forEach(function (i) { found[i] = 1; });
+    WDS.forEach(function (short, i) {
+      if (s.indexOf(DAY_WORDS[i]) >= 0 || new RegExp("(^|[^а-я])" + short + "([^а-я]|$)").test(s)) found[i] = 1;
+    });
+    var out = Object.keys(found).map(Number).sort(function (a, b) { return a - b; });
+    if (!out.length) throw new Error("дни поставок: например «пн, чт» или «ежедневно»");
+    return out;
+  }
+  function deliveryText(days) { return days.length === 7 ? "ежедневно" : days.map(function (i) { return WDS[i]; }).join(", "); }
+  function nextDelivery(days, after) { var d = after + 1; while (days.indexOf(wday(d)) < 0) d++; return d; }
+  function parseAmount(text, unit) {
+    var m = String(text == null ? "" : text).trim().toLowerCase().replace(",", ".").match(/^(\d+(?:\.\d+)?)\s*([a-zа-я.]*)/);
+    if (!m) return { amount: null, unit: null };
+    var x = parseFloat(m[1]), w = UNIT_WORDS[m[2].replace(/\.$/, "")];
+    if (w === "г") return { amount: x / 1000, unit: "кг" };
+    if (w === "мл") return { amount: x / 1000, unit: "л" };
+    return { amount: x, unit: w || unit || null };
+  }
+  function fmtAmount(x, unit) {
+    if (!UNITS[unit]) return String(rnd(x, 1)).replace(".", ",") + (unit ? " " + unit : "");
+    if (unit === "шт") return rnd(x) + " шт";
+    if (x > 0 && x < 1) return rnd(x * 1000) + " " + smallUnit(unit);
+    return String(rnd(x, 1)).replace(".", ",") + " " + unit;
+  }
+  function roundUp(x, unit) {
+    if (x <= EPS) return 0;
+    return unit === "шт" ? Math.ceil(x - EPS) : Math.ceil(x * 10 - EPS) / 10;
+  }
+  function perPiece(materials, recipes) {
+    var mats = {}, out = {};
+    Object.keys(materials).forEach(function (k) { mats[mkey(materials[k].name)] = materials[k]; });
+    recipes.forEach(function (r) {
+      var mk = mkey(r.material);
+      if (mats[mk] && r.norm > 0) (out[r.product] = out[r.product] || []).push([mk, r.norm / unitFactor(mats[mk].unit)]);
+    });
+    return out;
+  }
+  function needsOf(per, dayPlan) {
+    var out = {};
+    Object.keys(dayPlan || {}).forEach(function (p) {
+      (per[p] || []).forEach(function (x) { out[x[0]] = (out[x[0]] || 0) + dayPlan[p] * x[1]; });
+    });
+    return out;
+  }
+  function takeFrom(batches, day, amount) {
+    for (var i = 0; i < batches.length && amount > EPS; i++) {
+      var b = batches[i];
+      if (b.left <= EPS || b.arrived > day || b.expires < day) continue;
+      var t = Math.min(b.left, amount); b.left -= t; amount -= t;
+    }
+    return amount > EPS ? amount : 0;
+  }
+  // materials: { имя: { name, unit, delivery, shelf_life, cost } }, recipes: [{ product, material, norm }]
+  // batches: [{ id, item, amount, expires, arrived }] — дни числами, made и plan: { день: { товар: штук } }
+  function stockReport(materials, recipes, batches, made, plan, today) {
+    var mats = {}, per = perPiece(materials, recipes), pool = {};
+    Object.keys(materials).forEach(function (k) { mats[mkey(materials[k].name)] = materials[k]; });
+    batches.forEach(function (b) {
+      if (b.amount == null || b.amount <= 0) return;
+      var k = mkey(b.item);
+      (pool[k] = pool[k] || []).push({ id: b.id, left: +b.amount, expires: b.expires, arrived: b.arrived });
+    });
+    var arrived = [];
+    Object.keys(pool).forEach(function (k) {
+      pool[k].sort(function (a, b) { return a.expires - b.expires || a.id - b.id; });
+      pool[k].forEach(function (b) { arrived.push(b.arrived); });
+    });
+    for (var d = arrived.length ? Math.min.apply(null, arrived) : today; d < today; d++) {
+      var nd = needsOf(per, made[d]);
+      Object.keys(nd).forEach(function (mk) { if (pool[mk]) takeFrom(pool[mk], d, nd[mk]); });
+    }
+    var leftNow = {}, uses = {};
+    Object.keys(pool).forEach(function (k) { pool[k].forEach(function (b) { leftNow[b.id] = b.left; }); });
+    Object.keys(per).forEach(function (p) { per[p].forEach(function (x) { (uses[x[0]] = uses[x[0]] || []).push([p, x[1]]); }); });
+    var rows = Object.keys(mats).sort().map(function (mk) {
+      var m = mats[mk], days = parseDelivery(m.delivery), first = nextDelivery(days, today);
+      var cover = nextDelivery(days, first) - first;
+      if (m.shelf_life) cover = Math.min(cover, Math.max(1, Math.floor(m.shelf_life)));
+      var end = Math.min(first + cover, today + HORIZON);
+      var bs = (pool[mk] || []).map(function (b) { return { id: b.id, left: b.left, expires: b.expires, arrived: b.arrived }; });
+      var stock = bs.reduce(function (a, b) { return a + (b.expires >= today && b.arrived <= today ? b.left : 0); }, 0);
+      var needToday = needsOf(per, plan[today])[mk] || 0;
+      var shortToday = 0, shortBefore = 0, unmetCover = 0, needCover = 0, shortFirst = null;
+      for (var dd = today; dd < end; dd++) {
+        var n = needsOf(per, plan[dd])[mk] || 0;
+        if (dd >= first) needCover += n;
+        var u = takeFrom(bs, dd, n);
+        if (u > 0) {
+          if (dd === today) shortToday = u;
+          if (dd < first) { shortBefore += u; if (shortFirst == null) shortFirst = dd; } else unmetCover += u;
+        }
+      }
+      var waste = bs.filter(function (b) { return b.left > EPS && b.expires < end; }).map(function (b) { return { id: b.id, left: b.left, expires: b.expires }; });
+      var later = bs.reduce(function (a, b) { return a + (b.expires >= end ? b.left : 0); }, 0);
+      var us = (uses[mk] || []).slice().sort(function (a, b) { return a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : a[1] - b[1]; });
+      return { name: m.name, unit: m.unit, cost: m.cost == null ? null : m.cost, delivery: deliveryText(days),
+        stock: stock, need_today: needToday, short_today: shortToday, short_first: shortFirst, short_before: shortBefore,
+        next: first, cover: cover, order: roundUp(unmetCover + RESERVE * needCover - later, m.unit), need_cover: needCover,
+        waste: waste, waste_total: waste.reduce(function (a, w) { return a + w.left; }, 0), uses: us };
+    });
+    return { rows: rows, left: leftNow };
+  }
+  function wasteHint(row, planToday) {
+    var extra = [];
+    row.uses.forEach(function (u) { var n = u[1] > 0 ? Math.floor(row.waste_total / u[1] + EPS) : 0; if (n > 0) extra.push([n, u[0]]); });
+    if (!extra.length) return "";
+    var q = function (p) { return (planToday || {})[p] || 0; };
+    extra.sort(function (a, b) { return q(b[1]) - q(a[1]) || (a[1] < b[1] ? -1 : a[1] > b[1] ? 1 : 0); });
+    return "можно сделать больше: " + extra.slice(0, 2).map(function (x) { return x[1] + " +" + x[0]; }).join(" или ");
+  }
+
+  // отчёт по сырью в виде для экрана — тот же, что отдаёт сервер бота (web.py, Cabinet._stock)
+  function stockView(rep, planToday) {
+    var iso = function (d) { return d == null ? null : diso(d); };
+    return { rows: rep.rows.map(function (r) {
+      var first = r.waste.length ? Math.min.apply(null, r.waste.map(function (w) { return w.expires; })) : null;
+      var rest = roundUp(r.short_before - r.short_today, r.unit), f = function (x) { return fmtAmount(x, r.unit); };
+      return { name: r.name, unit: r.unit, delivery: r.delivery, cost: r.cost, stock: r.stock, need_today: r.need_today,
+        short_today: r.short_today, short_before: r.short_before, short_rest: rest, cover: r.cover, order: r.order, waste_total: r.waste_total,
+        short_first: iso(r.short_first), next: iso(r.next), waste_first: iso(first), uses: r.uses.map(function (u) { return u[0]; }),
+        hint: r.waste.length ? (wasteHint(r, planToday) || expiryTip(r.name)) : null,
+        text: { stock: f(r.stock), need_today: f(r.need_today), short_today: f(roundUp(r.short_today, r.unit)),
+                short_before: f(roundUp(r.short_before, r.unit)), short_rest: f(rest), order: f(r.order), waste_total: f(r.waste_total) } };
+    }), left: rep.left };
+  }
+  // что важно по сырью сегодня: нехватка и будущее списание. label(iso) — подпись дня, «пн, 09.11»
+  function stockAlerts(view, todayIso, label) {
+    var out = [], T = dnum(todayIso);
+    view.rows.forEach(function (r) {
+      if (r.short_today > 0) {
+        out.push({ level: "bad", name: r.name, text: "на сегодня нужно " + r.text.need_today + ", есть " + r.text.stock + " — не хватит " + r.text.short_today +
+          (r.short_rest > 0 ? ", до поставки " + label(r.next) + " — ещё " + r.text.short_rest : "") });
+      } else if (r.short_before > 0) {
+        out.push({ level: "warn", name: r.name, text: "хватит до " + label(diso(dnum(r.short_first) - 1)) + ", поставка " + label(r.next) + " — докупите " + r.text.short_before });
+      }
+      if (r.waste_total > 0) {
+        var st = expiryStatus(dnum(r.waste_first), T);
+        out.push({ level: st.left < 0 ? "bad" : "warn", name: r.name, waste: true, text: st.left < 0 ? "просрочено — спишите " + r.text.waste_total
+          : st.label + " — по плану не уйдёт " + r.text.waste_total + (r.cost ? " (≈ " + Math.round(r.waste_total * r.cost).toLocaleString("ru-RU") + " ₽)" : "") + " → " + r.hint });
+      }
+    });
+    return out;
+  }
+
   var api = { dnum: dnum, diso: diso, wday: wday, ddmm: ddmm, WD: WD, WDS: WDS, demand: demand, rainEffect: rainEffect,
+    stockReport: stockReport, stockView: stockView, stockAlerts: stockAlerts, roundUp: roundUp, wasteHint: wasteHint, parseDelivery: parseDelivery, deliveryText: deliveryText, parseAmount: parseAmount,
+    fmtAmount: fmtAmount, normUnit: normUnit, smallUnit: smallUnit, mkey: mkey, HORIZON: HORIZON,
     criticalRatio: criticalRatio, forecast: forecast, eveningThreshold: eveningThreshold, discountAdvice: discountAdvice,
     backtest: backtest, expiryStatus: expiryStatus, expiryTip: expiryTip, parseCSV: parseCSV, signed: signed, SHARE_EVENING: SHARE_EVENING,
     loadWeather: loadWeather, deg: deg, recentTemp: recentTemp };

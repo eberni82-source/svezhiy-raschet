@@ -14,7 +14,7 @@
 
   var now = new Date();
   var TODAY = M.dnum(now.getFullYear() + "-" + pad(now.getMonth() + 1) + "-" + pad(now.getDate()));
-  var KEY = "svezhiy-demo-v2";
+  var KEY = "svezhiy-demo-v3";
 
   // ---------------------------------------------------------------- данные примера и состояние
   // S сохраняется в браузере: продажи, товары, партии, выбранный день, погода и события по дням, планы
@@ -23,19 +23,26 @@
     var last = Math.max.apply(null, r.sales.map(function (s) { return s.day; })), shift = (TODAY - 1) - last;
     r.sales.forEach(function (s) { s.day += shift; });
     Object.keys(r.products).forEach(function (k) { r.products[k].shelf_life = k === "Эклер" || k === "Сэндвич с курицей" ? 2 : 1; });
-    var batches = [["Сливки 33%", "2 л", 1], ["Творог 5%", "3 кг", 2], ["Филе куриное", "1,5 кг", 0], ["Вишня замороженная", "2 кг", 20]]
-      .map(function (b, i) { return { id: i + 1, item: b[0], qty: b[1], exp: TODAY + b[2] }; });
-    return { v: 2, source: "demo", fileName: "", sales: r.sales, products: r.products, hidden: {}, batches: batches, today: TODAY, cond: {}, plans: {}, planAt: {}, edited: false };
+    // сырьё, техкарты и партии примера - из bot/core/materials.py
+    var DS = DEMO_STOCK || { materials: [], recipes: [], batches: [] }, mats = {};
+    DS.materials.forEach(function (m) { mats[m[0]] = { name: m[0], unit: m[1], delivery: m[2], shelf_life: m[3], cost: m[4] }; });
+    var batches = DS.batches.map(function (b, i) {
+      var u = mats[b[0]].unit;
+      return { id: i + 1, item: b[0], qty: M.fmtAmount(b[1], u), amount: b[1], unit: u, exp: TODAY + b[2], arrived: TODAY };
+    });
+    return { v: 3, source: "demo", fileName: "", sales: r.sales, products: r.products, hidden: {}, batches: batches, today: TODAY, cond: {}, plans: {}, planAt: {},
+             materials: mats, recipes: DS.recipes.map(function (x) { return { product: x[0], material: x[1], norm: x[2] }; }), edited: false };
   }
   function fileState(text, name) {
     var r = M.parseCSV(text), last = Math.max.apply(null, r.sales.map(function (s) { return s.day; }));
-    return { v: 2, source: "file", fileName: name, sales: r.sales, products: r.products, hidden: {}, batches: [], today: last + 1, cond: {}, plans: {}, planAt: {}, edited: false };
+    return { v: 3, source: "file", fileName: name, sales: r.sales, products: r.products, hidden: {}, batches: [], today: last + 1, cond: {}, plans: {}, planAt: {},
+             materials: {}, recipes: [], edited: false };
   }
   function restore() {
     try {
       var d = JSON.parse(localStorage.getItem(KEY) || "null");
-      if (d && d.v === 2 && Array.isArray(d.sales) && d.sales.length && typeof d.today === "number") {
-        d.plans = d.plans || {}; d.planAt = d.planAt || {};
+      if (d && d.v === 3 && Array.isArray(d.sales) && d.sales.length && typeof d.today === "number") {
+        d.plans = d.plans || {}; d.planAt = d.planAt || {}; d.materials = d.materials || {}; d.recipes = d.recipes || [];
         return d;
       }
     } catch (e) { /* хранилище недоступно — начинаем с примера */ }
@@ -47,6 +54,7 @@
   var WX = {};   // прогноз Open-Meteo для Челябинска по дням
   var saveT = null, index = null;
   function save() {
+    U.ver = (U.ver || 0) + 1;
     clearTimeout(saveT);
     saveT = setTimeout(function () { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { /* без хранилища работаем в памяти */ } }, 250);
   }
@@ -116,6 +124,31 @@
       if (same.length) habit[r.product] = same.reduce(function (a, s) { return a + s.baked; }, 0) / same.length;
     });
     return { recs: recs, eff: eff, habit: habit };
+  }
+  // сырьё: остатки по тому, что произвели, и заказ к ближайшей поставке (M.stockReport)
+  function matByName(name) {
+    var k = M.mkey(name), hit = null;
+    Object.keys(S.materials).forEach(function (n) { if (M.mkey(n) === k) hit = S.materials[n]; });
+    return hit;
+  }
+  var stockMemo = null;
+  function stock() {
+    if (!Object.keys(S.materials).length) return null;
+    var T = S.today, tag = (U.ver || 0) + "|" + T + "|" + Object.keys(WX).length;
+    if (stockMemo && stockMemo.tag === tag) return stockMemo.view;
+    var made = {}, plan = {}, arr = S.batches.filter(function (b) { return b.amount; }).map(function (b) { return b.arrived == null ? T : b.arrived; });
+    for (var d = arr.length ? Math.min.apply(null, arr) : T; d < T; d++) made[d] = Object.assign({}, S.plans[d] || {});
+    S.sales.forEach(function (x) { if (made[x.day] && x.baked != null) made[x.day][x.product] = x.baked; });
+    for (var i = 0; i < M.HORIZON; i++) plan[T + i] = S.plans[T + i] || qtyMap(compute(S, T + i, condFor(S, T + i)).recs);
+    var batches = S.batches.map(function (b) { return { id: b.id, item: b.item, amount: b.amount == null ? null : b.amount, expires: b.exp, arrived: b.arrived == null ? T : b.arrived }; });
+    var view = M.stockView(M.stockReport(S.materials, S.recipes, batches, made, plan, T), plan[T]);
+    stockMemo = { tag: tag, view: view };
+    return view;
+  }
+  function amountOf(item, qty, amount, unit) {
+    var m = matByName(item), r = amount != null && amount !== "" ? M.parseAmount(amount + " " + (unit || ""), m && m.unit) : M.parseAmount(qty, m && m.unit);
+    if (m && r.unit && r.unit !== m.unit) throw new Error(m.name + " считается в «" + m.unit + "» — укажите количество в " + m.unit);
+    return { qty: r.amount != null ? M.fmtAmount(r.amount, r.unit) : String(qty || "").trim().slice(0, 20), amount: r.amount, unit: r.unit };
   }
   function whyText(r) {
     return r.reasons.filter(function (x) { return x.indexOf("дождь") !== 0 && x.indexOf("событие") !== 0; }).slice(0, 2).join("; ");
@@ -303,6 +336,7 @@
     $("rain-note").textContent = (wx.length ? "Погода на " + dayLabel(day) + ": " + wx.join(", ") + ". " : "") +
       "Дождь: " + M.signed(e.eff * 100) + " к спросу" + (e.learned ? " (по истории продаж)." : " (по умолчанию).") + " «Обычно» — сколько делали в этот день недели за 4 недели.";
     renderConfirm(C.recs);
+    renderStock();
     renderChart();
   }
 
@@ -436,13 +470,47 @@
   }
 
   // ---------------------------------------------------------------- сроки годности, проверка, телефон
+  function stockAlerts(v) { return M.stockAlerts(v, M.diso(S.today), function (iso) { return dayLabel(M.dnum(iso)); }); }
+  function renderStock() {
+    var v = stock(), box = $("stock"), note = $("stock-note");
+    if (!v) {
+      box.innerHTML = '<div class="empty">Сырьё не заведено. Заполните листы «Сырьё» и «Техкарты» во вкладке «Таблицы».</div>';
+      note.hidden = true;
+      return;
+    }
+    var al = stockAlerts(v), tom = M.diso(S.today + 1), h = [];
+    if (al.length) h.push('<ul class="alerts">' + al.map(function (a) {
+      return '<li class="' + a.level + '"><span aria-hidden="true">' + (a.waste ? "🗑" : "⚠️") + "</span><span><b>" + esc(a.name) + ":</b> " + esc(a.text) + "</span></li>";
+    }).join("") + "</ul>");
+    h.push('<h3 class="plan-h" style="margin-top:18px">Заказ поставщикам</h3><div class="table-wrap"><table class="plan stock-t"><thead><tr><th>Сырьё</th><th class="r">На утро</th>' +
+      '<th class="r c-need">Сегодня уйдёт</th><th class="c-del">Поставки</th><th class="c-next">Ближайшая</th><th class="r">Заказать</th></tr></thead><tbody>');
+    v.rows.forEach(function (r) {
+      var due = r.order > 0 && r.next === tom;
+      h.push('<tr class="' + (due ? "due" : "") + '"><td class="name">' + esc(r.name) + '</td><td class="r num">' + esc(r.text.stock) + '</td><td class="r num c-need">' + esc(r.text.need_today) +
+        '</td><td class="c-del">' + esc(r.delivery) + '</td><td class="c-next">' + dayLabel(M.dnum(r.next)) + (due ? '<div class="why">заказ сегодня</div>' : "") + '</td><td class="r">' +
+        (r.order > 0 ? '<span class="qty">' + esc(r.text.order) + '</span><div class="why"><span class="m-only">' + (due ? "заказ сегодня, " : "к " + M.ddmm(M.dnum(r.next)) + ", ") + "</span>на " +
+          r.cover + " " + plural(r.cover, "день", "дня", "дней") + "</div>" : '<span class="muted">не нужно</span>') + "</td></tr>");
+    });
+    h.push('</tbody></table></div><p class="rain-note">Остаток уменьшается сам: по «Сделали» за прошлые дни, а если не внесено — по подтверждённому плану. ' +
+      "Заказ — к ближайшей поставке, чтобы хватило до следующей, с запасом 10% и в пределах срока годности. Расход сырья в примере ориентировочный.</p>");
+    box.innerHTML = h.join("");
+    var short = al.filter(function (a) { return !a.waste; }).length, waste = al.length - short, due = v.rows.filter(function (r) { return r.order > 0 && r.next === tom; }).length;
+    var parts = [];
+    if (short) parts.push(short + " " + plural(short, "позиция", "позиции", "позиций") + " не хватит");
+    if (waste) parts.push(waste + " спишется, если не пустить в работу");
+    if (due) parts.push(due + " заказать сегодня");
+    note.hidden = false;
+    note.innerHTML = "<b>Сырьё:</b> " + (parts.length ? esc(parts.join(", ")) : "хватает до ближайших поставок") + ' — <button type="button" class="linkbtn" id="go-stock">подробнее</button>';
+  }
   function renderBatches() {
-    var list = S.batches.slice().sort(function (a, b) { return a.exp - b.exp; }), h = [];
+    var list = S.batches.slice().sort(function (a, b) { return a.exp - b.exp; }), h = [], v = stock(), now = v ? v.left : {};
     var glyph = { ok: "●", warn: "▲", bad: "✕" };
+    renderStock();
     list.forEach(function (b) {
-      var st = M.expiryStatus(b.exp, S.today);
+      var st = M.expiryStatus(b.exp, S.today), rest = now[b.id];
+      var q = rest != null && b.amount && rest < b.amount - 1e-9 ? "осталось " + M.fmtAmount(rest, b.unit) + " из " + b.qty : b.qty || "";
       h.push('<div class="batch"><div><div class="b-name">' + esc(b.item) + ' <span class="chip ' + st.level + '">' + glyph[st.level] + " " + st.label + "</span></div>" +
-        '<div class="b-meta">' + esc(b.qty || "") + (b.qty ? " · " : "") + "годен до " + dayLabel(b.exp) + "</div></div>" +
+        '<div class="b-meta">' + esc(q) + (q ? " · " : "") + "годен до " + dayLabel(b.exp) + "</div></div>" +
         '<div class="b-actions"><button class="mini" data-act="used" data-id="' + b.id + '">Использовано</button><button class="mini" data-act="off" data-id="' + b.id + '">Списано</button></div>' +
         (st.left <= 1 ? '<div class="b-tip">→ ' + (st.left < 0 ? "спишите" : esc(M.expiryTip(b.item))) + "</div>" : "") + "</div>");
     });
@@ -491,10 +559,23 @@
       });
       out.push("\nВсего: <b>" + total + "</b> шт");
       if (hasH && habit > total * 1.03) out.push("Обычно в этот день пекли ~" + Math.round(habit) + " шт — план на " + Math.round(habit - total) + " шт меньше");
-      var exp = expiringLines(S.batches, day, 1);
+      var sv = stock(), mk = {};
+      if (sv) sv.rows.forEach(function (r) { mk[M.mkey(r.name)] = 1; });
+      var exp = expiringLines(S.batches.filter(function (b) { return !(b.amount != null && mk[M.mkey(b.item)]); }), day, 1);
       if (exp.length) {
         out.push("", "<b>Сроки годности</b>");
         exp.forEach(function (e) { out.push("• " + esc(e.b.item) + " (" + esc(e.b.qty) + ") — " + e.st.label + " → " + e.tip); });
+      }
+      if (sv) {
+        var al = stockAlerts(sv), tom = M.diso(day + 1), due = sv.rows.filter(function (r) { return r.order > 0 && r.next === tom; });
+        out.push("", "<b>Сырьё</b>");
+        if (!al.length && !due.length) out.push("Сырья хватает до ближайших поставок.");
+        al.forEach(function (a) { out.push((a.waste ? "🗑 " : "⚠️ ") + esc(a.name) + ": " + esc(a.text)); });
+        if (due.length) {
+          out.push("", "<b>Заказать сегодня — поставка завтра</b>");
+          due.forEach(function (r) { out.push("• " + esc(r.name) + " — <b>" + esc(r.text.order) + "</b>"); });
+        }
+        out.push("Все остатки и заказы: /syrye");
       }
       var ps = planState(day, recs);
       if (ps === "ok") out.push("\n✅ План подтверждён" + (S.planAt[day] ? " в " + S.planAt[day] : "") + ".");
@@ -540,7 +621,7 @@
     today: null,
     toast: toast,
     load: function () {
-      var base = S.today, prods = allProducts(S), hist = {}, week = {}, days = [];
+      var base = S.today, prods = allProducts(S), hist = {}, week = {}, days = [], sv = stock();
       sheetAdapter.today = M.diso(S.today - 1);
       S.sales.forEach(function (s) { (hist[s.product] = hist[s.product] || {})[s.day] = 1; });
       for (var i = 0; i < 7; i++) {
@@ -561,9 +642,17 @@
                    default_qty: p.default_qty == null ? null : p.default_qty, history_days: hist[k] ? Object.keys(hist[k]).length : 0 };
         }),
         batches: S.batches.slice().sort(function (a, b) { return a.exp - b.exp || a.id - b.id; }).map(function (b) {
-          var st = M.expiryStatus(b.exp, S.today);
-          return { id: b.id, item: b.item, qty: b.qty, expires: M.diso(b.exp), label: st.label, level: st.level, tip: st.left <= 1 ? (st.left < 0 ? "спишите" : M.expiryTip(b.item)) : null };
+          var st = M.expiryStatus(b.exp, S.today), rest = sv ? sv.left[b.id] : null;
+          return { id: b.id, item: b.item, qty: b.qty, rest_text: rest == null ? null : M.fmtAmount(rest, b.unit), expires: M.diso(b.exp), label: st.label, level: st.level,
+                   tip: st.left <= 1 ? (st.left < 0 ? "спишите" : M.expiryTip(b.item)) : null };
         }),
+        materials: Object.keys(S.materials).sort().map(function (k) {
+          var m = S.materials[k], r = sv ? sv.rows.filter(function (x) { return x.name === m.name; })[0] : null;
+          return { name: m.name, unit: m.unit, delivery: m.delivery, shelf_life: m.shelf_life == null ? null : m.shelf_life, cost: m.cost == null ? null : m.cost,
+                   stock_text: r ? r.text.stock : null, order_text: r ? (r.order > 0 ? r.text.order + " к " + M.ddmm(M.dnum(r.next)) : "не нужно") : null };
+        }),
+        recipes: S.recipes.map(function (r) { var m = matByName(r.material); return { product: r.product, material: r.material, norm: r.norm, unit: m ? m.unit : null }; })
+          .sort(function (a, b) { return a.product < b.product ? -1 : a.product > b.product ? 1 : a.material < b.material ? -1 : 1; }),
         week: { days: days, rows: Object.keys(week).map(function (k) { return { product: k, qty: week[k] }; }).sort(function (a, b) { return total(b.qty) - total(a.qty); }) }
       });
     },
@@ -575,6 +664,7 @@
     saveProduct: function (p, oldName) {
       if (oldName && oldName !== p.name) {
         S.sales.forEach(function (s) { if (s.product === oldName) s.product = p.name; });
+        S.recipes.forEach(function (r) { if (r.product === oldName) r.product = p.name; });
         delete S.products[oldName]; index = null;
       }
       delete S.hidden[p.name];
@@ -583,16 +673,49 @@
     },
     removeProduct: function (n) { S.hidden[n] = true; return changed(true); },
     addBatch: function (b) {
-      var exp = b.expires ? M.dnum(b.expires) : null, p = allProducts(S)[b.item];
+      var exp = b.expires ? M.dnum(b.expires) : null, p = allProducts(S)[b.item], m = matByName(b.item), am;
+      try { am = amountOf(b.item, b.qty); } catch (e) { return Promise.reject(e); }
       if (exp == null) {
-        if (!p || !p.shelf_life) return Promise.reject(new Error("Укажите «годен до»"));
-        exp = S.today + p.shelf_life;
+        var life = (p && p.shelf_life) || (m && m.shelf_life);
+        if (!life) return Promise.reject(new Error("Укажите «годен до»"));
+        exp = S.today + life;
       }
-      S.batches.push({ id: nextId(), item: b.item, qty: b.qty || "", exp: exp });
+      S.batches.push({ id: nextId(), item: b.item, qty: am.qty, amount: am.amount, unit: am.unit, exp: exp, arrived: S.today });
       return changed(true);
     },
     editBatch: function (b) {
-      S.batches.forEach(function (x) { if (x.id === b.id) { x.item = b.item; x.qty = b.qty; x.exp = M.dnum(b.expires); } });
+      var am;
+      try { am = amountOf(b.item, b.qty); } catch (e) { return Promise.reject(e); }
+      S.batches.forEach(function (x) { if (x.id === b.id) { x.item = b.item; x.qty = am.qty; x.amount = am.amount; x.unit = am.unit; x.exp = M.dnum(b.expires); } });
+      return changed(true);
+    },
+    saveMaterial: function (m, oldName) {
+      var days, unit;
+      try { days = M.parseDelivery(m.delivery); unit = M.normUnit(m.unit); } catch (e) { return Promise.reject(new Error(m.name + ": " + e.message)); }
+      if (oldName && oldName !== m.name) {
+        delete S.materials[oldName];
+        S.recipes.forEach(function (r) { if (r.material === oldName) r.material = m.name; });
+        S.batches.forEach(function (x) { if (x.item === oldName) x.item = m.name; });
+      }
+      S.materials[m.name] = { name: m.name, unit: unit, delivery: M.deliveryText(days), shelf_life: m.shelf_life, cost: m.cost };
+      return changed(true);
+    },
+    removeMaterial: function (n) {
+      delete S.materials[n];
+      S.recipes = S.recipes.filter(function (r) { return r.material !== n; });
+      return changed(true);
+    },
+    saveRecipe: function (r, old) {
+      var m = matByName(r.material);
+      if (!m) return Promise.reject(new Error("Сырья «" + r.material + "» нет в списке — добавьте его на листе «Сырьё»"));
+      var drop = function (p, mat) { S.recipes = S.recipes.filter(function (x) { return !(x.product === p && x.material === mat); }); };
+      if (old) drop(old.product, old.material);
+      drop(r.product, m.name);
+      S.recipes.push({ product: r.product, material: m.name, norm: r.norm });
+      return changed(true);
+    },
+    removeRecipe: function (r) {
+      S.recipes = S.recipes.filter(function (x) { return !(x.product === r.product && x.material === r.material); });
       return changed(true);
     },
     deleteBatch: function (id) { S.batches = S.batches.filter(function (x) { return x.id !== id; }); return changed(true); },
@@ -610,7 +733,7 @@
     save();
     clearTimeout(planT);
     planT = setTimeout(function () {
-      renderPlan(); renderPhone(); renderBatches(); renderNote();
+      renderPlan(); renderBatches(); renderPhone(); renderNote();
       if (fromSheets) { renderDay(); renderYesterday(); }
       if (U.tab === "bt") renderBacktest();
     }, 30);
@@ -713,7 +836,7 @@
       toast("План на " + dayLabel(day) + " подтверждён и пошёл в работу");
     }
     S.edited = true;
-    save(); renderPlan(); renderPhone(); renderNote();
+    save(); renderPlan(); renderBatches(); renderPhone(); renderNote();
   });
   $("go-next").addEventListener("click", function () {
     var day = S.today, inWork = !!S.plans[day];
@@ -723,6 +846,11 @@
   });
   ["plan", "exp", "bt", "sheets"].forEach(function (t) { $("tab-" + t).addEventListener("click", function () { U.tab = t; renderTabs(); }); });
   ["morning", "evening", "closing"].forEach(function (m) { $("m-" + m).addEventListener("click", function () { U.msg = m; renderPhone(); }); });
+  $("stock-note").addEventListener("click", function (e) {
+    if (e.target.id !== "go-stock") return;
+    U.tab = "exp"; renderTabs();
+    $("tab-exp").scrollIntoView({ behavior: "smooth", block: "start" });
+  });
   $("plan-table").addEventListener("click", function (e) {
     var tr = e.target.closest("tr[data-p]"); if (!tr) return;
     U.sel = tr.getAttribute("data-p");
@@ -743,7 +871,9 @@
     e.preventDefault();
     var item = $("b-item").value.trim(), dt = $("b-date").value;
     if (!item || !dt) return;
-    S.batches.push({ id: nextId(), item: item.slice(0, 60), qty: $("b-qty").value.trim().slice(0, 20), exp: M.dnum(dt) });
+    var am;
+    try { am = amountOf(item, $("b-qty").value); } catch (x) { toast(x.message); return; }
+    S.batches.push({ id: nextId(), item: item.slice(0, 60), qty: am.qty, amount: am.amount, unit: am.unit, exp: M.dnum(dt), arrived: S.today });
     $("b-item").value = ""; $("b-qty").value = "";
     changed();
   });
